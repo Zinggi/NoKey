@@ -11,10 +11,24 @@
     <!-- <div id="container"></div> -->
     <script src="build/main.js"></script>
     <script>
-        // var node = document.getElementById('container');
-        var app = Elm.Main.fullscreen();
-        // Note: if your Elm module is named "MyThing.Root" you
-        // would call "Elm.MyThing.Root.embed(node)" instead.
+
+let crypto = window.crypto || window.msCrypto;
+
+// get two cryptographically secure random ints
+var randInts = new Uint32Array(2);
+crypto.getRandomValues(randInts);
+
+
+// convert the two 32 bit ints to one 53 bit int (since that's the max number of bits for javascript ints)
+// taken from https://github.com/heap/cryptohat/blob/v1.0.1/index.js#L194
+let mask = Math.pow(2, 53 - 32) - 1;
+// NOTE: 4294967296 is Math.pow(2, 32). We inline the number to give V8 a
+//       better chance to implement the multiplication as << 32.
+let randInt = randInts[0] + (randInts[1] & mask) * 4294967296;
+
+
+// var node = document.getElementById('container');
+var app = Elm.Main.fullscreen({ initialSeed: randInt });
     </script>
 </body>
 </html>

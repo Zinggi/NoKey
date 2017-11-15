@@ -51,18 +51,23 @@ splitPassword meta req seed =
     PasswordPart (seed) meta (PasswordGenerator.getRequirements req)
 
 
-initModel : Model
-initModel =
+initModel : Int -> Model
+initModel randInt =
     { sites = []
     , newSiteEntry = defaultMetaData
     , expandSiteEntry = False
     , requirementsState = PasswordGenerator.requirementsInitState
-    , seed = Random.initialSeed 227852861
+    , seed = Random.initialSeed randInt
     }
 
 
-init =
-    initModel
+type alias Flags =
+    { initialSeed : Int }
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    ( initModel flags.initialSeed, Cmd.none )
 
 
 type Msg
@@ -73,7 +78,12 @@ type Msg
     | GenerateNewPassword
 
 
-update : Msg -> Model -> Model
+noCmd : a -> ( a, Cmd msg )
+noCmd a =
+    ( a, Cmd.none )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         AddPassword ->
@@ -86,15 +96,19 @@ update msg model =
 
         NewSiteEntry s ->
             { model | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry, expandSiteEntry = not <| String.isEmpty s }
+                |> noCmd
 
         SecurityLevel n ->
             { model | newSiteEntry = (\e -> { e | securityLevel = n }) model.newSiteEntry }
+                |> noCmd
 
         GenerateNewPassword ->
             { model | seed = Tuple.second <| Random.step (Random.independentSeed) model.seed }
+                |> noCmd
 
         SetPasswordRequirements state ->
             { model | requirementsState = state }
+                |> noCmd
 
 
 view : Model -> Html Msg
@@ -162,10 +176,16 @@ newSiteForm requirementsState expandSiteEntry entry seed =
             ]
 
 
-main : Program Never Model Msg
+subs : Model -> Sub Msg
+subs model =
+    Sub.none
+
+
+main : Program Flags Model Msg
 main =
-    Html.beginnerProgram
-        { model = init
+    Html.programWithFlags
+        { init = init
+        , subscriptions = subs
         , view = view
         , update = update
         }
