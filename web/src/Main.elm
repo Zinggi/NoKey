@@ -83,6 +83,11 @@ noCmd a =
     ( a, Cmd.none )
 
 
+withCmd : Cmd msg -> a -> ( a, Cmd msg )
+withCmd cmd a =
+    ( a, cmd )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of

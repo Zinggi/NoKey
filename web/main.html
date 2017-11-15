@@ -14,21 +14,35 @@
 
 let crypto = window.crypto || window.msCrypto;
 
-// get two cryptographically secure random ints
-var randInts = new Uint32Array(2);
-crypto.getRandomValues(randInts);
+let getRandomInt = () => {
+    // get two cryptographically secure random ints
+    var randInts = new Uint32Array(2);
+    crypto.getRandomValues(randInts);
 
 
-// convert the two 32 bit ints to one 53 bit int (since that's the max number of bits for javascript ints)
-// taken from https://github.com/heap/cryptohat/blob/v1.0.1/index.js#L194
-let mask = Math.pow(2, 53 - 32) - 1;
-// NOTE: 4294967296 is Math.pow(2, 32). We inline the number to give V8 a
-//       better chance to implement the multiplication as << 32.
-let randInt = randInts[0] + (randInts[1] & mask) * 4294967296;
+    // convert the two 32 bit ints to one 53 bit int (since that's the max number of bits for javascript ints)
+    // taken from https://github.com/heap/cryptohat/blob/v1.0.1/index.js#L194
+    let mask = Math.pow(2, 53 - 32) - 1;
+    // NOTE: 4294967296 is Math.pow(2, 32). We inline the number to give V8 a
+    //       better chance to implement the multiplication as << 32.
+    return randInts[0] + (randInts[1] & mask) * 4294967296;
+}
+
 
 
 // var node = document.getElementById('container');
-var app = Elm.Main.fullscreen({ initialSeed: randInt });
+var app = Elm.Main.fullscreen({ initialSeed: getRandomInt() });
+
+/*app.ports.outPort.subscribe((it) => {
+    console.log(it);
+    console.log(it.kind);
+    if (it.kind == "GetNewRandom") {
+        app.ports.inPort.send({ kind: "GetRandomInt", randInt: getRandomInt() });
+    } else {
+        console.log("command ignored: ", it);
+    }
+});*/
+
     </script>
 </body>
 </html>
