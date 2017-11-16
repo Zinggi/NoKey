@@ -73,9 +73,11 @@ init flags =
 type Msg
     = AddPassword
     | NewSiteEntry String
+    | ChangeLength Int
     | SecurityLevel Int
     | SetPasswordRequirements PasswordRequirementsState
     | GenerateNewPassword
+    | SetUserName String
 
 
 noCmd : a -> ( a, Cmd msg )
@@ -97,7 +99,8 @@ update msg model =
                     splitPassword model.newSiteEntry model.requirementsState model.seed
             in
                 { model | sites = pwPart :: model.sites, newSiteEntry = resetMeta model.newSiteEntry, expandSiteEntry = False }
-                    |> update GenerateNewPassword
+                    |> updateSeed
+                    |> noCmd
 
         NewSiteEntry s ->
             { model | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry, expandSiteEntry = not <| String.isEmpty s }
@@ -108,12 +111,26 @@ update msg model =
                 |> noCmd
 
         GenerateNewPassword ->
-            { model | seed = Tuple.second <| Random.step (Random.independentSeed) model.seed }
+            updateSeed model
                 |> noCmd
 
         SetPasswordRequirements state ->
             { model | requirementsState = state }
+                |> updateSeed
                 |> noCmd
+
+        ChangeLength l ->
+            { model | newSiteEntry = (\e -> { e | length = l }) model.newSiteEntry }
+                |> updateSeed
+                |> noCmd
+
+        SetUserName n ->
+            { model | newSiteEntry = (\e -> { e | userName = n }) model.newSiteEntry }
+                |> noCmd
+
+
+updateSeed model =
+    { model | seed = Tuple.second <| Random.step (Random.independentSeed) model.seed }
 
 
 view : Model -> Html Msg
@@ -135,6 +152,21 @@ viewSavedSites sites =
         )
 
 
+clampedNumberInput toMsg min default max n =
+    let
+        m =
+            clamp min max n
+    in
+        Html.input
+            [ Attr.type_ "number"
+            , Attr.min (toString min)
+            , Attr.max (toString max)
+            , Attr.value (toString m)
+            , onInput (\s -> String.toInt s |> Result.map (clamp min max) |> Result.withDefault default |> toMsg)
+            ]
+            []
+
+
 newSiteForm : PasswordRequirementsState -> Bool -> PasswordMetaData -> Random.Seed -> Html Msg
 newSiteForm requirementsState expandSiteEntry entry seed =
     let
@@ -150,17 +182,14 @@ newSiteForm requirementsState expandSiteEntry entry seed =
                 Html.text ""
                else
                 Html.div []
-                    ([ Html.text "Security Level: "
-                     , Html.input
-                        [ Attr.type_ "number"
-                        , Attr.min "2"
+                    ([ Html.text "Login name: "
+                     , Html.input [ Attr.value entry.userName, onInput SetUserName ] []
+                     , Html.text "Security Level: "
 
-                        -- TODO: limit max by number of available devices.
-                        , Attr.max "5"
-                        , Attr.value (toString entry.securityLevel)
-                        , onInput (\s -> String.toInt s |> Result.withDefault 2 |> SecurityLevel)
-                        ]
-                        []
+                     -- TODO: limit max by number of available devices.
+                     , clampedNumberInput SecurityLevel 2 2 5 entry.securityLevel
+                     , Html.text "Password length: "
+                     , clampedNumberInput ChangeLength 4 16 512 entry.length
                      , PasswordGenerator.viewRequirements SetPasswordRequirements requirementsState
                      ]
                         ++ case pw of
