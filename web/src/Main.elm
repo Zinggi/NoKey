@@ -3,19 +3,20 @@ module Main exposing (..)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onInput, onSubmit, onClick)
-import Random.Pcg as Random exposing (Generator)
+import Random.Pcg as Random exposing (Generator, Seed)
 
 
 --
 
-import PasswordGenerator exposing (CharSet, PasswordRequirements, PasswordRequirementsState)
+import PasswordGenerator exposing (PasswordRequirements)
+import PasswordGenerator.View as PW
 
 
 type alias Model =
     { sites : List PasswordPart
     , newSiteEntry : PasswordMetaData
     , expandSiteEntry : Bool
-    , requirementsState : PasswordRequirementsState
+    , requirementsState : PW.State
     , seed : Random.Seed
     }
 
@@ -42,13 +43,13 @@ type alias PasswordPart =
     { pw : Random.Seed, meta : PasswordMetaData, requirements : PasswordRequirements }
 
 
-splitPassword : PasswordMetaData -> PasswordRequirementsState -> Random.Seed -> PasswordPart
+splitPassword : PasswordMetaData -> PW.State -> Random.Seed -> PasswordPart
 splitPassword meta req seed =
     -- TODO: the seed is the actual password!
     -- since the seed IS the password, it should have at least as many bytes of randomness as the desired password length!
     -- Use the seed that was used to generate the password and split it into parts.
     -- Use Shamir's secret sharing algorithm
-    PasswordPart (seed) meta (PasswordGenerator.getRequirements req)
+    PasswordPart (seed) meta (PW.getRequirements req)
 
 
 initModel : Int -> Model
@@ -56,7 +57,7 @@ initModel randInt =
     { sites = []
     , newSiteEntry = defaultMetaData
     , expandSiteEntry = False
-    , requirementsState = PasswordGenerator.requirementsInitState
+    , requirementsState = PW.init
     , seed = Random.initialSeed randInt
     }
 
@@ -72,12 +73,12 @@ init flags =
 
 type Msg
     = AddPassword
-    | NewSiteEntry String
-    | ChangeLength Int
-    | SecurityLevel Int
-    | SetPasswordRequirements PasswordRequirementsState
+    | SiteNameChanged String
+    | PasswordLengthChanged Int
+    | SecurityLevelChanged Int
+    | NewPasswordRequirements PW.State
     | GenerateNewPassword
-    | SetUserName String
+    | UserNameChanged String
 
 
 noCmd : a -> ( a, Cmd msg )
@@ -102,11 +103,11 @@ update msg model =
                     |> updateSeed
                     |> noCmd
 
-        NewSiteEntry s ->
+        SiteNameChanged s ->
             { model | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry, expandSiteEntry = not <| String.isEmpty s }
                 |> noCmd
 
-        SecurityLevel n ->
+        SecurityLevelChanged n ->
             { model | newSiteEntry = (\e -> { e | securityLevel = n }) model.newSiteEntry }
                 |> noCmd
 
@@ -114,23 +115,27 @@ update msg model =
             updateSeed model
                 |> noCmd
 
-        SetPasswordRequirements state ->
+        NewPasswordRequirements state ->
             { model | requirementsState = state }
                 |> updateSeed
                 |> noCmd
 
-        ChangeLength l ->
+        PasswordLengthChanged l ->
             { model | newSiteEntry = (\e -> { e | length = l }) model.newSiteEntry }
                 |> updateSeed
                 |> noCmd
 
-        SetUserName n ->
+        UserNameChanged n ->
             { model | newSiteEntry = (\e -> { e | userName = n }) model.newSiteEntry }
                 |> noCmd
 
 
+updateSeed : Model -> Model
 updateSeed model =
-    { model | seed = Tuple.second <| Random.step (Random.independentSeed) model.seed }
+    { model
+        | seed =
+            Tuple.second <| PW.getNextPassword model.requirementsState model.newSiteEntry.length model.seed
+    }
 
 
 view : Model -> Html Msg
@@ -152,7 +157,8 @@ viewSavedSites sites =
         )
 
 
-clampedNumberInput toMsg min default max n =
+clampedNumberInput : (Int -> msg) -> ( Int, Int, Int ) -> Int -> Html msg
+clampedNumberInput toMsg ( min, default, max ) n =
     let
         m =
             clamp min max n
@@ -167,30 +173,30 @@ clampedNumberInput toMsg min default max n =
             []
 
 
-newSiteForm : PasswordRequirementsState -> Bool -> PasswordMetaData -> Random.Seed -> Html Msg
+newSiteForm : PW.State -> Bool -> PasswordMetaData -> Seed -> Html Msg
 newSiteForm requirementsState expandSiteEntry entry seed =
     let
         pw =
-            Tuple.first (Random.step (PasswordGenerator.randomPassword entry.length (PasswordGenerator.getRequirements requirementsState)) seed)
+            Tuple.first (PW.getNextPassword requirementsState entry.length seed)
     in
         Html.div []
             [ Html.form [ onSubmit GenerateNewPassword ]
                 [ Html.text "New Site: "
-                , Html.input [ Attr.placeholder "example.com", Attr.value entry.siteName, onInput NewSiteEntry ] []
+                , Html.input [ Attr.placeholder "example.com", Attr.value entry.siteName, onInput SiteNameChanged ] []
                 ]
             , (if not expandSiteEntry then
                 Html.text ""
                else
                 Html.div []
                     ([ Html.text "Login name: "
-                     , Html.input [ Attr.value entry.userName, onInput SetUserName ] []
+                     , Html.input [ Attr.value entry.userName, onInput UserNameChanged ] []
                      , Html.text "Security Level: "
 
                      -- TODO: limit max by number of available devices.
-                     , clampedNumberInput SecurityLevel 2 2 5 entry.securityLevel
+                     , clampedNumberInput SecurityLevelChanged ( 2, 2, 5 ) entry.securityLevel
                      , Html.text "Password length: "
-                     , clampedNumberInput ChangeLength 4 16 512 entry.length
-                     , PasswordGenerator.viewRequirements SetPasswordRequirements requirementsState
+                     , clampedNumberInput PasswordLengthChanged ( 4, 16, 512 ) entry.length
+                     , PW.view NewPasswordRequirements requirementsState
                      ]
                         ++ case pw of
                             Ok thePw ->
