@@ -4,17 +4,13 @@ import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, list, int, string, tuple, intRange, string)
 import Test exposing (..)
 import BigInt exposing (BigInt)
+import Random.Pcg as Random
 
 
 --
 
 import SecretSharing
 import TestUtils exposing (..)
-
-
-secret : Fuzzer BigInt
-secret =
-    Fuzz.map BigInt.fromInt int
 
 
 numShares : Fuzzer ( Int, Int )
@@ -35,11 +31,20 @@ suite2 =
 
 suite : Test
 suite =
-    describe "SecretSharing"
-        [ fuzz2 numShares secret "secret should be recoverable from minimum number of shares" <|
-            \( m, n ) s ->
-                SecretSharing.splitSecret ( m, n ) s
-                    |> List.take m
-                    |> SecretSharing.joinSecret
-                    |> Expect.equal s
-        ]
+    skip <|
+        describe "SecretSharing"
+            [ fuzz3 numShares smallPosBigInt seed "secret should be recoverable from minimum number of shares" <|
+                \( m, n ) s seed_ ->
+                    let
+                        _ =
+                            Debug.log "((m, n), s)" ( ( m, n ), s )
+                    in
+                        SecretSharing.splitSecret ( m, n ) s seed_
+                            |> Debug.log "splits"
+                            |> Tuple.first
+                            |> List.take m
+                            |> Debug.log "first m"
+                            |> SecretSharing.joinSecret
+                            |> Debug.log "joined"
+                            |> Expect.equal (Ok s)
+            ]

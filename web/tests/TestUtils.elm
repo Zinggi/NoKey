@@ -1,6 +1,13 @@
 module TestUtils exposing (..)
 
-import Fuzz exposing (Fuzzer, tuple, int, string)
+import Fuzz exposing (Fuzzer, tuple, int, string, intRange)
+import Random.Pcg as Random exposing (Seed)
+import BigInt exposing (BigInt)
+
+
+seed : Fuzzer Seed
+seed =
+    Fuzz.map Random.initialSeed int
 
 
 shortString : Int -> Fuzzer String
@@ -11,3 +18,25 @@ shortString n =
 int2 : Fuzzer ( Int, Int )
 int2 =
     tuple ( int, int )
+
+
+smallPosBigInt : Fuzzer BigInt
+smallPosBigInt =
+    Fuzz.map BigInt.fromInt (intRange 0 Random.maxInt)
+
+
+bigIntMod : BigInt -> Fuzzer BigInt
+bigIntMod base =
+    Fuzz.map (\x -> BigInt.mod x base) smallPosBigInt
+
+
+bigIntModNonZero : BigInt -> Fuzzer BigInt
+bigIntModNonZero base =
+    bigIntMod base
+        |> Fuzz.map
+            (\x ->
+                if BigInt.fromInt 0 == x then
+                    BigInt.fromInt 1
+                else
+                    x
+            )

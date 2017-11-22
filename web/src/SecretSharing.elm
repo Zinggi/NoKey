@@ -2,56 +2,20 @@ module SecretSharing exposing (..)
 
 import BigInt exposing (BigInt)
 import String.UTF8 as UTF8
-import Random.Pcg as Random exposing (Generator)
+import Random.Pcg as Random exposing (Generator, Seed)
 
 
 --
 
-import FiniteField exposing (Prime)
+import FiniteField exposing (Field, makeField, primeBiggerThan, secretPolynom, getPolynomialPoints, lagrangeInterpolation)
 
 
 type alias Share =
-    { requiredParts : Int, x : Int, y : BigInt }
+    { requiredParts : Int, x : Int, y : BigInt, prime : BigInt }
 
 
 type alias Secret =
     BigInt
-
-
-secretPolynom : Prime -> BigInt -> Int -> Generator (List BigInt)
-secretPolynom p c0 numOfCoeffs =
-    Random.list numOfCoeffs (bigIntMax p)
-        |> Random.map (\x -> c0 :: x)
-
-
-bigIntMax : BigInt -> Generator BigInt
-bigIntMax m =
-    let
-        l =
-            BigInt.toString m |> String.length
-    in
-        bigIntDigits l
-            |> Random.andThen
-                (\n ->
-                    if BigInt.lt n m then
-                        Random.constant n
-                    else
-                        -- if it doesn meet requirements, try again
-                        -- this should terminate in max ~10 rounds, e.g. if m = 11111
-                        -- then then the chance of producing a 0 as first char is 1/10
-                        bigIntMax m
-                )
-
-
-bigIntDigits : Int -> Generator BigInt
-bigIntDigits n =
-    Random.list n (Random.int 0 9)
-        |> Random.map
-            (List.map toString
-                >> String.join ""
-                >> BigInt.fromString
-                >> Maybe.withDefault (BigInt.fromInt 0)
-            )
 
 
 stringToBigInt : String -> BigInt
@@ -87,11 +51,33 @@ bigIntToStringHelp n acc =
         acc
 
 
-splitSecret : ( Int, Int ) -> Secret -> List Share
-splitSecret a =
-    Debug.crash "todo"
+splitSecret : ( Int, Int ) -> Secret -> Seed -> ( List Share, Seed )
+splitSecret ( level, numPoints ) secret seed =
+    let
+        prime =
+            primeBiggerThan secret
+
+        ( coefficients, newSeed ) =
+            Random.step (secretPolynom prime secret (level - 1)) seed
+
+        field =
+            makeField prime
+    in
+        ( getPolynomialPoints field coefficients numPoints
+            |> List.map (\( x, y ) -> { requiredParts = level, x = x, y = y, prime = prime })
+        , newSeed
+        )
 
 
-joinSecret : List Share -> Secret
-joinSecret a =
-    Debug.crash "todo"
+joinSecret : List Share -> Result String Secret
+joinSecret shares =
+    let
+        points =
+            List.map (\s -> ( BigInt.fromInt s.x, s.y )) shares
+    in
+        case shares of
+            s :: otherShares ->
+                Ok (lagrangeInterpolation (makeField s.prime) points (BigInt.fromInt 0))
+
+            _ ->
+                Err "Empty list of shares"

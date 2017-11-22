@@ -2,6 +2,24 @@ module Helper exposing (..)
 
 import Dict exposing (Dict)
 import Random.Pcg as Random exposing (Generator)
+import BigInt exposing (BigInt)
+
+
+-- Maybe
+
+
+{-| Use this when you know for certain that a Maybe will be Just a.
+If you were wrong, it will crash!
+-}
+crashOnNothing : String -> Maybe a -> a
+crashOnNothing s ma =
+    case ma of
+        Just a ->
+            a
+
+        Nothing ->
+            Debug.crash s
+
 
 
 -- Result
@@ -95,3 +113,33 @@ sampleSubset n set =
                             sampleSubset (n - 1) (List.filter (\a -> a /= e) set)
                                 |> Random.map (\l -> e :: l)
                 )
+
+
+bigIntMax : BigInt -> Generator BigInt
+bigIntMax m =
+    let
+        l =
+            BigInt.toString m |> String.length
+    in
+        bigIntDigits l
+            |> Random.andThen
+                (\n ->
+                    if BigInt.lt n m then
+                        Random.constant n
+                    else
+                        -- if it doesn meet requirements, try again
+                        -- this should terminate in max ~10 rounds, e.g. if m = 11111
+                        -- then then the chance of producing a 0 as first char is 1/10
+                        bigIntMax m
+                )
+
+
+bigIntDigits : Int -> Generator BigInt
+bigIntDigits n =
+    Random.list n (Random.int 0 9)
+        |> Random.map
+            (List.map toString
+                >> String.join ""
+                >> BigInt.fromString
+                >> Maybe.withDefault (BigInt.fromInt 0)
+            )
