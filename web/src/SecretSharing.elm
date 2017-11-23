@@ -74,10 +74,16 @@ joinSecret shares =
     let
         points =
             List.map (\s -> ( BigInt.fromInt s.x, s.y )) shares
+
+        l =
+            List.length shares
     in
         case shares of
             s :: otherShares ->
-                Ok (lagrangeInterpolation (makeField s.prime) points (BigInt.fromInt 0))
+                if l >= s.requiredParts then
+                    Ok (lagrangeInterpolation (makeField s.prime) points (BigInt.fromInt 0))
+                else
+                    Err "not enough parts to decrypt the secret"
 
             _ ->
                 Err "Empty list of shares"

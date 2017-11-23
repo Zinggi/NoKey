@@ -31,20 +31,12 @@ suite2 =
 
 suite : Test
 suite =
-    skip <|
-        describe "SecretSharing"
-            [ fuzz3 numShares smallPosBigInt seed "secret should be recoverable from minimum number of shares" <|
-                \( m, n ) s seed_ ->
-                    let
-                        _ =
-                            Debug.log "((m, n), s)" ( ( m, n ), s )
-                    in
-                        SecretSharing.splitSecret ( m, n ) s seed_
-                            |> Debug.log "splits"
-                            |> Tuple.first
-                            |> List.take m
-                            |> Debug.log "first m"
-                            |> SecretSharing.joinSecret
-                            |> Debug.log "joined"
-                            |> Expect.equal (Ok s)
-            ]
+    describe "SecretSharing"
+        [ fuzz3 numShares smallPosBigInt seed "secret should be recoverable from minimum number of shares" <|
+            \( m, n ) s seed_ ->
+                SecretSharing.splitSecret ( m, n ) s seed_
+                    |> Tuple.first
+                    |> List.take m
+                    |> SecretSharing.joinSecret
+                    |> Expect.equal (Ok s)
+        ]

@@ -54,7 +54,10 @@ bigIntPowModHelp b e p acc =
     if BigInt.gt e zero then
         let
             acc_ =
-                BigInt.mod (BigInt.mul acc b) p
+                if BigInt.mod e (BigInt.fromInt 2) /= zero then
+                    BigInt.mod (BigInt.mul acc b) p
+                else
+                    acc
 
             b_ =
                 BigInt.mod (BigInt.mul b b) p
@@ -138,9 +141,6 @@ lagrangeInterpolation f points x =
         -- lagrange basis polynomial l_i(x)
         l_i_x =
             getLagrangePolynomial f points x
-
-        _ =
-            Debug.log "l_i_x 1" (l_i_x (BigInt.fromInt 1))
     in
         List.foldl (\( xi, yi ) acc -> f.add acc (f.mul yi (l_i_x xi))) zero points
 
@@ -148,25 +148,18 @@ lagrangeInterpolation f points x =
 getLagrangePolynomial : Field -> List ( BigInt, BigInt ) -> BigInt -> BigInt -> BigInt
 getLagrangePolynomial f points x xi =
     let
-        ( num, denom ) =
+        ( a, b ) =
             List.foldl
-                (\( xj, yj ) ( num, denum ) ->
-                    let
-                        _ =
-                            Debug.log "(xj, yj)" ( xj, yj )
-                    in
-                        if xi == xj then
-                            ( num, denom )
-                        else
-                            ( f.mul num (f.sub x xj), f.mul denom (f.sub xi xj) )
+                (\( xj, yj ) ( num, denom ) ->
+                    if xi == xj then
+                        ( num, denom )
+                    else
+                        ( f.mul num (f.sub x xj), f.mul denom (f.sub xi xj) )
                 )
                 ( BigInt.fromInt 1, BigInt.fromInt 1 )
                 points
-
-        _ =
-            Debug.log "(num, denom)" ( num, denom )
     in
-        f.mul (f.modInverse denom) num
+        f.mul (f.modInverse b) a
 
 
 secretPolynom : Prime -> BigInt -> Int -> Generator (List BigInt)
