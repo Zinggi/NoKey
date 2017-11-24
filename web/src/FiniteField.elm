@@ -1,4 +1,4 @@
-module FiniteField exposing (Field, makeField, primeBiggerThan, lagrangeInterpolation, getPolynomialPoints, secretPolynom, evalPolynom)
+module FiniteField exposing (Field, Prime, makeField, primeBiggerThan, lagrangeInterpolation, getPolynomialPoints, secretPolynom, evalPolynom)
 
 import BigInt exposing (BigInt)
 import Random.Pcg as Random exposing (Generator)

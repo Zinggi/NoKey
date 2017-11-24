@@ -9,7 +9,7 @@ import String.UTF8 as UTF8
 
 --
 
-import FiniteField exposing (Field, makeField, primeBiggerThan, secretPolynom, getPolynomialPoints, lagrangeInterpolation)
+import FiniteField exposing (Field, Prime, makeField, primeBiggerThan, secretPolynom, getPolynomialPoints, lagrangeInterpolation)
 
 
 type alias Share =
@@ -131,21 +131,51 @@ splitSecret ( level, numPoints ) secret seed =
         )
 
 
+createMoreShares : Int -> List Share -> Result String (List Share)
+createMoreShares n existingShares =
+    withEnoughShares
+        (\requiredParts prime shares ->
+            let
+                poly x =
+                    lagrangeInterpolation (makeField prime) (sharesToPoints shares) (BigInt.fromInt x)
+            in
+                List.sortBy .x shares
+                    |> List.head
+                    |> Maybe.map .x
+                    |> Maybe.withDefault 1
+                    |> (\maxx ->
+                            List.range (maxx + 1) (maxx + n)
+                                |> List.map (\x -> { requiredParts = requiredParts, x = x, y = poly x, prime = prime })
+                       )
+        )
+        existingShares
+
+
+sharesToPoints : List Share -> List ( BigInt, BigInt )
+sharesToPoints =
+    List.map (\s -> ( BigInt.fromInt s.x, s.y ))
+
+
+{-| Run some function (f requiredParts prime shares) on the the shares if there are enough shares.
+Otherwise returns an error.
+-}
+withEnoughShares : (Int -> Prime -> List Share -> a) -> List Share -> Result String a
+withEnoughShares f shares =
+    case shares of
+        s :: otherShares ->
+            if List.length shares >= s.requiredParts then
+                Ok (f s.requiredParts s.prime shares)
+            else
+                Err "not enough parts to decrypt the secret"
+
+        _ ->
+            Err "Empty list of shares"
+
+
 joinSecret : List Share -> Result String Secret
 joinSecret shares =
-    let
-        points =
-            List.map (\s -> ( BigInt.fromInt s.x, s.y )) shares
-
-        l =
-            List.length shares
-    in
-        case shares of
-            s :: otherShares ->
-                if l >= s.requiredParts then
-                    Ok (lagrangeInterpolation (makeField s.prime) points (BigInt.fromInt 0))
-                else
-                    Err "not enough parts to decrypt the secret"
-
-            _ ->
-                Err "Empty list of shares"
+    withEnoughShares
+        (\_ prime shares ->
+            lagrangeInterpolation (makeField prime) (sharesToPoints shares) (BigInt.fromInt 0)
+        )
+        shares
