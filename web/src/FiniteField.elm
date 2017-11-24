@@ -26,6 +26,7 @@ type alias Prime =
 
 
 bigPrime =
+    -- TODO: this is only good for up to 32 characters!
     BigInt.fromString "78964309289234503966245545309514784011238902738532633290445390498470508979557"
         |> crashOnNothing "Failed to parse something that is clearly a number..."
 

@@ -1,9 +1,9 @@
 module FiniteFieldTest exposing (..)
 
+import BigInt
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, list, int, string, tuple, intRange, string)
 import Test exposing (..)
-import BigInt
 
 
 --

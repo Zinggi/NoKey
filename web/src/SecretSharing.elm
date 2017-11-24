@@ -1,8 +1,10 @@
 module SecretSharing exposing (..)
 
 import BigInt exposing (BigInt)
-import String.UTF8 as UTF8
+import Json.Decode as JD
+import Json.Encode as JE
 import Random.Pcg as Random exposing (Generator, Seed)
+import String.UTF8 as UTF8
 
 
 --
@@ -12,6 +14,55 @@ import FiniteField exposing (Field, makeField, primeBiggerThan, secretPolynom, g
 
 type alias Share =
     { requiredParts : Int, x : Int, y : BigInt, prime : BigInt }
+
+
+shareDecoder : JD.Decoder Share
+shareDecoder =
+    JD.map4 Share
+        (JD.at [ "requiredParts" ] JD.int)
+        (JD.at [ "x" ] JD.int)
+        (JD.at [ "y" ] bigIntDecoder)
+        (JD.at [ "prime" ] bigIntDecoder)
+
+
+shareToJson : Share -> String
+shareToJson s =
+    shareEncoder s
+        |> JE.encode 4
+
+
+shareFromJson : String -> Result String Share
+shareFromJson =
+    JD.decodeString shareDecoder
+
+
+bigIntDecoder : JD.Decoder BigInt
+bigIntDecoder =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case BigInt.fromString s of
+                    Just i ->
+                        JD.succeed i
+
+                    Nothing ->
+                        JD.fail "Couldn't convert String to BigInt!"
+            )
+
+
+shareEncoder : Share -> JE.Value
+shareEncoder s =
+    JE.object
+        [ ( "requiredParts", JE.int s.requiredParts )
+        , ( "x", JE.int s.x )
+        , ( "y", bigIntEncoder s.y )
+        , ( "prime", bigIntEncoder s.prime )
+        ]
+
+
+bigIntEncoder : BigInt -> JE.Value
+bigIntEncoder i =
+    JE.string (BigInt.toString i)
 
 
 type alias Secret =
@@ -49,6 +100,17 @@ bigIntToStringHelp n acc =
                 Debug.crash "256 shouldn't be 0 ..."
     else
         acc
+
+
+splitString : ( Int, Int ) -> String -> Seed -> ( List Share, Seed )
+splitString config secret =
+    splitSecret config (stringToBigInt secret)
+
+
+joinToString : List Share -> Result String String
+joinToString shares =
+    joinSecret shares
+        |> Result.map bigIntToString
 
 
 splitSecret : ( Int, Int ) -> Secret -> Seed -> ( List Share, Seed )

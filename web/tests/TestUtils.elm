@@ -1,8 +1,8 @@
 module TestUtils exposing (..)
 
+import BigInt exposing (BigInt)
 import Fuzz exposing (Fuzzer, tuple, int, string, intRange)
 import Random.Pcg as Random exposing (Seed)
-import BigInt exposing (BigInt)
 
 
 seed : Fuzzer Seed
