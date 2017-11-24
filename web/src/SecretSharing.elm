@@ -134,12 +134,12 @@ splitSecret ( level, numPoints ) secret seed =
 createMoreShares : Int -> List Share -> Result String (List Share)
 createMoreShares n existingShares =
     withEnoughShares
-        (\requiredParts prime shares ->
+        (\requiredParts prime ->
             let
                 poly x =
-                    lagrangeInterpolation (makeField prime) (sharesToPoints shares) (BigInt.fromInt x)
+                    lagrangeInterpolation (makeField prime) (sharesToPoints existingShares) (BigInt.fromInt x)
             in
-                List.sortBy .x shares
+                List.sortBy .x existingShares
                     |> List.head
                     |> Maybe.map .x
                     |> Maybe.withDefault 1
@@ -156,15 +156,33 @@ sharesToPoints =
     List.map (\s -> ( BigInt.fromInt s.x, s.y ))
 
 
+redistributeShares : List Share -> ( Int, Int ) -> Seed -> Result String ( List Share, Seed )
+redistributeShares shares ( n, m ) seed =
+    withSecret
+        (\s ->
+            splitSecret ( n, m ) s seed
+        )
+        shares
+
+
+withSecret : (Secret -> a) -> List Share -> Result String a
+withSecret f shares =
+    withEnoughShares
+        (\_ prime ->
+            f (lagrangeInterpolation (makeField prime) (sharesToPoints shares) (BigInt.fromInt 0))
+        )
+        shares
+
+
 {-| Run some function (f requiredParts prime shares) on the the shares if there are enough shares.
 Otherwise returns an error.
 -}
-withEnoughShares : (Int -> Prime -> List Share -> a) -> List Share -> Result String a
+withEnoughShares : (Int -> Prime -> a) -> List Share -> Result String a
 withEnoughShares f shares =
     case shares of
         s :: otherShares ->
             if List.length shares >= s.requiredParts then
-                Ok (f s.requiredParts s.prime shares)
+                Ok (f s.requiredParts s.prime)
             else
                 Err "not enough parts to decrypt the secret"
 
@@ -175,7 +193,7 @@ withEnoughShares f shares =
 joinSecret : List Share -> Result String Secret
 joinSecret shares =
     withEnoughShares
-        (\_ prime shares ->
+        (\_ prime ->
             lagrangeInterpolation (makeField prime) (sharesToPoints shares) (BigInt.fromInt 0)
         )
         shares
