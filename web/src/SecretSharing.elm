@@ -72,6 +72,7 @@ type alias Secret =
 stringToBigInt : String -> BigInt
 stringToBigInt s =
     UTF8.toBytes s
+        -- convert the string byte by byte, e.g. interpret the string as a base 256 number and convert this number to base 10
         |> List.foldl (\elm acc -> BigInt.add (BigInt.mul acc (BigInt.fromInt 256)) (BigInt.fromInt elm)) (BigInt.fromInt 0)
 
 

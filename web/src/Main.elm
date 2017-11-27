@@ -18,6 +18,7 @@ type alias Model =
     , expandSiteEntry : Bool
     , requirementsState : PW.State
     , seed : Random.Seed
+    , devices : List Device
     }
 
 
@@ -27,6 +28,19 @@ type alias PasswordMetaData =
     , siteName : String
     , userName : String
     }
+
+
+type alias Device =
+    { name : String
+    , status : DeviceStatus
+    }
+
+
+type DeviceStatus
+    = Online
+    | Offline
+      -- local means the device that is actually running the code
+    | Local
 
 
 defaultMetaData : PasswordMetaData
@@ -59,6 +73,7 @@ initModel randInt =
     , expandSiteEntry = False
     , requirementsState = PW.init
     , seed = Random.initialSeed randInt
+    , devices = [ { name = "Local PC", status = Local } ]
     }
 
 
@@ -141,8 +156,33 @@ updateSeed model =
 view : Model -> Html Msg
 view model =
     Html.div []
-        [ newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
+        [ viewDevices model.devices
+        , addNewDevice
+        , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
         , viewSavedSites model.sites
+        ]
+
+
+addNewDevice : Html Msg
+addNewDevice =
+    -- TODO: display QR code
+    -- probably using: pablohirafuji/elm-qrcode
+    Html.button [] [ Html.text "Add new device" ]
+
+
+viewDevices : List Device -> Html Msg
+viewDevices devs =
+    Html.table []
+        (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "status" ] ]
+            :: List.map viewDeviceEntry devs
+        )
+
+
+viewDeviceEntry : Device -> Html Msg
+viewDeviceEntry dev =
+    Html.tr []
+        [ Html.td [] [ Html.text dev.name ]
+        , Html.td [] [ Html.text (toString dev.status) ]
         ]
 
 
