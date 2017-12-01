@@ -25,8 +25,8 @@ defmodule NoPassWeb.Router do
   # Other scopes may use custom stacks.
   scope "/api", NoPassWeb do
     pipe_through :api
-    
-    post "/newPairingToken", PairingController, :new_pairing_token
-    get "/pairWith/:token", PairingController, :pair_with
+
+    post "/initPairing", PairingController, :init_pairing
+    post "/pairWith", PairingController, :pair_with
   end
 end
