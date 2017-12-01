@@ -8,6 +8,8 @@ This website can later be embedded in the browser extension, the android app, et
 ### Setup
 
  * Install [elm](http://elm-lang.org/)
+ * Install [elm-github-install](https://github.com/gdotdesign/elm-github-install) (for [elm-phoenix](https://github.com/saschatimme/elm-phoenix))
+ * install dependencies: `elm-github-install`
  * (Optional) for a nice live reload server, install [elm-live](https://github.com/tomekwi/elm-live)
  * (Optional) to run tests, install [elm-test](https://github.com/elm-community/elm-test/tree/master) and [elm-verify-examples](https://github.com/stoeffel/elm-verify-examples)
 

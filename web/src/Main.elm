@@ -3,7 +3,25 @@ module Main exposing (..)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onInput, onSubmit, onClick)
+import Json.Encode as JE
+
+
+-- TODO: change random to a higher bit version
+-- also adapt the UUID package
+-- see:
+--  https://github.com/danyx23/elm-uuid/issues/10
+--  https://github.com/mgold/elm-random-pcg/issues/18
+
 import Random.Pcg as Random exposing (Generator, Seed)
+import Uuid
+
+
+-- https://github.com/saschatimme/elm-phoenix
+
+import Phoenix
+import Phoenix.Socket as Socket
+import Phoenix.Channel as Channel
+import Phoenix.Push as Push
 
 
 --
@@ -19,6 +37,9 @@ type alias Model =
     , requirementsState : PW.State
     , seed : Random.Seed
     , devices : List Device
+    , messages : List JE.Value
+    , input : String
+    , uniqueIdentifyier : String
     }
 
 
@@ -66,15 +87,35 @@ splitPassword meta req seed =
     PasswordPart (seed) meta (PW.getRequirements req)
 
 
+socketUrl : String
+socketUrl =
+    -- TODO: change
+    "localhost"
+        -- "10.2.117.8"
+        |> (\ip -> "ws://" ++ ip ++ ":4000/socket/websocket")
+
+
+randomUUID : Generator String
+randomUUID =
+    Random.map Uuid.toString Uuid.uuidGenerator
+
+
 initModel : Int -> Model
 initModel randInt =
-    { sites = []
-    , newSiteEntry = defaultMetaData
-    , expandSiteEntry = False
-    , requirementsState = PW.init
-    , seed = Random.initialSeed randInt
-    , devices = [ { name = "Local PC", status = Local } ]
-    }
+    let
+        ( uuid, seed2 ) =
+            Random.step randomUUID (Random.initialSeed randInt)
+    in
+        { sites = []
+        , newSiteEntry = defaultMetaData
+        , expandSiteEntry = False
+        , requirementsState = PW.init
+        , seed = seed2
+        , uniqueIdentifyier = uuid
+        , devices = [ { name = "Local PC", status = Local } ]
+        , messages = []
+        , input = ""
+        }
 
 
 type alias Flags =
@@ -94,6 +135,9 @@ type Msg
     | NewPasswordRequirements PW.State
     | GenerateNewPassword
     | UserNameChanged String
+    | ReceiveMessage JE.Value
+    | SendMessage JE.Value
+    | SetInput String
 
 
 noCmd : a -> ( a, Cmd msg )
@@ -144,6 +188,24 @@ update msg model =
             { model | newSiteEntry = (\e -> { e | userName = n }) model.newSiteEntry }
                 |> noCmd
 
+        ReceiveMessage msg ->
+            ( { model | messages = msg :: model.messages }
+            , Cmd.none
+            )
+
+        SendMessage msg ->
+            let
+                push =
+                    Push.init "private:lobby" "new_msg"
+                        |> Push.withPayload msg
+            in
+                ( { model | input = "" }
+                , Phoenix.push socketUrl push
+                )
+
+        SetInput i ->
+            { model | input = i } |> noCmd
+
 
 updateSeed : Model -> Model
 updateSeed model =
@@ -160,6 +222,12 @@ view model =
         , addNewDevice
         , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
         , viewSavedSites model.sites
+        , Html.div []
+            [ Html.form [ onSubmit (SendMessage (JE.object [ ( "body", JE.string model.input ) ])) ]
+                [ Html.input [ Attr.value model.input, onInput SetInput ] []
+                ]
+            ]
+        , Html.div [] [ Html.text (toString model.messages) ]
         ]
 
 
@@ -258,7 +326,18 @@ newSiteForm requirementsState expandSiteEntry entry seed =
 
 subs : Model -> Sub Msg
 subs model =
-    Sub.none
+    let
+        socket =
+            Socket.init socketUrl
+
+        channel =
+            Channel.init "private:lobby"
+                -- register a handler for messages with a "new_msg" event
+                |> Channel.on "new_msg" ReceiveMessage
+                |> Channel.withDebug
+                |> Channel.withPayload (JE.object [ ( "uuid", JE.string model.uniqueIdentifyier ) ])
+    in
+        Phoenix.connect socket [ channel ]
 
 
 main : Program Flags Model Msg
