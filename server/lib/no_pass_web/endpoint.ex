@@ -39,6 +39,11 @@ defmodule NoPassWeb.Endpoint do
     key: "_no_pass_key",
     signing_salt: "9hfAG+LC"
 
+
+  # TODO: maybe only allow some URLs?
+  # https://github.com/mschae/cors_plug
+  plug CORSPlug
+
   plug NoPassWeb.Router
 
   @doc """

@@ -4,6 +4,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onInput, onSubmit, onClick)
 import Json.Encode as JE
+import Json.Decode as JD
 
 
 -- TODO: change random to a higher bit version
@@ -13,6 +14,7 @@ import Json.Encode as JE
 --  https://github.com/mgold/elm-random-pcg/issues/18
 
 import Random.Pcg as Random exposing (Generator, Seed)
+import Http
 import Uuid
 
 
@@ -21,7 +23,6 @@ import Uuid
 import Phoenix
 import Phoenix.Socket as Socket
 import Phoenix.Channel as Channel
-import Phoenix.Push as Push
 
 
 --
@@ -38,8 +39,16 @@ type alias Model =
     , seed : Random.Seed
     , devices : List Device
     , messages : List JE.Value
-    , input : String
     , uniqueIdentifyier : String
+    , pairingDialogue : PairingDialogue
+    , showPairingDialogue : Bool
+    }
+
+
+type alias PairingDialogue =
+    { token : Maybe String
+    , pairingCodeInput : String
+    , inputToken : String
     }
 
 
@@ -53,6 +62,7 @@ type alias PasswordMetaData =
 
 type alias Device =
     { name : String
+    , uuid : String
     , status : DeviceStatus
     }
 
@@ -62,6 +72,18 @@ type DeviceStatus
     | Offline
       -- local means the device that is actually running the code
     | Local
+
+
+initPairing : String -> Cmd Msg
+initPairing uuid =
+    Http.post (apiUrl "/initPairing") (Http.jsonBody (JE.object [ ( "deviceId", JE.string uuid ) ])) (JD.at [ "token" ] JD.string)
+        |> Http.send ReceiveToken
+
+
+pairWith : String -> String -> Cmd Msg
+pairWith myId token =
+    Http.post (apiUrl "/pairWith") (Http.jsonBody (JE.object [ ( "deviceId", JE.string myId ), ( "token", JE.string token ) ])) (JD.at [ "otherId" ] JD.string)
+        |> Http.send PairedWith
 
 
 defaultMetaData : PasswordMetaData
@@ -87,12 +109,22 @@ splitPassword meta req seed =
     PasswordPart (seed) meta (PW.getRequirements req)
 
 
-socketUrl : String
-socketUrl =
+endPointUrl : String -> String -> String
+endPointUrl pre path =
     -- TODO: change
     "localhost"
         -- "10.2.117.8"
-        |> (\ip -> "ws://" ++ ip ++ ":4000/socket/websocket")
+        |> (\ip -> pre ++ ip ++ ":4000" ++ path)
+
+
+apiUrl : String -> String
+apiUrl path =
+    endPointUrl "http://" ("/api" ++ path)
+
+
+socketUrl : String
+socketUrl =
+    endPointUrl "ws://" "/socket/websocket"
 
 
 randomUUID : Generator String
@@ -112,9 +144,10 @@ initModel randInt =
         , requirementsState = PW.init
         , seed = seed2
         , uniqueIdentifyier = uuid
-        , devices = [ { name = "Local PC", status = Local } ]
+        , devices = [ { name = "Local PC", uuid = uuid, status = Local } ]
         , messages = []
-        , input = ""
+        , pairingDialogue = { pairingCodeInput = "", token = Nothing, inputToken = "" }
+        , showPairingDialogue = False
         }
 
 
@@ -136,8 +169,12 @@ type Msg
     | GenerateNewPassword
     | UserNameChanged String
     | ReceiveMessage JE.Value
-    | SendMessage JE.Value
-    | SetInput String
+    | ReceiveToken (Result Http.Error String)
+    | PairDeviceClicked
+    | GetTokenClicked
+    | TokenChanged String
+    | TokenSubmitted
+    | PairedWith (Result Http.Error String)
 
 
 noCmd : a -> ( a, Cmd msg )
@@ -193,18 +230,39 @@ update msg model =
             , Cmd.none
             )
 
-        SendMessage msg ->
-            let
-                push =
-                    Push.init "private:lobby" "new_msg"
-                        |> Push.withPayload msg
-            in
-                ( { model | input = "" }
-                , Phoenix.push socketUrl push
-                )
+        ReceiveToken mayToken ->
+            case mayToken of
+                Ok token ->
+                    ( { model | pairingDialogue = (\d -> { d | token = Just token }) model.pairingDialogue }, Cmd.none )
 
-        SetInput i ->
-            { model | input = i } |> noCmd
+                Err e ->
+                    Debug.crash ("TODO: deal with no internet, etc.:\n" ++ toString e)
+
+        PairDeviceClicked ->
+            { model | showPairingDialogue = not model.showPairingDialogue }
+                |> noCmd
+
+        GetTokenClicked ->
+            model
+                |> withCmd (initPairing model.uniqueIdentifyier)
+
+        TokenChanged s ->
+            { model | pairingDialogue = (\d -> { d | inputToken = s }) model.pairingDialogue }
+                |> noCmd
+
+        TokenSubmitted ->
+            model
+                |> withCmd (pairWith model.uniqueIdentifyier model.pairingDialogue.inputToken)
+
+        PairedWith mayOtherId ->
+            (case mayOtherId of
+                Ok id ->
+                    { model | devices = { name = "", uuid = id, status = Online } :: model.devices }
+
+                Err e ->
+                    Debug.crash ("TODO: deal with no internet, token expiry, etc...:\n" ++ toString e)
+            )
+                |> noCmd
 
 
 updateSeed : Model -> Model
@@ -219,29 +277,36 @@ view : Model -> Html Msg
 view model =
     Html.div []
         [ viewDevices model.devices
-        , addNewDevice
         , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
         , viewSavedSites model.sites
-        , Html.div []
-            [ Html.form [ onSubmit (SendMessage (JE.object [ ( "body", JE.string model.input ) ])) ]
-                [ Html.input [ Attr.value model.input, onInput SetInput ] []
-                ]
-            ]
+        , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
+        , viewPairingDialogue model.showPairingDialogue model.pairingDialogue
         , Html.div [] [ Html.text (toString model.messages) ]
         ]
 
 
-addNewDevice : Html Msg
-addNewDevice =
-    -- TODO: display QR code
-    -- probably using: pablohirafuji/elm-qrcode
-    Html.button [] [ Html.text "Add new device" ]
+viewPairingDialogue : Bool -> PairingDialogue -> Html Msg
+viewPairingDialogue doShow diag =
+    if doShow then
+        -- TODO: display QR code
+        -- probably using: pablohirafuji/elm-qrcode
+        Html.div []
+            [ Html.button [ onClick GetTokenClicked ] [ Html.text "Get code" ]
+            , case diag.token of
+                Just t ->
+                    Html.div [] [ Html.text "token: ", Html.span [] [ Html.text t ] ]
+
+                Nothing ->
+                    Html.form [ onSubmit TokenSubmitted ] [ Html.input [ Attr.placeholder "enter token", onInput TokenChanged, Attr.value diag.inputToken ] [] ]
+            ]
+    else
+        Html.text ""
 
 
 viewDevices : List Device -> Html Msg
 viewDevices devs =
     Html.table []
-        (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "status" ] ]
+        (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ], Html.th [] [ Html.text "status" ] ]
             :: List.map viewDeviceEntry devs
         )
 
@@ -250,6 +315,7 @@ viewDeviceEntry : Device -> Html Msg
 viewDeviceEntry dev =
     Html.tr []
         [ Html.td [] [ Html.text dev.name ]
+        , Html.td [] [ Html.text dev.uuid ]
         , Html.td [] [ Html.text (toString dev.status) ]
         ]
 
@@ -331,7 +397,7 @@ subs model =
             Socket.init socketUrl
 
         channel =
-            Channel.init "private:lobby"
+            Channel.init ("private:" ++ model.uniqueIdentifyier)
                 -- register a handler for messages with a "new_msg" event
                 |> Channel.on "new_msg" ReceiveMessage
                 |> Channel.withDebug
