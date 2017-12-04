@@ -13,7 +13,9 @@
         "elm-lang/html": "2.0.0 <= v < 3.0.0",
         "elm-lang/http": "1.0.0 <= v < 2.0.0",
         "gilbertkennen/bigint": "1.0.1 <= v < 2.0.0",
+        "krisajenkins/remotedata": "4.3.3 <= v < 5.0.0",
         "mgold/elm-random-pcg": "5.0.2 <= v < 6.0.0",
+        "ohanhi/remotedata-http": "2.1.0 <= v < 3.0.0",
         "saschatimme/elm-phoenix": "0.3.0 <= v < 1.0.0",
         "spisemisu/elm-bytes": "1.1.0 <= v < 2.0.0",
         "zwilias/elm-utf-tools": "1.0.1 <= v < 2.0.0"

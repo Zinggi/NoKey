@@ -16,11 +16,15 @@ import Helper exposing (..)
 
 
 type alias State =
-    { forbiddenSets : Dict String ( Bool, CharSet )
-    , atLeastOneOf : Dict String ( Bool, CharSet )
+    { forbiddenSets : Select
+    , atLeastOneOf : Select
     , customForbidden : String
     , customAtLeastOneOf : String
     }
+
+
+type alias Select =
+    Dict String ( Bool, CharSet )
 
 
 init : State
@@ -54,13 +58,19 @@ viewCharSets toMsg ({ forbiddenSets, atLeastOneOf } as state) =
         , [ customSet (\t -> toMsg { state | customForbidden = t }) state.customForbidden ]
         , [ Html.div [] [ Html.text "At least one of these:" ] ]
         , viewSets (\b key set -> toMsg { state | atLeastOneOf = Dict.insert key ( b, set ) atLeastOneOf })
-            (Dict.filter (\key v -> Dict.get key forbiddenSets |> Maybe.map (not << Tuple.first) |> Maybe.withDefault False) atLeastOneOf)
+            (Dict.filter
+                -- dont show the ones that aren't even allowed
+                (\key v ->
+                    Dict.get key forbiddenSets |> Maybe.map (not << Tuple.first) |> Maybe.withDefault False
+                )
+                atLeastOneOf
+            )
         , [ customSet (\t -> toMsg { state | customAtLeastOneOf = t }) state.customAtLeastOneOf ]
         ]
         |> Html.div []
 
 
-viewSets : (Bool -> String -> CharSet -> msg) -> Dict String ( Bool, CharSet ) -> List (Html msg)
+viewSets : (Bool -> String -> CharSet -> msg) -> Select -> List (Html msg)
 viewSets toMsg sets =
     Dict.toList sets
         |> List.map

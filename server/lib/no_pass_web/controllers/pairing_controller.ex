@@ -17,7 +17,7 @@ defmodule NoPassWeb.PairingController do
         json conn, %{ error: "token expired" }
 
       id ->
-        NoPassWeb.Endpoint.broadcast("private:" <> id, "new_msg", %{type: "PairedWith", other_id: dev_id})
+        NoPassWeb.Endpoint.broadcast!("private:" <> id, "new_msg", %{type: "PairedWith", other_id: dev_id})
         json conn, %{ otherId: id }
     end
   end
