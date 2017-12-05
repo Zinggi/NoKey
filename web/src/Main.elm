@@ -4,6 +4,9 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onInput, onSubmit, onClick)
 import Json.Encode as JE
+import Json.Decode as JD
+import Dict exposing (Dict)
+import Set exposing (Set)
 
 
 -- TODO: change random to a higher bit version
@@ -24,6 +27,7 @@ import PasswordGenerator exposing (PasswordRequirements)
 import PasswordGenerator.View as PW
 import Pairing
 import Api
+import Crdt.ORSet as ORSet exposing (ORSet)
 
 
 type alias Model =
@@ -39,7 +43,7 @@ type alias Model =
     , uniqueIdentifyier : String
 
     -- TODO: these two should be in a state objects and inside a CRDT for synchronisation
-    , devices : List Device
+    , devices : Devices
     , sites : List PasswordPart
     }
 
@@ -52,11 +56,31 @@ type alias PasswordMetaData =
     }
 
 
-type alias Device =
+type alias Devices =
+    { uuids : ORSet String
+    , meta : Dict String DeviceMeta
+    }
+
+
+type alias DeviceMeta =
     { name : String
-    , uuid : String
     , status : DeviceStatus
     }
+
+
+devicesMap : (String -> DeviceMeta -> b) -> Devices -> List b
+devicesMap f devs =
+    Set.foldl
+        (\uuid acc ->
+            case Dict.get uuid devs.meta of
+                Just m ->
+                    f uuid m :: acc
+
+                Nothing ->
+                    acc
+        )
+        []
+        (ORSet.get devs.uuids)
 
 
 type DeviceStatus
@@ -106,7 +130,7 @@ initModel randInt =
         , requirementsState = PW.init
         , seed = seed2
         , uniqueIdentifyier = uuid
-        , devices = [ { name = "Local PC", uuid = uuid, status = Local } ]
+        , devices = { uuids = ORSet.init |> ORSet.add uuid, meta = Dict.singleton uuid { name = "Local PC", status = Local } }
         , messages = []
         , pairingDialogue = Pairing.init
         , showPairingDialogue = False
@@ -149,6 +173,25 @@ withCmd cmd a =
     ( a, cmd )
 
 
+type ServerResponse
+    = SPairedWith String
+
+
+serverResponseDecoder : JD.Decoder ServerResponse
+serverResponseDecoder =
+    JD.field "type" JD.string
+        |> JD.andThen
+            (\t ->
+                case t of
+                    "PairedWith" ->
+                        JD.field "other_id" JD.string
+                            |> JD.map SPairedWith
+
+                    other ->
+                        JD.fail ("no recognized type: " ++ other)
+            )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -188,9 +231,15 @@ update msg model =
                 |> noCmd
 
         ReceiveMessage msg ->
-            ( { model | messages = msg :: model.messages }
-            , Cmd.none
+            (case JD.decodeValue serverResponseDecoder msg of
+                Ok (SPairedWith id) ->
+                    pairedWith id model
+
+                _ ->
+                    model
             )
+                |> (\m -> { m | messages = msg :: model.messages })
+                |> noCmd
 
         ReceiveToken token ->
             ( { model | pairingDialogue = Pairing.receivedToken token model.pairingDialogue }, Cmd.none )
@@ -214,12 +263,26 @@ update msg model =
         PairedWith mayOtherId ->
             (case mayOtherId of
                 Ok id ->
-                    { model | devices = { name = "", uuid = id, status = Online } :: model.devices }
+                    pairedWith id model
 
                 Err e ->
                     Debug.crash ("TODO: deal with no internet, token expiry, etc...:\n" ++ toString e)
             )
                 |> noCmd
+
+
+pairedWith : String -> Model -> Model
+pairedWith id model =
+    { model
+        | devices =
+            (\d ->
+                { d
+                    | meta = Dict.insert id { name = "", status = Online } d.meta
+                    , uuids = ORSet.add id d.uuids
+                }
+            )
+                model.devices
+    }
 
 
 updateSeed : Model -> Model
@@ -247,20 +310,20 @@ pairingConfig doShow =
     { doShow = doShow, onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
 
 
-viewDevices : List Device -> Html Msg
+viewDevices : Devices -> Html Msg
 viewDevices devs =
     Html.table []
         (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ], Html.th [] [ Html.text "status" ] ]
-            :: List.map viewDeviceEntry devs
+            :: devicesMap viewDeviceEntry devs
         )
 
 
-viewDeviceEntry : Device -> Html Msg
-viewDeviceEntry dev =
+viewDeviceEntry : String -> DeviceMeta -> Html Msg
+viewDeviceEntry uuid meta =
     Html.tr []
-        [ Html.td [] [ Html.text dev.name ]
-        , Html.td [] [ Html.text dev.uuid ]
-        , Html.td [] [ Html.text (toString dev.status) ]
+        [ Html.td [] [ Html.text meta.name ]
+        , Html.td [] [ Html.text uuid ]
+        , Html.td [] [ Html.text (toString meta.status) ]
         ]
 
 

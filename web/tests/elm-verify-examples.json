@@ -1,4 +1,4 @@
 {
   "root": "../src",
-  "tests": ["Interval"]
+  "tests": ["Interval", "Crdt.GCounter", "Crdt.PNCounter", "Crdt.VClock", "Crdt.ORSet"]
 }
