@@ -15,6 +15,7 @@ defmodule NoPassWeb.PrivateChannel do
     # {:error, %{reason: "unauthorized"}}
   end
 
+
   # def handle_in("new_msg", %{"body" => body}, socket) do
   #   broadcast! socket, "new_msg", %{body: body, uuid: socket.assigns[:uuid]}
   #   {:noreply, socket}

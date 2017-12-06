@@ -1,21 +1,23 @@
-module Pairing exposing (State, Config, view, receivedToken, init)
+module Pairing exposing (State, Config, view, receivedToken, init, tokenSubmitted, pairingCompleted, getTockenClicked)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onSubmit, onClick, onInput)
 import RemoteData exposing (WebData, RemoteData(..))
+import Http
 
 
 type alias State =
     { token : WebData String
     , pairingCodeInput : String
     , inputToken : String
+    , tokenSubmitStatus : SubmitStatus
     }
 
 
 init : State
 init =
-    { pairingCodeInput = "", token = NotAsked, inputToken = "" }
+    { pairingCodeInput = "", token = NotAsked, inputToken = "", tokenSubmitStatus = Initial }
 
 
 type alias Config msg =
@@ -42,6 +44,26 @@ receivedToken token state =
     { state | token = token }
 
 
+getTockenClicked : State -> State
+getTockenClicked s =
+    { s | token = Loading, tokenSubmitStatus = Initial }
+
+
+type SubmitStatus
+    = Initial
+    | Submitted
+    | Answer (Result Http.Error String)
+
+
+tokenSubmitted : State -> State
+tokenSubmitted s =
+    { s | tokenSubmitStatus = Submitted }
+
+
+pairingCompleted a s =
+    { s | tokenSubmitStatus = Answer a }
+
+
 view : Config msg -> State -> Html msg
 view config diag =
     let
@@ -63,18 +85,27 @@ view config diag =
             -- probably using: pablohirafuji/elm-qrcode
             Html.div []
                 [ Html.button [ onClick config.onGetTokenClicked ] [ Html.text "Get code" ]
-                , case diag.token of
-                    NotAsked ->
+                , case ( diag.token, diag.tokenSubmitStatus ) of
+                    ( _, Submitted ) ->
+                        inp True [ Html.text "wait for response.." ]
+
+                    ( _, Answer (Ok a) ) ->
+                        inp True [ Html.text ("Successfully paired with: " ++ a) ]
+
+                    ( _, Answer (Err e) ) ->
+                        inp True [ Html.text ("Error: " ++ toString e) ]
+
+                    ( NotAsked, _ ) ->
                         inp True []
 
-                    Loading ->
+                    ( Loading, _ ) ->
                         inp False [ Html.text "wait for token..." ]
 
-                    Failure e ->
+                    ( Failure e, _ ) ->
                         inp True [ Html.text ("Something went wrong: " ++ toString e) ]
 
-                    Success t ->
-                        Html.div [] [ Html.text "token: ", Html.span [] [ Html.text t ] ]
+                    ( Success t, _ ) ->
+                        inp True [ Html.div [] [ Html.text "token: ", Html.span [] [ Html.text t ] ] ]
                 ]
         else
             Html.text ""

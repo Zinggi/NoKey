@@ -8,7 +8,7 @@ use Mix.Config
 # with brunch.io to recompile .js and .css sources.
 
 # TODO: change this to try on mobile
-onlyLocal = true
+onlyLocal = false #true
 
 config :no_pass, NoPassWeb.Endpoint,
   http: [port: 4000, ip: (if onlyLocal, do: {127,0,0,1}, else: {0,0,0,0})],

@@ -1,11 +1,32 @@
-module Crdt.ORSet exposing (ORSet, init, add, remove, get, merge)
+module Crdt.ORSet exposing (ORSet, init, add, remove, get, merge, decoder, encode)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
+import Json.Decode as JD exposing (Decoder)
+import Json.Encode as JE exposing (Value)
 
 
 type alias ORSet comparable =
     Dict comparable ( List Int, List Int )
+
+
+decoder : Decoder (ORSet String)
+decoder =
+    JD.keyValuePairs (JD.map2 (,) (JD.index 0 (JD.list JD.int)) (JD.index 1 (JD.list JD.int)))
+        |> JD.map Dict.fromList
+
+
+encode : ORSet String -> Value
+encode =
+    encodeCustomKey identity
+
+
+encodeCustomKey : (comparable -> String) -> ORSet comparable -> Value
+encodeCustomKey keyTrans set =
+    JE.object
+        (Dict.toList set
+            |> List.map (\( key, ( a, d ) ) -> ( keyTrans key, JE.list [ JE.list (List.map JE.int a), JE.list (List.map JE.int d) ] ))
+        )
 
 
 init : ORSet comparable

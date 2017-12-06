@@ -38,12 +38,13 @@ type alias Model =
     , showPairingDialogue : Bool
     , seed : Random.Seed
     , messages : List JE.Value
+    , onlineDevices : Devices
 
     -- TODO: The ones below should be serialized:
     , uniqueIdentifyier : String
 
     -- TODO: these two should be in a state objects and inside a CRDT for synchronisation
-    , devices : Devices
+    , syncData : Api.SyncData
     , sites : List PasswordPart
     }
 
@@ -57,37 +58,25 @@ type alias PasswordMetaData =
 
 
 type alias Devices =
-    { uuids : ORSet String
-    , meta : Dict String DeviceMeta
-    }
+    Set String
 
 
-type alias DeviceMeta =
-    { name : String
-    , status : DeviceStatus
-    }
-
-
-devicesMap : (String -> DeviceMeta -> b) -> Devices -> List b
-devicesMap f devs =
+devicesMap : (String -> DeviceStatus -> b) -> ORSet String -> Devices -> List b
+devicesMap f known_ids devs =
     Set.foldl
         (\uuid acc ->
-            case Dict.get uuid devs.meta of
-                Just m ->
-                    f uuid m :: acc
-
-                Nothing ->
-                    acc
+            if Set.member uuid devs then
+                f uuid Online :: acc
+            else
+                f uuid Offline :: acc
         )
         []
-        (ORSet.get devs.uuids)
+        (ORSet.get known_ids)
 
 
 type DeviceStatus
     = Online
     | Offline
-      -- local means the device that is actually running the code
-    | Local
 
 
 defaultMetaData : PasswordMetaData
@@ -130,7 +119,8 @@ initModel randInt =
         , requirementsState = PW.init
         , seed = seed2
         , uniqueIdentifyier = uuid
-        , devices = { uuids = ORSet.init |> ORSet.add uuid, meta = Dict.singleton uuid { name = "Local PC", status = Local } }
+        , syncData = Api.init uuid
+        , onlineDevices = Set.empty
         , messages = []
         , pairingDialogue = Pairing.init
         , showPairingDialogue = False
@@ -160,7 +150,9 @@ type Msg
     | GetTokenClicked
     | UpdatePairing Pairing.State
     | TokenSubmitted
-    | PairedWith (Result Http.Error String)
+    | PairedWith (Result Http.Error ( String, Api.SyncData ))
+    | RejoinChannel JE.Value
+    | NoOp
 
 
 noCmd : a -> ( a, Cmd msg )
@@ -173,28 +165,12 @@ withCmd cmd a =
     ( a, cmd )
 
 
-type ServerResponse
-    = SPairedWith String
-
-
-serverResponseDecoder : JD.Decoder ServerResponse
-serverResponseDecoder =
-    JD.field "type" JD.string
-        |> JD.andThen
-            (\t ->
-                case t of
-                    "PairedWith" ->
-                        JD.field "other_id" JD.string
-                            |> JD.map SPairedWith
-
-                    other ->
-                        JD.fail ("no recognized type: " ++ other)
-            )
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NoOp ->
+            model |> noCmd
+
         AddPassword ->
             let
                 pwPart =
@@ -231,15 +207,19 @@ update msg model =
                 |> noCmd
 
         ReceiveMessage msg ->
-            (case JD.decodeValue serverResponseDecoder msg of
-                Ok (SPairedWith id) ->
-                    pairedWith id model
-
-                _ ->
-                    model
-            )
+            model
                 |> (\m -> { m | messages = msg :: model.messages })
-                |> noCmd
+                |> (\m ->
+                        case JD.decodeValue Api.serverResponseDecoder msg of
+                            Ok (Api.PairedWith id syncData) ->
+                                pairedWith id syncData m
+
+                            Ok (Api.SyncUpdate syncData) ->
+                                syncUpdate syncData m
+
+                            Err e ->
+                                m |> noCmd
+                   )
 
         ReceiveToken token ->
             ( { model | pairingDialogue = Pairing.receivedToken token model.pairingDialogue }, Cmd.none )
@@ -250,7 +230,8 @@ update msg model =
 
         GetTokenClicked ->
             model
-                |> withCmd (Api.initPairing ReceiveToken model.uniqueIdentifyier)
+                |> (\m -> { m | pairingDialogue = Pairing.getTockenClicked model.pairingDialogue })
+                |> withCmd (Api.initPairing ReceiveToken model.uniqueIdentifyier model.syncData)
 
         UpdatePairing s ->
             { model | pairingDialogue = s }
@@ -258,31 +239,49 @@ update msg model =
 
         TokenSubmitted ->
             model
-                |> withCmd (Api.pairWith PairedWith model.uniqueIdentifyier model.pairingDialogue.inputToken)
+                |> (\m -> { m | pairingDialogue = Pairing.tokenSubmitted m.pairingDialogue })
+                |> withCmd (Api.pairWith PairedWith model.uniqueIdentifyier model.pairingDialogue.inputToken model.syncData)
 
-        PairedWith mayOtherId ->
-            (case mayOtherId of
-                Ok id ->
-                    pairedWith id model
+        PairedWith res ->
+            case res of
+                Ok ( id, known_ids ) ->
+                    model
+                        |> (\m -> { m | pairingDialogue = Pairing.pairingCompleted (Ok id) m.pairingDialogue })
+                        |> pairedWith id known_ids
 
                 Err e ->
-                    Debug.crash ("TODO: deal with no internet, token expiry, etc...:\n" ++ toString e)
-            )
-                |> noCmd
+                    model
+                        |> (\m -> { m | pairingDialogue = Pairing.pairingCompleted (Err e) m.pairingDialogue })
+                        |> noCmd
+
+        RejoinChannel v ->
+            -- TODO: WTF is v???
+            let
+                _ =
+                    Debug.log "RejoinChannel v" v
+
+                ( newSync, cmd ) =
+                    Api.syncToOthers NoOp (Api.resetSynchedWith model.syncData)
+            in
+                { model | syncData = newSync }
+                    |> withCmd cmd
 
 
-pairedWith : String -> Model -> Model
-pairedWith id model =
-    { model
-        | devices =
-            (\d ->
-                { d
-                    | meta = Dict.insert id { name = "", status = Online } d.meta
-                    , uuids = ORSet.add id d.uuids
-                }
-            )
-                model.devices
-    }
+pairedWith : String -> Api.SyncData -> Model -> ( Model, Cmd Msg )
+pairedWith id syncData model =
+    { model | onlineDevices = Set.insert id model.onlineDevices }
+        |> syncUpdate syncData
+
+
+syncUpdate : Api.SyncData -> Model -> ( Model, Cmd Msg )
+syncUpdate syncData model =
+    let
+        ( newSync, cmd ) =
+            Api.syncToOthers NoOp (Api.merge model.syncData syncData)
+    in
+        ( { model | syncData = newSync }
+        , cmd
+        )
 
 
 updateSeed : Model -> Model
@@ -296,12 +295,12 @@ updateSeed model =
 view : Model -> Html Msg
 view model =
     Html.div []
-        [ viewDevices model.devices
+        [ viewDevices model.syncData.knownIds model.onlineDevices
         , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
         , viewSavedSites model.sites
         , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
         , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
-        , Html.div [] [ Html.text (toString model.messages) ]
+        , Html.div [] [ Html.text (toString (List.length model.messages)), Html.text (toString model.messages) ]
         ]
 
 
@@ -310,20 +309,20 @@ pairingConfig doShow =
     { doShow = doShow, onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
 
 
-viewDevices : Devices -> Html Msg
-viewDevices devs =
+viewDevices : ORSet String -> Devices -> Html Msg
+viewDevices knownIds devs =
     Html.table []
         (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ], Html.th [] [ Html.text "status" ] ]
-            :: devicesMap viewDeviceEntry devs
+            :: devicesMap viewDeviceEntry knownIds devs
         )
 
 
-viewDeviceEntry : String -> DeviceMeta -> Html Msg
-viewDeviceEntry uuid meta =
+viewDeviceEntry : String -> DeviceStatus -> Html Msg
+viewDeviceEntry uuid status =
     Html.tr []
-        [ Html.td [] [ Html.text meta.name ]
+        [ Html.td [] [ Html.text "" ]
         , Html.td [] [ Html.text uuid ]
-        , Html.td [] [ Html.text (toString meta.status) ]
+        , Html.td [] [ Html.text (toString status) ]
         ]
 
 
@@ -399,7 +398,7 @@ newSiteForm requirementsState expandSiteEntry entry seed =
 
 subs : Model -> Sub Msg
 subs model =
-    Api.connectPrivateSocket ReceiveMessage model.uniqueIdentifyier
+    Api.connectPrivateSocket ReceiveMessage RejoinChannel model.uniqueIdentifyier
 
 
 main : Program Flags Model Msg
