@@ -7,6 +7,7 @@ import Json.Encode as JE
 import Json.Decode as JD
 import Dict exposing (Dict)
 import Set exposing (Set)
+import Time
 
 
 -- TODO: change random to a higher bit version
@@ -19,6 +20,7 @@ import Random.Pcg as Random exposing (Generator, Seed)
 import Http
 import Uuid
 import RemoteData exposing (WebData)
+import Debounce exposing (Debounce)
 
 
 --
@@ -40,6 +42,7 @@ type alias Model =
     , seed : Random.Seed
     , messages : List JE.Value
     , onlineDevices : Devices
+    , debounce : Debounce ()
 
     -- TODO: The ones below should be serialized:
     , uniqueIdentifyier : String
@@ -119,6 +122,7 @@ initModel randInt =
         , expandSiteEntry = False
         , requirementsState = PW.init
         , seed = seed2
+        , debounce = Debounce.init
         , uniqueIdentifyier = uuid
         , syncData = Api.init uuid
         , onlineDevices = Set.empty
@@ -126,6 +130,13 @@ initModel randInt =
         , pairingDialogue = Pairing.init
         , showPairingDialogue = False
         }
+
+
+debounceConfig : Debounce.Config Msg
+debounceConfig =
+    { strategy = Debounce.soon (1 * Time.second)
+    , transform = DebounceMsg
+    }
 
 
 type alias Flags =
@@ -155,6 +166,7 @@ type Msg
     | RejoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
+    | DebounceMsg Debounce.Msg
     | NoOp
 
 
@@ -279,11 +291,29 @@ update msg model =
 
         SetDeviceName newName ->
             let
-                ( newSync, cmd ) =
-                    Api.syncToOthers NoOp (Api.renameDevice newName model.syncData)
+                newSync =
+                    -- do not sync immediately to reduce #of messages.
+                    Api.renameDevice newName model.syncData
+
+                ( debounce, cmd ) =
+                    Debounce.push debounceConfig () model.debounce
             in
-                { model | syncData = newSync }
+                { model | syncData = newSync, debounce = debounce }
                     |> withCmd cmd
+
+        DebounceMsg msg ->
+            let
+                ( newSync, cmdToDebounce ) =
+                    Api.syncToOthers NoOp model.syncData
+
+                ( debounce, cmd ) =
+                    Debounce.update
+                        debounceConfig
+                        (Debounce.takeLast (always cmdToDebounce))
+                        msg
+                        model.debounce
+            in
+                { model | debounce = debounce, syncData = newSync } ! [ cmd ]
 
 
 pairedWith : String -> Api.SyncData -> Model -> ( Model, Cmd Msg )
@@ -319,7 +349,8 @@ view model =
         , viewSavedSites model.sites
         , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
         , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
-        , Html.div [] [ Html.text (toString (List.length model.messages)), Html.text (toString model.messages) ]
+
+        -- , Html.div [] [ Html.text (toString (List.length model.messages)), Html.text (toString model.messages) ]
         ]
 
 
