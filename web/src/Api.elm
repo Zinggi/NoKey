@@ -4,6 +4,7 @@ import Http
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import Set exposing (Set)
+import Dict
 import RemoteData exposing (WebData)
 import RemoteData.Http
 
@@ -17,23 +18,53 @@ import Phoenix.Channel as Channel
 
 --
 
+import Helper exposing (decodeTuple2, encodeTuple2)
 import Crdt.ORSet as ORSet exposing (ORSet)
+import Crdt.ORDict as ORDict exposing (ORDict)
 
 
 type alias SyncData =
-    { id : String, knownIds : ORSet String, synchedWith : Set String }
+    { id : String, knownIds : ORDict String ( Int, String ), synchedWith : Set String }
 
 
 init : String -> SyncData
 init uuid =
-    { knownIds = ORSet.init |> ORSet.add uuid, synchedWith = Set.empty, id = uuid }
+    { knownIds = ORDict.init |> ORDict.insert uuid ( 0, "" ), synchedWith = Set.empty, id = uuid }
+
+
+removeDevice : String -> SyncData -> SyncData
+removeDevice uuid sync =
+    { sync | knownIds = ORDict.remove uuid sync.knownIds, synchedWith = Set.empty }
+
+
+renameDevice : String -> SyncData -> SyncData
+renameDevice newName sync =
+    { sync | knownIds = ORDict.update sync.id (\( n, _ ) -> ( n + 1, newName )) sync.knownIds, synchedWith = Set.empty }
+
+
+pairedWith : String -> SyncData -> SyncData -> SyncData
+pairedWith uuid hisSync mySync =
+    case Dict.get uuid (ORDict.get hisSync.knownIds) of
+        Just v ->
+            { mySync | knownIds = ORDict.insert uuid v mySync.knownIds }
+
+        Nothing ->
+            mySync
 
 
 merge : SyncData -> SyncData -> SyncData
 merge my other =
     let
         newData =
-            ORSet.merge my.knownIds other.knownIds
+            ORDict.merge
+                (\( na, a ) ( nb, b ) ->
+                    if na >= nb then
+                        ( na, a )
+                    else
+                        ( nb, b )
+                )
+                my.knownIds
+                other.knownIds
     in
         { my
             | knownIds = newData
@@ -60,7 +91,7 @@ syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
 syncToOthers msg sync =
     let
         contactSet =
-            Set.diff (ORSet.get sync.knownIds) (Set.insert sync.id sync.synchedWith)
+            Set.diff (ORDict.get sync.knownIds |> Dict.keys |> Set.fromList) (Set.insert sync.id sync.synchedWith)
     in
         ( { sync | synchedWith = Set.union contactSet sync.synchedWith }
         , contactSet
@@ -92,13 +123,13 @@ syncDataDecoder : Decoder SyncData
 syncDataDecoder =
     JD.map3 SyncData
         (JD.field "id" JD.string)
-        (JD.field "knownIds" ORSet.decoder)
+        (JD.field "knownIds" <| ORDict.decoder (decodeTuple2 JD.int JD.string))
         (JD.succeed Set.empty)
 
 
 syncDataEncoder : SyncData -> Value
 syncDataEncoder s =
-    JE.object [ ( "knownIds", ORSet.encode s.knownIds ), ( "id", JE.string s.id ) ]
+    JE.object [ ( "knownIds", ORDict.encode (encodeTuple2 JE.int JE.string) s.knownIds ), ( "id", JE.string s.id ) ]
 
 
 endPointUrl : String -> String -> String
@@ -106,7 +137,8 @@ endPointUrl pre path =
     -- TODO: change
     -- "localhost"
     -- "10.2.117.8"
-    "floyogaarch.fritz.box"
+    "10.2.54.70"
+        -- "floyogaarch.fritz.box"
         |> (\ip -> pre ++ ip ++ ":4000" ++ path)
 
 

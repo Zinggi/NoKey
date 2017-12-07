@@ -3,6 +3,8 @@ module Helper exposing (..)
 import Dict exposing (Dict)
 import Random.Pcg as Random exposing (Generator)
 import BigInt exposing (BigInt)
+import Json.Decode as JD exposing (Decoder)
+import Json.Encode as JE exposing (Value)
 
 
 -- Maybe
@@ -74,6 +76,34 @@ indexedMap f s =
     String.toList s
         |> List.indexedMap f
         |> String.fromList
+
+
+
+-- Decoder
+
+
+decodeTuple : Decoder a -> Decoder ( a, a )
+decodeTuple valueDecoder =
+    JD.map2 (,) (JD.index 0 valueDecoder) (JD.index 1 valueDecoder)
+
+
+decodeTuple2 : Decoder a -> Decoder b -> Decoder ( a, b )
+decodeTuple2 valueDecoderA valueDecoderB =
+    JD.map2 (,) (JD.index 0 valueDecoderA) (JD.index 1 valueDecoderB)
+
+
+
+-- Encoder
+
+
+encodeTuple : (a -> Value) -> ( a, a ) -> Value
+encodeTuple valueEncoder ( a, b ) =
+    JE.list [ valueEncoder a, valueEncoder b ]
+
+
+encodeTuple2 : (a -> Value) -> (b -> Value) -> ( a, b ) -> Value
+encodeTuple2 valueEncoderA valueEncoderB ( a, b ) =
+    JE.list [ valueEncoderA a, valueEncoderB b ]
 
 
 

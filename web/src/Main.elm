@@ -28,6 +28,7 @@ import PasswordGenerator.View as PW
 import Pairing
 import Api
 import Crdt.ORSet as ORSet exposing (ORSet)
+import Crdt.ORDict as ORDict exposing (ORDict)
 
 
 type alias Model =
@@ -61,17 +62,17 @@ type alias Devices =
     Set String
 
 
-devicesMap : (String -> DeviceStatus -> b) -> ORSet String -> Devices -> List b
+devicesMap : (String -> String -> DeviceStatus -> b) -> ORDict String ( Int, String ) -> Devices -> List b
 devicesMap f known_ids devs =
-    Set.foldl
-        (\uuid acc ->
+    Dict.foldl
+        (\uuid ( _, name ) acc ->
             if Set.member uuid devs then
-                f uuid Online :: acc
+                f uuid name Online :: acc
             else
-                f uuid Offline :: acc
+                f uuid name Offline :: acc
         )
         []
-        (ORSet.get known_ids)
+        (ORDict.get known_ids)
 
 
 type DeviceStatus
@@ -152,6 +153,8 @@ type Msg
     | TokenSubmitted
     | PairedWith (Result Http.Error ( String, Api.SyncData ))
     | RejoinChannel JE.Value
+    | RemoveDevice String
+    | SetDeviceName String
     | NoOp
 
 
@@ -266,10 +269,26 @@ update msg model =
                 { model | syncData = newSync }
                     |> withCmd cmd
 
+        RemoveDevice uuid ->
+            let
+                ( newSync, cmd ) =
+                    Api.syncToOthers NoOp (Api.removeDevice uuid model.syncData)
+            in
+                { model | syncData = newSync }
+                    |> withCmd cmd
+
+        SetDeviceName newName ->
+            let
+                ( newSync, cmd ) =
+                    Api.syncToOthers NoOp (Api.renameDevice newName model.syncData)
+            in
+                { model | syncData = newSync }
+                    |> withCmd cmd
+
 
 pairedWith : String -> Api.SyncData -> Model -> ( Model, Cmd Msg )
 pairedWith id syncData model =
-    { model | onlineDevices = Set.insert id model.onlineDevices }
+    { model | onlineDevices = Set.insert id model.onlineDevices, syncData = Api.pairedWith id syncData model.syncData }
         |> syncUpdate syncData
 
 
@@ -295,7 +314,7 @@ updateSeed model =
 view : Model -> Html Msg
 view model =
     Html.div []
-        [ viewDevices model.syncData.knownIds model.onlineDevices
+        [ viewDevices model.uniqueIdentifyier model.syncData.knownIds model.onlineDevices
         , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
         , viewSavedSites model.sites
         , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
@@ -309,21 +328,32 @@ pairingConfig doShow =
     { doShow = doShow, onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
 
 
-viewDevices : ORSet String -> Devices -> Html Msg
-viewDevices knownIds devs =
+viewDevices : String -> ORDict String ( Int, String ) -> Devices -> Html Msg
+viewDevices myId knownIds devs =
     Html.table []
         (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ], Html.th [] [ Html.text "status" ] ]
-            :: devicesMap viewDeviceEntry knownIds devs
+            :: devicesMap (viewDeviceEntry myId) knownIds devs
         )
 
 
-viewDeviceEntry : String -> DeviceStatus -> Html Msg
-viewDeviceEntry uuid status =
+viewDeviceEntry : String -> String -> String -> DeviceStatus -> Html Msg
+viewDeviceEntry myId uuid name status =
     Html.tr []
-        [ Html.td [] [ Html.text "" ]
-        , Html.td [] [ Html.text uuid ]
-        , Html.td [] [ Html.text (toString status) ]
-        ]
+        ([ Html.td []
+            [ if myId == uuid then
+                Html.input [ Attr.value name, onInput SetDeviceName, Attr.placeholder "Name your device.." ] []
+              else
+                Html.text name
+            ]
+         , Html.td [] [ Html.text uuid ]
+         , Html.td [] [ Html.text (toString status) ]
+         ]
+            ++ (if myId /= uuid then
+                    [ Html.button [ onClick (RemoveDevice uuid) ] [ Html.text "Remove!" ] ]
+                else
+                    []
+               )
+        )
 
 
 viewSavedSites : List PasswordPart -> Html Msg

@@ -4,6 +4,7 @@ import Dict exposing (Dict)
 import Set exposing (Set)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
+import Helper exposing (decodeTuple, encodeTuple)
 
 
 type alias ORSet comparable =
@@ -12,8 +13,7 @@ type alias ORSet comparable =
 
 decoder : Decoder (ORSet String)
 decoder =
-    JD.keyValuePairs (JD.map2 (,) (JD.index 0 (JD.list JD.int)) (JD.index 1 (JD.list JD.int)))
-        |> JD.map Dict.fromList
+    JD.dict (decodeTuple (JD.list JD.int))
 
 
 encode : ORSet String -> Value
@@ -25,7 +25,7 @@ encodeCustomKey : (comparable -> String) -> ORSet comparable -> Value
 encodeCustomKey keyTrans set =
     JE.object
         (Dict.toList set
-            |> List.map (\( key, ( a, d ) ) -> ( keyTrans key, JE.list [ JE.list (List.map JE.int a), JE.list (List.map JE.int d) ] ))
+            |> List.map (\( key, ( a, d ) ) -> ( keyTrans key, encodeTuple (\it -> JE.list (List.map JE.int it)) ( a, d ) ))
         )
 
 
