@@ -16,13 +16,24 @@ defmodule NoPassWeb.PairingController do
       nil ->
         json conn, %{ error: "token expired" }
 
-      %{:dev_id => dev_id_b, :sync_data => sync_data_b} ->
-        # send to b the information of a
-        NoPassWeb.Endpoint.broadcast!("private:" <> dev_id_b, "new_msg", %{type: "PairedWith", otherId: dev_id_a, syncData: sync_data_a})
-        # send to a the info of b
-        json conn, %{ otherId: dev_id_b, syncData: sync_data_b }
+        %{:dev_id => dev_id_b, :sync_data => sync_data_b} ->
+          if dev_id_a == dev_id_b do
+            NoPass.TokenStore.store(token, %{dev_id: dev_id_a, sync_data: sync_data_a})
+            json conn, %{error: "you can't pair with yourself!"}
+          else 
+            # send to b the information of a
+            NoPassWeb.Endpoint.broadcast!("private:" <> dev_id_b, "new_msg", %{type: "PairedWith", otherId: dev_id_a, syncData: sync_data_a})
+            # send to a the info of b
+            json conn, %{ otherId: dev_id_b, syncData: sync_data_b }
+          end
     end
   end
+
+  def remove_device(conn, %{"otherId" => other_id}) do
+    NoPassWeb.Endpoint.broadcast!("private:" <> other_id, "new_msg", %{type: "GotRemoved"})
+    json conn, %{}
+  end
+
 
   def sync_with(conn, %{"syncData" => sync_data, "otherId" => other_id}) do
     NoPassWeb.Endpoint.broadcast!("private:" <> other_id, "new_msg", %{type: "SyncUpdate", syncData: sync_data})

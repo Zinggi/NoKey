@@ -1,9 +1,10 @@
-module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, decoder, get, update)
+module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, decoder, get, update, equal, reset)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
 import Json.Encode as JE exposing (Value)
 import Json.Decode as JD exposing (Decoder)
+import Random.Pcg as Random exposing (Seed)
 import Crdt.ORSet as ORSet exposing (ORSet)
 
 
@@ -11,6 +12,16 @@ type alias ORDict comparable value =
     { keys : ORSet comparable
     , store : Dict comparable value
     }
+
+
+reset : ORDict comparable value -> ORDict comparable value
+reset dict =
+    { keys = ORSet.reset dict.keys, store = Dict.empty }
+
+
+equal : ORDict comparable value -> ORDict comparable value -> Bool
+equal a b =
+    a.store == b.store && ORSet.equal a.keys b.keys
 
 
 decoder : Decoder value -> Decoder (ORDict String value)
@@ -25,9 +36,9 @@ encode encodeValue dict =
     JE.object [ ( "keys", ORSet.encode dict.keys ), ( "store", JE.object (Dict.toList (Dict.map (always encodeValue) dict.store)) ) ]
 
 
-init : ORDict comparable value
-init =
-    { keys = ORSet.init, store = Dict.empty }
+init : Seed -> ORDict comparable value
+init seed =
+    { keys = ORSet.init seed, store = Dict.empty }
 
 
 insert : comparable -> value -> ORDict comparable value -> ORDict comparable value
@@ -72,17 +83,21 @@ get dict =
         (ORSet.get dict.keys)
 
 
+{-| **CAUTION**
+The order of arguments matter, e.g.
+`newA = merge b a` means merge b into a to produce newA
+-}
 merge : (value -> value -> value) -> ORDict comparable value -> ORDict comparable value -> ORDict comparable value
-merge mergeValue dictA dictB =
+merge mergeValue otherDict myDict =
     let
         newKeys =
-            ORSet.merge dictA.keys dictB.keys
+            ORSet.merge otherDict.keys myDict.keys
 
         newStore =
             ORSet.get newKeys
                 |> Set.foldl
                     (\key st ->
-                        case ( Dict.get key dictA.store, Dict.get key dictB.store ) of
+                        case ( Dict.get key myDict.store, Dict.get key otherDict.store ) of
                             ( Just va, Just vb ) ->
                                 if va == vb then
                                     Dict.insert key va st

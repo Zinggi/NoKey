@@ -1,6 +1,7 @@
 module Helper exposing (..)
 
 import Dict exposing (Dict)
+import Set exposing (Set)
 import Random.Pcg as Random exposing (Generator)
 import BigInt exposing (BigInt)
 import Json.Decode as JD exposing (Decoder)
@@ -79,6 +80,30 @@ indexedMap f s =
 
 
 
+-- List
+
+
+{-| merges a sorted list (from high to low) into another sorted list, dropping duplicates
+-}
+mergeLists : List Int -> List Int -> List Int
+mergeLists a b =
+    case ( a, b ) of
+        ( aa :: aas, bb :: bbs ) ->
+            if aa > bb then
+                aa :: mergeLists aas b
+            else if aa < bb then
+                bb :: mergeLists a bbs
+            else
+                aa :: mergeLists aas bbs
+
+        ( [], bbs ) ->
+            bbs
+
+        ( aas, [] ) ->
+            aas
+
+
+
 -- Decoder
 
 
@@ -90,6 +115,11 @@ decodeTuple valueDecoder =
 decodeTuple2 : Decoder a -> Decoder b -> Decoder ( a, b )
 decodeTuple2 valueDecoderA valueDecoderB =
     JD.map2 (,) (JD.index 0 valueDecoderA) (JD.index 1 valueDecoderB)
+
+
+decodeSet : Decoder comparable -> Decoder (Set comparable)
+decodeSet valueDecoder =
+    JD.map Set.fromList (JD.list valueDecoder)
 
 
 
@@ -104,6 +134,11 @@ encodeTuple valueEncoder ( a, b ) =
 encodeTuple2 : (a -> Value) -> (b -> Value) -> ( a, b ) -> Value
 encodeTuple2 valueEncoderA valueEncoderB ( a, b ) =
     JE.list [ valueEncoderA a, valueEncoderB b ]
+
+
+encodeSet : (comparable -> Value) -> Set comparable -> Value
+encodeSet valueEncoder set =
+    JE.list (Set.toList set |> List.map valueEncoder)
 
 
 

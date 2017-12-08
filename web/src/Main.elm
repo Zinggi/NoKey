@@ -40,7 +40,6 @@ type alias Model =
     , pairingDialogue : Pairing.State
     , showPairingDialogue : Bool
     , seed : Random.Seed
-    , messages : List JE.Value
     , onlineDevices : Devices
     , debounce : Debounce ()
 
@@ -116,19 +115,21 @@ initModel randInt =
     let
         ( uuid, seed2 ) =
             Random.step randomUUID (Random.initialSeed randInt)
+
+        ( indepSeed, seed3 ) =
+            Random.step Random.independentSeed seed2
     in
         { sites = []
         , newSiteEntry = defaultMetaData
         , expandSiteEntry = False
         , requirementsState = PW.init
-        , seed = seed2
+        , seed = seed3
         , debounce = Debounce.init
         , uniqueIdentifyier = uuid
-        , syncData = Api.init uuid
+        , syncData = Api.init indepSeed uuid
         , onlineDevices = Set.empty
-        , messages = []
         , pairingDialogue = Pairing.init
-        , showPairingDialogue = False
+        , showPairingDialogue = True
         }
 
 
@@ -223,14 +224,16 @@ update msg model =
 
         ReceiveMessage msg ->
             model
-                |> (\m -> { m | messages = msg :: model.messages })
                 |> (\m ->
-                        case JD.decodeValue Api.serverResponseDecoder msg of
+                        case JD.decodeValue Api.serverResponseDecoder (Debug.log "received msg" msg) of
                             Ok (Api.PairedWith id syncData) ->
                                 pairedWith id syncData m
 
                             Ok (Api.SyncUpdate syncData) ->
                                 syncUpdate syncData m
+
+                            Ok Api.GotRemoved ->
+                                { m | syncData = Api.gotRemoved model.syncData } |> noCmd
 
                             Err e ->
                                 m |> noCmd
@@ -283,11 +286,14 @@ update msg model =
 
         RemoveDevice uuid ->
             let
-                ( newSync, cmd ) =
-                    Api.syncToOthers NoOp (Api.removeDevice uuid model.syncData)
+                ( sync, removeCmd ) =
+                    Api.removeDevice NoOp uuid model.syncData
+
+                ( newSync, syncCmd ) =
+                    Api.syncToOthers NoOp sync
             in
                 { model | syncData = newSync }
-                    |> withCmd cmd
+                    |> withCmd (Cmd.batch [ syncCmd, removeCmd ])
 
         SetDeviceName newName ->
             let
@@ -326,7 +332,7 @@ syncUpdate : Api.SyncData -> Model -> ( Model, Cmd Msg )
 syncUpdate syncData model =
     let
         ( newSync, cmd ) =
-            Api.syncToOthers NoOp (Api.merge model.syncData syncData)
+            Api.syncToOthers NoOp (Api.merge syncData model.syncData)
     in
         ( { model | syncData = newSync }
         , cmd
@@ -345,12 +351,11 @@ view : Model -> Html Msg
 view model =
     Html.div []
         [ viewDevices model.uniqueIdentifyier model.syncData.knownIds model.onlineDevices
-        , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
-        , viewSavedSites model.sites
-        , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
-        , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
 
-        -- , Html.div [] [ Html.text (toString (List.length model.messages)), Html.text (toString model.messages) ]
+        -- , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
+        -- , viewSavedSites model.sites
+        -- , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
+        , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
         ]
 
 
@@ -362,7 +367,8 @@ pairingConfig doShow =
 viewDevices : String -> ORDict String ( Int, String ) -> Devices -> Html Msg
 viewDevices myId knownIds devs =
     Html.table []
-        (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ], Html.th [] [ Html.text "status" ] ]
+        (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ] ]
+            -- , Html.th [] [ Html.text "status" ] ]
             :: devicesMap (viewDeviceEntry myId) knownIds devs
         )
 
@@ -377,7 +383,8 @@ viewDeviceEntry myId uuid name status =
                 Html.text name
             ]
          , Html.td [] [ Html.text uuid ]
-         , Html.td [] [ Html.text (toString status) ]
+
+         -- , Html.td [] [ Html.text (toString status) ]
          ]
             ++ (if myId /= uuid then
                     [ Html.button [ onClick (RemoveDevice uuid) ] [ Html.text "Remove!" ] ]

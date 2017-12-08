@@ -7,6 +7,7 @@ import Set exposing (Set)
 import Dict
 import RemoteData exposing (WebData)
 import RemoteData.Http
+import Random.Pcg as Random exposing (Seed)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -27,14 +28,31 @@ type alias SyncData =
     { id : String, knownIds : ORDict String ( Int, String ), synchedWith : Set String }
 
 
-init : String -> SyncData
-init uuid =
-    { knownIds = ORDict.init |> ORDict.insert uuid ( 0, "" ), synchedWith = Set.empty, id = uuid }
+init : Seed -> String -> SyncData
+init seed uuid =
+    { knownIds = ORDict.init seed |> ORDict.insert uuid ( 0, "" ), synchedWith = Set.empty, id = uuid }
 
 
-removeDevice : String -> SyncData -> SyncData
-removeDevice uuid sync =
-    { sync | knownIds = ORDict.remove uuid sync.knownIds, synchedWith = Set.empty }
+removeDevice : msg -> String -> SyncData -> ( SyncData, Cmd msg )
+removeDevice msg uuid sync =
+    ( { sync | knownIds = ORDict.remove uuid sync.knownIds, synchedWith = Set.empty }
+    , informOfRemove msg uuid
+    )
+
+
+gotRemoved : SyncData -> SyncData
+gotRemoved sync =
+    { sync | knownIds = ORDict.reset sync.knownIds, synchedWith = Set.empty }
+
+
+informOfRemove : msg -> String -> Cmd msg
+informOfRemove msg uuid =
+    Http.post (apiUrl "/removeDevice")
+        (Http.jsonBody
+            (JE.object [ ( "otherId", JE.string uuid ) ])
+        )
+        (JD.succeed ())
+        |> Http.send (always msg)
 
 
 renameDevice : String -> SyncData -> SyncData
@@ -52,8 +70,12 @@ pairedWith uuid hisSync mySync =
             mySync
 
 
+{-| **CAUTION**
+The order of arguments matter, e.g.
+`newA = merge b a` means merge b into a to produce newA
+-}
 merge : SyncData -> SyncData -> SyncData
-merge my other =
+merge other my =
     let
         newData =
             ORDict.merge
@@ -63,23 +85,23 @@ merge my other =
                     else
                         ( nb, b )
                 )
-                my.knownIds
                 other.knownIds
+                my.knownIds
     in
         { my
             | knownIds = newData
             , synchedWith =
-                (if newData /= my.knownIds then
+                (if not <| ORDict.equal newData my.knownIds then
                     Set.empty
                  else
-                    (if other.knownIds == newData then
+                    (if ORDict.equal other.knownIds newData then
                         my.synchedWith
                      else
                         Set.remove other.id my.synchedWith
                     )
                 )
                     |> (\sWith ->
-                            if newData == other.knownIds then
+                            if ORDict.equal newData other.knownIds then
                                 Set.insert other.id sWith
                             else
                                 sWith
@@ -136,8 +158,12 @@ endPointUrl : String -> String -> String
 endPointUrl pre path =
     -- TODO: change
     -- "localhost"
+    -- {- etz upper -}
     -- "10.2.117.8"
-    "10.2.54.70"
+    {- etz lower -}
+    "10.2.122.231"
+        -- {- hg lower -}
+        -- "10.2.54.70"
         -- "floyogaarch.fritz.box"
         |> (\ip -> pre ++ ip ++ ":4000" ++ path)
 
@@ -181,6 +207,7 @@ pairWith tagger myId token syncData =
 type ServerResponse
     = PairedWith String SyncData
     | SyncUpdate SyncData
+    | GotRemoved
 
 
 serverResponseDecoder : JD.Decoder ServerResponse
@@ -196,6 +223,9 @@ serverResponseDecoder =
 
                     "SyncUpdate" ->
                         JD.map SyncUpdate (JD.field "syncData" syncDataDecoder)
+
+                    "GotRemoved" ->
+                        JD.succeed GotRemoved
 
                     other ->
                         JD.fail ("no recognized type: " ++ other)

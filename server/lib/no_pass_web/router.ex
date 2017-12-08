@@ -29,6 +29,8 @@ defmodule NoPassWeb.Router do
     post "/initPairing", PairingController, :init_pairing
     post "/pairWith", PairingController, :pair_with
     post "/syncWith", PairingController, :sync_with
+    post "/removeDevice", PairingController, :remove_device
+
 
   end
 end
