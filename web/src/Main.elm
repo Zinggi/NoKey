@@ -29,7 +29,6 @@ import PasswordGenerator exposing (PasswordRequirements)
 import PasswordGenerator.View as PW
 import Pairing
 import Api
-import Crdt.ORSet as ORSet exposing (ORSet)
 import Crdt.ORDict as ORDict exposing (ORDict)
 
 
@@ -225,6 +224,7 @@ update msg model =
         ReceiveMessage msg ->
             model
                 |> (\m ->
+                        -- TODO: include senderID in message + reject messages from unknown sources
                         case Debug.log "received msg" <| JD.decodeValue Api.serverResponseDecoder msg of
                             Ok (Api.PairedWith id syncData) ->
                                 pairedWith id syncData m
@@ -352,11 +352,13 @@ view : Model -> Html Msg
 view model =
     Html.div []
         [ viewDevices model.uniqueIdentifyier model.syncData.knownIds model.onlineDevices
-
-        -- , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
-        -- , viewSavedSites model.sites
-        -- , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
         , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
+        , Html.hr [] []
+        , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
+        , Html.hr [] []
+        , viewSavedSites model.sites
+
+        -- , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
         ]
 
 
@@ -369,6 +371,7 @@ viewDevices : String -> ORDict String ( Int, String ) -> Devices -> Html Msg
 viewDevices myId knownIds devs =
     Html.table []
         (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ] ]
+            -- TODO. see if there is a reliable method for detecting online devices
             -- , Html.th [] [ Html.text "status" ] ]
             :: devicesMap (viewDeviceEntry myId) knownIds devs
         )

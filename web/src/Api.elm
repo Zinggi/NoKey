@@ -42,7 +42,11 @@ removeDevice msg uuid sync =
 
 gotRemoved : SyncData -> SyncData
 gotRemoved sync =
-    { sync | knownIds = ORDict.reset sync.knownIds, synchedWith = Set.empty }
+    let
+        myName =
+            ORDict.get sync.knownIds |> Dict.get sync.id |> Maybe.map Tuple.second |> Maybe.withDefault ""
+    in
+        { sync | knownIds = ORDict.reset sync.knownIds |> ORDict.insert sync.id ( 0, myName ), synchedWith = Set.empty }
 
 
 informOfRemove : msg -> String -> Cmd msg
@@ -142,6 +146,7 @@ syncWith msg id sync =
 syncDataDecoder : Decoder SyncData
 syncDataDecoder =
     JD.map3 SyncData
+        -- TODO: don't decode id, get it from the sender
         (JD.field "id" JD.string)
         (JD.field "knownIds" <| ORDict.decoder (decodeTuple2 JD.int JD.string))
         (JD.succeed Set.empty)
@@ -149,6 +154,7 @@ syncDataDecoder =
 
 syncDataEncoder : SyncData -> Value
 syncDataEncoder s =
+    -- TODO: don't encode ID
     JE.object [ ( "knownIds", ORDict.encode (encodeTuple2 JE.int JE.string) s.knownIds ), ( "id", JE.string s.id ) ]
 
 
