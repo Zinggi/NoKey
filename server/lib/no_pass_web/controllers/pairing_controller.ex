@@ -28,16 +28,4 @@ defmodule NoPassWeb.PairingController do
           end
     end
   end
-
-  def remove_device(conn, %{"otherId" => other_id}) do
-    NoPassWeb.Endpoint.broadcast!("private:" <> other_id, "new_msg", %{type: "GotRemoved"})
-    json conn, %{}
-  end
-
-
-  def sync_with(conn, %{"syncData" => sync_data, "otherId" => other_id}) do
-    NoPassWeb.Endpoint.broadcast!("private:" <> other_id, "new_msg", %{type: "SyncUpdate", syncData: sync_data})
-    json conn, %{}
-  end
-
 end

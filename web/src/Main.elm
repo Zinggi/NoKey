@@ -225,7 +225,7 @@ update msg model =
         ReceiveMessage msg ->
             model
                 |> (\m ->
-                        case JD.decodeValue Api.serverResponseDecoder (Debug.log "received msg" msg) of
+                        case Debug.log "received msg" <| JD.decodeValue Api.serverResponseDecoder msg of
                             Ok (Api.PairedWith id syncData) ->
                                 pairedWith id syncData m
 
@@ -296,6 +296,7 @@ update msg model =
                     |> withCmd (Cmd.batch [ syncCmd, removeCmd ])
 
         SetDeviceName newName ->
+            -- TODO: set page title to quickly see which tab is which
             let
                 newSync =
                     -- do not sync immediately to reduce #of messages.

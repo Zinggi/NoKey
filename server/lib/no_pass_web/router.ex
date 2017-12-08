@@ -22,15 +22,12 @@ defmodule NoPassWeb.Router do
     resources "/users", UserController
   end
 
-  # Other scopes may use custom stacks.
+  # Other scopes may use custom stacks. 
   scope "/api", NoPassWeb do
     pipe_through :api
 
     post "/initPairing", PairingController, :init_pairing
+    post "/sendMsgTo/:otherId", MessageForewardingController, :send_msg_to
     post "/pairWith", PairingController, :pair_with
-    post "/syncWith", PairingController, :sync_with
-    post "/removeDevice", PairingController, :remove_device
-
-
   end
 end

@@ -47,10 +47,13 @@ gotRemoved sync =
 
 informOfRemove : msg -> String -> Cmd msg
 informOfRemove msg uuid =
-    Http.post (apiUrl "/removeDevice")
-        (Http.jsonBody
-            (JE.object [ ( "otherId", JE.string uuid ) ])
-        )
+    sendMsgTo msg uuid "GotRemoved" []
+
+
+sendMsgTo : msg -> String -> String -> List ( String, Value ) -> Cmd msg
+sendMsgTo msg id type_ content =
+    Http.post (apiUrl ("/sendMsgTo/" ++ id))
+        (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: content)))
         (JD.succeed ())
         |> Http.send (always msg)
 
@@ -133,12 +136,7 @@ resetSynchedWith sync =
 
 syncWith : msg -> String -> SyncData -> Cmd msg
 syncWith msg id sync =
-    Http.post (apiUrl "/syncWith")
-        (Http.jsonBody
-            (JE.object [ ( "syncData", syncDataEncoder sync ), ( "otherId", JE.string id ) ])
-        )
-        (JD.succeed ())
-        |> Http.send (always msg)
+    sendMsgTo msg id "SyncUpdate" [ ( "syncData", syncDataEncoder sync ) ]
 
 
 syncDataDecoder : Decoder SyncData
@@ -157,11 +155,11 @@ syncDataEncoder s =
 endPointUrl : String -> String -> String
 endPointUrl pre path =
     -- TODO: change
-    -- "localhost"
-    -- {- etz upper -}
-    -- "10.2.117.8"
-    {- etz lower -}
-    "10.2.122.231"
+    "localhost"
+        -- {- etz upper -}
+        -- "10.2.117.8"
+        -- {- etz lower -}
+        -- "10.2.122.231"
         -- {- hg lower -}
         -- "10.2.54.70"
         -- "floyogaarch.fritz.box"
