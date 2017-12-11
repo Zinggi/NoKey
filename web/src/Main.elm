@@ -135,7 +135,7 @@ initModel randInt =
 debounceConfig : Debounce.Config Msg
 debounceConfig =
     { strategy = Debounce.soon (1 * Time.second)
-    , transform = DebounceMsg
+    , transform = SyncToOthers
     }
 
 
@@ -166,7 +166,7 @@ type Msg
     | RejoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
-    | DebounceMsg Debounce.Msg
+    | SyncToOthers Debounce.Msg
     | NoOp
 
 
@@ -178,6 +178,11 @@ noCmd a =
 withCmd : Cmd msg -> a -> ( a, Cmd msg )
 withCmd cmd a =
     ( a, cmd )
+
+
+addCmd : List (Cmd msg) -> ( a, Cmd msg ) -> ( a, Cmd msg )
+addCmd cmds ( a, cmd ) =
+    ( a, Cmd.batch (cmd :: cmds) )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -273,27 +278,21 @@ update msg model =
                         |> noCmd
 
         RejoinChannel v ->
-            -- TODO: WTF is v???
             let
                 _ =
-                    Debug.log "RejoinChannel v" v
-
-                ( newSync, cmd ) =
-                    Api.syncToOthers NoOp (Api.resetSynchedWith model.syncData)
+                    Debug.log "RejoinChannel" ()
             in
-                { model | syncData = newSync }
-                    |> withCmd cmd
+                model
+                    |> syncToOthers
 
         RemoveDevice uuid ->
             let
                 ( sync, removeCmd ) =
                     Api.removeDevice NoOp uuid model.syncData
-
-                ( newSync, syncCmd ) =
-                    Api.syncToOthers NoOp sync
             in
-                { model | syncData = newSync }
-                    |> withCmd (Cmd.batch [ syncCmd, removeCmd ])
+                { model | syncData = sync }
+                    |> syncToOthers
+                    |> addCmd [ removeCmd ]
 
         SetDeviceName newName ->
             -- TODO: set page title to quickly see which tab is which
@@ -301,14 +300,12 @@ update msg model =
                 newSync =
                     -- do not sync immediately to reduce #of messages.
                     Api.renameDevice newName model.syncData
-
-                ( debounce, cmd ) =
-                    Debounce.push debounceConfig () model.debounce
             in
-                { model | syncData = newSync, debounce = debounce }
-                    |> withCmd cmd
+                { model | syncData = newSync }
+                    |> syncToOthers
 
-        DebounceMsg msg ->
+        SyncToOthers msg ->
+            -- delay the sync update to others, as we might get multiple updates in a short time, so wait until it settled.
             let
                 ( newSync, cmdToDebounce ) =
                     Api.syncToOthers NoOp model.syncData
@@ -329,13 +326,25 @@ pairedWith id syncData model =
         |> syncUpdate syncData
 
 
+syncToOthers : Model -> ( Model, Cmd Msg )
+syncToOthers model =
+    let
+        ( debounce, cmd ) =
+            Debounce.push debounceConfig () model.debounce
+    in
+        ( { model | debounce = debounce }, cmd )
+
+
 syncUpdate : Api.SyncData -> Model -> ( Model, Cmd Msg )
 syncUpdate syncData model =
     let
-        ( newSync, cmd ) =
-            Api.syncToOthers NoOp (Api.merge syncData model.syncData)
+        newSync =
+            Api.merge syncData model.syncData
+
+        ( debounce, cmd ) =
+            Debounce.push debounceConfig () model.debounce
     in
-        ( { model | syncData = newSync }
+        ( { model | syncData = newSync, debounce = debounce }
         , cmd
         )
 

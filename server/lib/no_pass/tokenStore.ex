@@ -9,6 +9,10 @@ defmodule NoPass.TokenStore do
   def store(token, id) do
     GenServer.cast(__MODULE__, {:store, token, id})
   end
+  
+  def has_token?(token) do
+    GenServer.call(__MODULE__, {:has_token, token})
+  end
 
   def try_remove(token) do
     GenServer.call(__MODULE__, {:try_remove, token})
@@ -27,6 +31,10 @@ defmodule NoPass.TokenStore do
   def handle_call({:try_remove, item}, _from, state) do
     {reply, newState} = Map.pop(state, item)
     {:reply, reply[:id], newState}
+  end
+
+  def handle_call({:has_token, token}, _from, state) do
+    {:reply, Map.has_key?(state, token), state}
   end
 
   def handle_cast({:store, token, id}, state) do
