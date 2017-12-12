@@ -4,10 +4,8 @@ import Http
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import Set exposing (Set)
-import Dict
 import RemoteData exposing (WebData)
 import RemoteData.Http
-import Random.Pcg as Random exposing (Seed)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -19,143 +17,7 @@ import Phoenix.Channel as Channel
 
 --
 
-import Helper exposing (decodeTuple2, encodeTuple2)
-import Crdt.ORSet as ORSet exposing (ORSet)
-import Crdt.ORDict as ORDict exposing (ORDict)
-
-
-type alias SyncData =
-    { id : String, knownIds : ORDict String ( Int, String ), synchedWith : Set String }
-
-
-init : Seed -> String -> SyncData
-init seed uuid =
-    { knownIds = ORDict.init seed |> ORDict.insert uuid ( 0, "" ), synchedWith = Set.empty, id = uuid }
-
-
-removeDevice : msg -> String -> SyncData -> ( SyncData, Cmd msg )
-removeDevice msg uuid sync =
-    ( { sync | knownIds = ORDict.remove uuid sync.knownIds, synchedWith = Set.empty }
-    , informOfRemove msg uuid
-    )
-
-
-gotRemoved : SyncData -> SyncData
-gotRemoved sync =
-    let
-        myName =
-            ORDict.get sync.knownIds |> Dict.get sync.id |> Maybe.map Tuple.second |> Maybe.withDefault ""
-    in
-        { sync | knownIds = ORDict.reset sync.knownIds |> ORDict.insert sync.id ( 0, myName ), synchedWith = Set.empty }
-
-
-informOfRemove : msg -> String -> Cmd msg
-informOfRemove msg uuid =
-    sendMsgTo msg uuid "GotRemoved" []
-
-
-sendMsgTo : msg -> String -> String -> List ( String, Value ) -> Cmd msg
-sendMsgTo msg id type_ content =
-    Http.post (apiUrl ("/sendMsgTo/" ++ id))
-        (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: content)))
-        (JD.succeed ())
-        |> Http.send (always msg)
-
-
-renameDevice : String -> SyncData -> SyncData
-renameDevice newName sync =
-    { sync | knownIds = ORDict.update sync.id (\( n, _ ) -> ( n + 1, newName )) sync.knownIds, synchedWith = Set.empty }
-
-
-pairedWith : String -> SyncData -> SyncData -> SyncData
-pairedWith uuid hisSync mySync =
-    case Dict.get uuid (ORDict.get hisSync.knownIds) of
-        Just v ->
-            { mySync | knownIds = ORDict.insert uuid v mySync.knownIds }
-
-        Nothing ->
-            mySync
-
-
-{-| **CAUTION**
-The order of arguments matter, e.g.
-`newA = merge b a` means merge b into a to produce newA
--}
-merge : SyncData -> SyncData -> SyncData
-merge other my =
-    let
-        newData =
-            ORDict.merge
-                (\( na, a ) ( nb, b ) ->
-                    if na >= nb then
-                        ( na, a )
-                    else
-                        ( nb, b )
-                )
-                other.knownIds
-                my.knownIds
-    in
-        { my
-            | knownIds = newData
-            , synchedWith =
-                (if not <| ORDict.equal newData my.knownIds then
-                    Set.empty
-                 else
-                    (if ORDict.equal other.knownIds newData then
-                        my.synchedWith
-                     else
-                        Set.remove other.id my.synchedWith
-                    )
-                )
-                    |> (\sWith ->
-                            if ORDict.equal newData other.knownIds then
-                                Set.insert other.id sWith
-                            else
-                                sWith
-                       )
-        }
-
-
-syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
-syncToOthers msg sync =
-    let
-        contactSet =
-            Set.diff (ORDict.get sync.knownIds |> Dict.keys |> Set.fromList) (Set.insert sync.id sync.synchedWith)
-    in
-        ( { sync | synchedWith = Set.union contactSet sync.synchedWith }
-        , contactSet
-            |> Set.foldl
-                (\id acc ->
-                    syncWith msg id sync :: acc
-                )
-                []
-            |> Cmd.batch
-        )
-
-
-resetSynchedWith : SyncData -> SyncData
-resetSynchedWith sync =
-    { sync | synchedWith = Set.empty }
-
-
-syncWith : msg -> String -> SyncData -> Cmd msg
-syncWith msg id sync =
-    sendMsgTo msg id "SyncUpdate" [ ( "syncData", syncDataEncoder sync ) ]
-
-
-syncDataDecoder : Decoder SyncData
-syncDataDecoder =
-    JD.map3 SyncData
-        -- TODO: don't decode id, get it from the sender
-        (JD.field "id" JD.string)
-        (JD.field "knownIds" <| ORDict.decoder (decodeTuple2 JD.int JD.string))
-        (JD.succeed Set.empty)
-
-
-syncDataEncoder : SyncData -> Value
-syncDataEncoder s =
-    -- TODO: don't encode ID
-    JE.object [ ( "knownIds", ORDict.encode (encodeTuple2 JE.int JE.string) s.knownIds ), ( "id", JE.string s.id ) ]
+import SyncData exposing (SyncData)
 
 
 endPointUrl : String -> String -> String
@@ -182,12 +44,54 @@ socketUrl =
     endPointUrl "ws://" "/socket/websocket"
 
 
+removeDevice : msg -> String -> SyncData -> ( SyncData, Cmd msg )
+removeDevice msg uuid sync =
+    ( SyncData.removeDevice uuid sync
+    , informOfRemove msg uuid
+    )
+
+
+informOfRemove : msg -> String -> Cmd msg
+informOfRemove msg uuid =
+    sendMsgTo msg uuid "GotRemoved" []
+
+
+sendMsgTo : msg -> String -> String -> List ( String, Value ) -> Cmd msg
+sendMsgTo msg id type_ content =
+    Http.post (apiUrl ("/sendMsgTo/" ++ id))
+        (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: content)))
+        (JD.succeed ())
+        |> Http.send (always msg)
+
+
+syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
+syncToOthers msg sync =
+    let
+        contactSet =
+            SyncData.getContactSet sync
+    in
+        ( SyncData.updateSynchedWith contactSet sync
+        , contactSet
+            |> Set.foldl
+                (\id acc ->
+                    syncWith msg id sync :: acc
+                )
+                []
+            |> Cmd.batch
+        )
+
+
+syncWith : msg -> String -> SyncData -> Cmd msg
+syncWith msg id sync =
+    sendMsgTo msg id "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
+
+
 initPairing : (WebData String -> msg) -> String -> SyncData -> Cmd msg
 initPairing tagger uuid syncData =
     RemoteData.Http.post (apiUrl "/initPairing")
         tagger
         (JD.at [ "token" ] JD.string)
-        (JE.object [ ( "deviceId", JE.string uuid ), ( "syncData", syncDataEncoder syncData ) ])
+        (JE.object [ ( "deviceId", JE.string uuid ), ( "syncData", SyncData.encode syncData ) ])
 
 
 pairWith : (Result Http.Error ( String, SyncData ) -> msg) -> String -> String -> SyncData -> Cmd msg
@@ -197,13 +101,13 @@ pairWith tagger myId token syncData =
             (JE.object
                 [ ( "deviceId", JE.string myId )
                 , ( "token", JE.string token )
-                , ( "syncData", syncDataEncoder syncData )
+                , ( "syncData", SyncData.encode syncData )
                 ]
             )
         )
         (JD.map2 (,)
             (JD.field "otherId" JD.string)
-            (JD.field "syncData" syncDataDecoder)
+            (JD.field "syncData" SyncData.decoder)
         )
         |> Http.send tagger
 
@@ -223,10 +127,10 @@ serverResponseDecoder =
                     "PairedWith" ->
                         JD.map2 PairedWith
                             (JD.field "otherId" JD.string)
-                            (JD.field "syncData" syncDataDecoder)
+                            (JD.field "syncData" SyncData.decoder)
 
                     "SyncUpdate" ->
-                        JD.map SyncUpdate (JD.field "syncData" syncDataDecoder)
+                        JD.map SyncUpdate (JD.field "syncData" SyncData.decoder)
 
                     "GotRemoved" ->
                         JD.succeed GotRemoved

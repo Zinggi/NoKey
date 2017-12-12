@@ -28,6 +28,7 @@ import Debounce exposing (Debounce)
 import PasswordGenerator exposing (PasswordRequirements)
 import PasswordGenerator.View as PW
 import Pairing
+import SyncData exposing (SyncData)
 import Api
 import Crdt.ORDict as ORDict exposing (ORDict)
 
@@ -46,7 +47,7 @@ type alias Model =
     , uniqueIdentifyier : String
 
     -- TODO: these two should be in a state objects and inside a CRDT for synchronisation
-    , syncData : Api.SyncData
+    , syncData : SyncData
     , sites : List PasswordPart
     }
 
@@ -125,7 +126,7 @@ initModel randInt =
         , seed = seed3
         , debounce = Debounce.init
         , uniqueIdentifyier = uuid
-        , syncData = Api.init indepSeed uuid
+        , syncData = SyncData.init indepSeed uuid
         , onlineDevices = Set.empty
         , pairingDialogue = Pairing.init
         , showPairingDialogue = True
@@ -162,7 +163,7 @@ type Msg
     | GetTokenClicked
     | UpdatePairing Pairing.State
     | TokenSubmitted
-    | PairedWith (Result Http.Error ( String, Api.SyncData ))
+    | PairedWith (Result Http.Error ( String, SyncData ))
     | RejoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
@@ -238,7 +239,7 @@ update msg model =
                                 syncUpdate syncData m
 
                             Ok Api.GotRemoved ->
-                                { m | syncData = Api.gotRemoved model.syncData } |> noCmd
+                                { m | syncData = SyncData.gotRemoved model.syncData } |> noCmd
 
                             Err e ->
                                 m |> noCmd
@@ -299,7 +300,7 @@ update msg model =
             let
                 newSync =
                     -- do not sync immediately to reduce #of messages.
-                    Api.renameDevice newName model.syncData
+                    SyncData.renameDevice newName model.syncData
             in
                 { model | syncData = newSync }
                     |> syncToOthers
@@ -320,9 +321,9 @@ update msg model =
                 { model | debounce = debounce, syncData = newSync } ! [ cmd ]
 
 
-pairedWith : String -> Api.SyncData -> Model -> ( Model, Cmd Msg )
+pairedWith : String -> SyncData -> Model -> ( Model, Cmd Msg )
 pairedWith id syncData model =
-    { model | onlineDevices = Set.insert id model.onlineDevices, syncData = Api.pairedWith id syncData model.syncData }
+    { model | onlineDevices = Set.insert id model.onlineDevices, syncData = SyncData.pairedWith id syncData model.syncData }
         |> syncUpdate syncData
 
 
@@ -335,11 +336,11 @@ syncToOthers model =
         ( { model | debounce = debounce }, cmd )
 
 
-syncUpdate : Api.SyncData -> Model -> ( Model, Cmd Msg )
+syncUpdate : SyncData -> Model -> ( Model, Cmd Msg )
 syncUpdate syncData model =
     let
         newSync =
-            Api.merge syncData model.syncData
+            SyncData.merge syncData model.syncData
 
         ( debounce, cmd ) =
             Debounce.push debounceConfig () model.debounce
