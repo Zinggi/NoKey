@@ -30,6 +30,7 @@ import PasswordGenerator.View as PW
 import Pairing
 import SyncData exposing (SyncData)
 import Api
+import SecretSharing
 import Crdt.ORDict as ORDict exposing (ORDict)
 
 
@@ -48,7 +49,6 @@ type alias Model =
 
     -- TODO: these two should be in a state objects and inside a CRDT for synchronisation
     , syncData : SyncData
-    , sites : List PasswordPart
     }
 
 
@@ -119,8 +119,7 @@ initModel randInt =
         ( indepSeed, seed3 ) =
             Random.step Random.independentSeed seed2
     in
-        { sites = []
-        , newSiteEntry = defaultMetaData
+        { newSiteEntry = defaultMetaData
         , expandSiteEntry = False
         , requirementsState = PW.init
         , seed = seed3
@@ -150,7 +149,7 @@ init flags =
 
 
 type Msg
-    = AddPassword
+    = AddPassword String
     | SiteNameChanged String
     | PasswordLengthChanged Int
     | SecurityLevelChanged Int
@@ -192,14 +191,36 @@ update msg model =
         NoOp ->
             model |> noCmd
 
-        AddPassword ->
+        AddPassword pw ->
             let
                 pwPart =
+                    -- TODO: what to do with the password parts?
                     splitPassword model.newSiteEntry model.requirementsState model.seed
+
+                ( shares, seed2 ) =
+                    -- TODO: distribute shares to others
+                    SecretSharing.splitString ( model.newSiteEntry.securityLevel, SyncData.knownIds model.syncData |> List.length ) pw model.seed
+
+                share =
+                    List.map2
+                        (\id share ->
+                            ( id, share )
+                        )
+                        (SyncData.knownIds model.syncData)
+                        shares
+                        |> Dict.fromList
+
+                { userName, siteName } =
+                    model.newSiteEntry
             in
-                { model | sites = pwPart :: model.sites, newSiteEntry = resetMeta model.newSiteEntry, expandSiteEntry = False }
+                { model
+                    | newSiteEntry = resetMeta model.newSiteEntry
+                    , expandSiteEntry = False
+                    , syncData = SyncData.insertSite siteName userName share model.syncData
+                    , seed = seed2
+                }
                     |> updateSeed
-                    |> noCmd
+                    |> syncToOthers
 
         SiteNameChanged s ->
             { model | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry, expandSiteEntry = not <| String.isEmpty s }
@@ -360,16 +381,23 @@ updateSeed model =
 
 view : Model -> Html Msg
 view model =
-    Html.div []
-        [ viewDevices model.uniqueIdentifyier model.syncData.knownIds model.onlineDevices
-        , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
-        , Html.hr [] []
-        , newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry model.seed
-        , Html.hr [] []
-        , viewSavedSites model.sites
+    let
+        numberOfKnownDevices =
+            SyncData.knownIds model.syncData |> List.length
+    in
+        Html.div []
+            [ viewDevices model.uniqueIdentifyier model.syncData.knownIds model.onlineDevices
+            , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
+            , Html.hr [] []
+            , if numberOfKnownDevices >= 2 then
+                newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry numberOfKnownDevices model.seed
+              else
+                Html.text "pair a device to save your first password"
+            , Html.hr [] []
+            , SyncData.mapSavedSites viewSavedSite model.syncData |> Html.div []
 
-        -- , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
-        ]
+            -- , Html.div [] [ Html.button [ onClick PairDeviceClicked ] [ Html.text "Pair device..." ] ]
+            ]
 
 
 pairingConfig : Bool -> Pairing.Config Msg
@@ -408,15 +436,9 @@ viewDeviceEntry myId uuid name status =
         )
 
 
-viewSavedSites : List PasswordPart -> Html Msg
-viewSavedSites sites =
-    Html.div []
-        (List.map
-            (\({ meta } as spw) ->
-                Html.div [] [ Html.h3 [] [ Html.text meta.siteName ], Html.text (toString spw) ]
-            )
-            sites
-        )
+viewSavedSite : String -> String -> Bool -> Html Msg
+viewSavedSite siteName userName hasShare =
+    Html.div [] [ Html.h3 [] [ Html.text siteName ], Html.text userName, Html.text (" -> has share: " ++ toString hasShare) ]
 
 
 clampedNumberInput : (Int -> msg) -> ( Int, Int, Int ) -> Int -> Html msg
@@ -435,8 +457,8 @@ clampedNumberInput toMsg ( min, default, max ) n =
             []
 
 
-newSiteForm : PW.State -> Bool -> PasswordMetaData -> Seed -> Html Msg
-newSiteForm requirementsState expandSiteEntry entry seed =
+newSiteForm : PW.State -> Bool -> PasswordMetaData -> Int -> Seed -> Html Msg
+newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
     let
         pw =
             Tuple.first (PW.getNextPassword requirementsState entry.length seed)
@@ -455,7 +477,7 @@ newSiteForm requirementsState expandSiteEntry entry seed =
                      , Html.text "Security Level: "
 
                      -- TODO: limit max by number of available devices.
-                     , clampedNumberInput SecurityLevelChanged ( 2, 2, 5 ) entry.securityLevel
+                     , clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
                      , Html.text "Password length: "
                      , clampedNumberInput PasswordLengthChanged ( 4, 16, 512 ) entry.length
                      , PW.view NewPasswordRequirements requirementsState
@@ -466,7 +488,7 @@ newSiteForm requirementsState expandSiteEntry entry seed =
                                 , Html.text thePw
                                 , Html.div
                                     []
-                                    [ Html.button [ onClick AddPassword ] [ Html.text "OK" ]
+                                    [ Html.button [ onClick (AddPassword thePw) ] [ Html.text "OK" ]
                                     , Html.button [ onClick GenerateNewPassword ] [ Html.text "Generate another one!" ]
                                     ]
                                 ]

@@ -1,5 +1,8 @@
-module Crdt.GCounter exposing (GCounter, init, add, merge, get)
+module Crdt.GCounter exposing (GCounter, init, add, merge, get, decoder, encode)
 
+import Json.Decode as JD exposing (Decoder)
+import Json.Encode as JE exposing (Value)
+import Json.Encode.Extra as JE
 import Dict exposing (Dict)
 
 
@@ -10,6 +13,16 @@ type alias GCounter =
 init : GCounter
 init =
     Dict.empty
+
+
+encode : GCounter -> Value
+encode =
+    JE.dict identity JE.int
+
+
+decoder : Decoder GCounter
+decoder =
+    JD.dict JD.int
 
 
 {-| add something to the counter. Negative numberes are interpreted as 0

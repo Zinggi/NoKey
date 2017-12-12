@@ -1,9 +1,11 @@
-module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, decoder, get, update, equal, reset)
+module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, encode2, decoder, get, update, equal, reset, decoder2)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
 import Json.Encode as JE exposing (Value)
+import Json.Encode.Extra as JE
 import Json.Decode as JD exposing (Decoder)
+import Json.Decode.Extra as JD
 import Random.Pcg as Random exposing (Seed)
 import Crdt.ORSet as ORSet exposing (ORSet)
 
@@ -31,9 +33,21 @@ decoder valueDecoder =
         (JD.field "store" (JD.dict valueDecoder))
 
 
+decoder2 : Decoder comparable -> Decoder value -> Decoder (ORDict comparable value)
+decoder2 keyDecoder valueDecoder =
+    JD.map2 ORDict
+        (JD.field "keys" (ORSet.customDecoder keyDecoder))
+        (JD.field "store" (JD.dict2 keyDecoder valueDecoder))
+
+
 encode : (value -> Value) -> ORDict String value -> Value
 encode encodeValue dict =
     JE.object [ ( "keys", ORSet.encode dict.keys ), ( "store", JE.object (Dict.toList (Dict.map (always encodeValue) dict.store)) ) ]
+
+
+encode2 : (comparable -> String) -> (value -> Value) -> ORDict comparable value -> Value
+encode2 encodeKey encodeValue dict =
+    JE.object [ ( "keys", ORSet.encodeCustom encodeKey dict.keys ), ( "store", JE.dict encodeKey encodeValue dict.store ) ]
 
 
 init : Seed -> ORDict comparable value

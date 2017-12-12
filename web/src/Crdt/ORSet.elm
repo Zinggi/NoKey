@@ -1,4 +1,4 @@
-module Crdt.ORSet exposing (ORSet, init, add, remove, get, merge, decoder, encode, equal, reset)
+module Crdt.ORSet exposing (ORSet, init, add, remove, get, merge, decoder, encode, encodeCustom, equal, reset, customDecoder)
 
 {-| This implements an Observed Remove Set, Conflict-free Replicated Data Structure (CRDT)
 
@@ -10,7 +10,9 @@ since this data structure has some internal state for randomness, you have to us
 import Dict exposing (Dict)
 import Set exposing (Set)
 import Json.Decode as JD exposing (Decoder)
+import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
+import Json.Encode.Extra as JE
 import Random.Pcg as Random exposing (Seed)
 import Helper exposing (decodeTuple, encodeTuple, encodeSet, decodeSet)
 
@@ -37,19 +39,22 @@ decoder =
         (JD.dict (decodeTuple (decodeSet JD.int)))
 
 
+customDecoder : Decoder comparable -> Decoder (ORSet comparable)
+customDecoder keyDecoder =
+    JD.map (\d -> { data = d, seed = Random.initialSeed 0 })
+        (JD.dict2 keyDecoder (decodeTuple (decodeSet JD.int)))
+
+
 {-| This encoder won't encode the seed. Other clients don't need to know our internal seed.
 -}
 encode : ORSet String -> Value
 encode =
-    encodeCustomKey identity
+    encodeCustom identity
 
 
-encodeCustomKey : (comparable -> String) -> ORSet comparable -> Value
-encodeCustomKey keyTrans set =
-    JE.object
-        (Dict.toList set.data
-            |> List.map (\( key, ( a, d ) ) -> ( keyTrans key, encodeTuple (encodeSet JE.int) ( a, d ) ))
-        )
+encodeCustom : (comparable -> String) -> ORSet comparable -> Value
+encodeCustom keyTrans set =
+    JE.dict keyTrans (encodeTuple (encodeSet JE.int)) set.data
 
 
 init : Seed -> ORSet comparable
