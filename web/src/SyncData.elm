@@ -4,7 +4,9 @@ import Set exposing (Set)
 import Dict exposing (Dict)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
+import Json.Encode.Extra as JE
 import Random.Pcg as Random exposing (Seed)
+import Time exposing (Time)
 
 
 --
@@ -12,22 +14,23 @@ import Random.Pcg as Random exposing (Seed)
 import Helper exposing (decodeTuple, decodeTuple2, encodeTuple, encodeTuple2)
 import SecretSharing
 import Crdt.ORDict as ORDict exposing (ORDict)
-import Crdt.GSet as GSet exposing (GSet)
-import Crdt.GCounter as GCounter exposing (GCounter)
 import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersionRegister)
+import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 
 
 type alias SyncData =
     { knownIds : ORDict String (SingleVersionRegister String)
 
-    {- Dict (SiteName, UserName) (SecretVersionNumber, DevicesThatKnowAShare) -}
-    , savedSites : ORDict ( String, String ) ( GCounter, GSet String )
+    {- Dict (SiteName, UserName) (Dict DeviceID Share)
+       TODO: the dict should contain encryptedShares instead of the shares directly
+    -}
+    , savedSites : ORDict ( String, String ) (TimestampedVersionRegister (Dict String SecretSharing.Share))
 
     -- private data
     , id : String
+    , seed : Seed
     , synchedWith : Set String
-    , shares : Dict ( String, String ) SecretSharing.Share
-    , sharesForOthers : Dict ( String, String, String ) SecretSharing.Share
+    , myShares : Dict ( String, String ) SecretSharing.Share
     }
 
 
@@ -36,9 +39,9 @@ init seed uuid =
     { knownIds = ORDict.init seed |> ORDict.insert uuid (SingleVersionRegister.init "")
     , synchedWith = Set.empty
     , id = uuid
+    , seed = seed
     , savedSites = ORDict.init seed
-    , shares = Dict.empty
-    , sharesForOthers = Dict.empty
+    , myShares = Dict.empty
     }
 
 
@@ -76,28 +79,23 @@ pairedWith uuid hisSync mySync =
             mySync
 
 
-insertSite : String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData
-insertSite siteName userName shares sync =
-    { sync
-        | savedSites = ORDict.insert ( siteName, userName ) ( GCounter.init, GSet.init ) sync.savedSites
-        , synchedWith = Set.empty
-        , shares =
+insertSite : Time -> String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData
+insertSite timestamp siteName userName shares sync =
+    let
+        ( myShares, sharesForOthers ) =
             case Dict.get sync.id shares of
                 Just share ->
-                    Dict.insert ( siteName, userName ) share sync.shares
+                    ( Dict.insert ( siteName, userName ) share sync.myShares, Dict.remove sync.id shares )
 
                 Nothing ->
-                    sync.shares
-
-        -- TODO: this erases old shares
-        , sharesForOthers =
-            Dict.foldl
-                (\key value acc ->
-                    Dict.insert ( key, siteName, userName ) value acc
-                )
-                sync.sharesForOthers
-                shares
-    }
+                    Debug.log "This should never happen, but there is a save default, so don't crash" <|
+                        ( sync.myShares, shares )
+    in
+        { sync
+            | savedSites = ORDict.insert ( siteName, userName ) (TimestampedVersionRegister.init timestamp sharesForOthers) sync.savedSites
+            , synchedWith = Set.empty
+            , myShares = myShares
+        }
 
 
 {-| mapSavedSites (\siteName userName hasShare -> ..)
@@ -107,7 +105,7 @@ mapSavedSites f sync =
     (ORDict.get sync.savedSites)
         |> Dict.foldl
             (\( siteName, userName ) value acc ->
-                f siteName userName (Dict.member ( siteName, userName ) sync.shares) :: acc
+                f siteName userName (Dict.member ( siteName, userName ) sync.myShares) :: acc
             )
             []
 
@@ -115,19 +113,20 @@ mapSavedSites f sync =
 {-| **CAUTION**
 The order of arguments matter, e.g.
 `newA = merge b a` means merge b into a to produce newA
+
+TODO: upon receive a savedSite for me, take my share out into myShares
+and remove it from the savedSites
+
 -}
-merge : SyncData -> SyncData -> SyncData
-merge other my =
+merge : Time -> SyncData -> SyncData -> SyncData
+merge timestamp other my =
     adjustSynchedWith other
         my
         { my
             | knownIds =
                 ORDict.merge SingleVersionRegister.merge other.knownIds my.knownIds
             , savedSites =
-                ORDict.merge
-                    (\( aCount, aSet ) ( bCount, bSet ) ->
-                        ( GCounter.merge aCount bCount, GSet.merge aSet bSet )
-                    )
+                ORDict.merge TimestampedVersionRegister.merge
                     other.savedSites
                     my.savedSites
         }
@@ -185,15 +184,18 @@ decoder =
             { id = id
             , knownIds = knownIds
             , savedSites = savedSites
-            , shares = Dict.empty
+            , myShares = Dict.empty
             , synchedWith = Set.empty
-            , sharesForOthers = Dict.empty
+            , seed = Random.initialSeed 0
             }
         )
         -- TODO: don't decode id, get it from the sender
         (JD.field "id" JD.string)
         (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder JD.string))
-        (JD.field "savedSites" <| ORDict.decoder2 (decodeTuple JD.string) (decodeTuple2 GCounter.decoder GSet.decoder))
+        (JD.field "savedSites" <|
+            ORDict.decoder2 (decodeTuple JD.string)
+                (TimestampedVersionRegister.decoder (JD.dict SecretSharing.shareDecoder))
+        )
 
 
 encode : SyncData -> Value
@@ -202,5 +204,10 @@ encode s =
     JE.object
         [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) s.knownIds )
         , ( "id", JE.string s.id )
-        , ( "savedSites", ORDict.encode2 (\t -> encodeTuple JE.string t |> JE.encode 0) (encodeTuple2 GCounter.encode GSet.encode) s.savedSites )
+        , ( "savedSites"
+          , ORDict.encode2
+                (\t -> encodeTuple JE.string t |> JE.encode 0)
+                (TimestampedVersionRegister.encode (JE.dict identity SecretSharing.encodeShare))
+                s.savedSites
+          )
         ]

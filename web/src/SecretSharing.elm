@@ -27,7 +27,7 @@ shareDecoder =
 
 shareToJson : Share -> String
 shareToJson s =
-    shareEncoder s
+    encodeShare s
         |> JE.encode 4
 
 
@@ -50,8 +50,8 @@ bigIntDecoder =
             )
 
 
-shareEncoder : Share -> JE.Value
-shareEncoder s =
+encodeShare : Share -> JE.Value
+encodeShare s =
     JE.object
         [ ( "requiredParts", JE.int s.requiredParts )
         , ( "x", JE.int s.x )

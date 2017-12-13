@@ -1,6 +1,9 @@
-module Crdt.VClock exposing (VClock, PartialOrder(..), init, increment, compare, merge)
+module Crdt.VClock exposing (VClock, PartialOrder(..), init, increment, compare, merge, encode, decoder)
 
 import Dict exposing (Dict)
+import Json.Decode as JD exposing (Decoder)
+import Json.Encode as JE exposing (Value)
+import Json.Encode.Extra as JE
 
 
 type alias VClock =
@@ -10,6 +13,16 @@ type alias VClock =
 init : VClock
 init =
     Dict.empty
+
+
+encode : VClock -> Value
+encode =
+    JE.dict identity JE.int
+
+
+decoder : Decoder VClock
+decoder =
+    JD.dict JD.int
 
 
 increment : String -> VClock -> VClock

@@ -1,6 +1,8 @@
-module TimestampedVersionRegister exposing (TimestampedVersionRegister, init, set, merge, get)
+module Crdt.TimestampedVersionRegister exposing (TimestampedVersionRegister, init, set, merge, get, encode, decoder)
 
 import Time exposing (Time)
+import Json.Decode as JD exposing (Decoder)
+import Json.Encode as JE exposing (Value)
 import Crdt.VClock as VClock exposing (VClock, PartialOrder(..))
 
 
@@ -11,6 +13,23 @@ type alias TimestampedVersionRegister a =
 init : Time -> a -> TimestampedVersionRegister a
 init t v =
     { version = VClock.init, value = v, timestamp = t }
+
+
+decoder : Decoder a -> Decoder (TimestampedVersionRegister a)
+decoder valueDecoder =
+    JD.map3 TimestampedVersionRegister
+        (JD.field "version" VClock.decoder)
+        (JD.field "timestamp" JD.float)
+        (JD.field "value" valueDecoder)
+
+
+encode : (a -> Value) -> TimestampedVersionRegister a -> Value
+encode valueEncoder reg =
+    JE.object
+        [ ( "version", VClock.encode reg.version )
+        , ( "timestamp", JE.float reg.timestamp )
+        , ( "value", valueEncoder reg.value )
+        ]
 
 
 set : String -> Time -> a -> TimestampedVersionRegister a -> TimestampedVersionRegister a

@@ -7,7 +7,9 @@ import Json.Encode as JE
 import Json.Decode as JD
 import Dict exposing (Dict)
 import Set exposing (Set)
-import Time
+import Time exposing (Time)
+import Date
+import Task
 
 
 -- TODO: change random to a higher bit version
@@ -157,16 +159,18 @@ type Msg
     | GenerateNewPassword
     | UserNameChanged String
     | ReceiveMessage JE.Value
+    | DecodeReceivedMessage JE.Value Time
     | ReceiveToken (WebData String)
     | PairDeviceClicked
     | GetTokenClicked
     | UpdatePairing Pairing.State
     | TokenSubmitted
-    | PairedWith (Result Http.Error ( String, SyncData ))
+    | PairedWith (Result Http.Error ( String, SyncData, Time ))
     | RejoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
     | SyncToOthers Debounce.Msg
+    | InsertSite String String (Dict String SecretSharing.Share) Time
     | NoOp
 
 
@@ -183,6 +187,12 @@ withCmd cmd a =
 addCmd : List (Cmd msg) -> ( a, Cmd msg ) -> ( a, Cmd msg )
 addCmd cmds ( a, cmd ) =
     ( a, Cmd.batch (cmd :: cmds) )
+
+
+withTimestamp : (Time -> msg) -> Cmd msg
+withTimestamp toMsg =
+    Time.now
+        |> Task.perform (toMsg)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -216,11 +226,14 @@ update msg model =
                 { model
                     | newSiteEntry = resetMeta model.newSiteEntry
                     , expandSiteEntry = False
-                    , syncData = SyncData.insertSite siteName userName share model.syncData
                     , seed = seed2
                 }
                     |> updateSeed
-                    |> syncToOthers
+                    |> withCmd (withTimestamp (InsertSite siteName userName share))
+
+        InsertSite siteName userName share timestamp ->
+            { model | syncData = SyncData.insertSite timestamp siteName userName share model.syncData }
+                |> syncToOthers
 
         SiteNameChanged s ->
             { model | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry, expandSiteEntry = not <| String.isEmpty s }
@@ -249,22 +262,26 @@ update msg model =
                 |> noCmd
 
         ReceiveMessage msg ->
-            model
-                |> (\m ->
-                        -- TODO: include senderID in message + reject messages from unknown sources
-                        case Debug.log "received msg" <| JD.decodeValue Api.serverResponseDecoder msg of
-                            Ok (Api.PairedWith id syncData) ->
-                                pairedWith id syncData m
+            model |> withCmd (withTimestamp (DecodeReceivedMessage msg))
 
-                            Ok (Api.SyncUpdate syncData) ->
-                                syncUpdate syncData m
+        DecodeReceivedMessage msg timestamp ->
+            let
+                _ =
+                    Debug.log ("(at: " ++ toString (Date.fromTime timestamp) ++ ") received msg") msg
+            in
+                -- TODO: include senderID in message + reject messages from unknown sources
+                case JD.decodeValue Api.serverResponseDecoder msg of
+                    Ok (Api.PairedWith id syncData) ->
+                        pairedWith timestamp id syncData model
 
-                            Ok Api.GotRemoved ->
-                                { m | syncData = SyncData.gotRemoved model.syncData } |> noCmd
+                    Ok (Api.SyncUpdate syncData) ->
+                        syncUpdate timestamp syncData model
 
-                            Err e ->
-                                m |> noCmd
-                   )
+                    Ok Api.GotRemoved ->
+                        { model | syncData = SyncData.gotRemoved model.syncData } |> noCmd
+
+                    Err e ->
+                        model |> noCmd
 
         ReceiveToken token ->
             ( { model | pairingDialogue = Pairing.receivedToken token model.pairingDialogue }, Cmd.none )
@@ -289,10 +306,10 @@ update msg model =
 
         PairedWith res ->
             case res of
-                Ok ( id, known_ids ) ->
+                Ok ( id, known_ids, timestamp ) ->
                     model
                         |> (\m -> { m | pairingDialogue = Pairing.pairingCompleted (Ok id) m.pairingDialogue })
-                        |> pairedWith id known_ids
+                        |> pairedWith timestamp id known_ids
 
                 Err e ->
                     model
@@ -342,10 +359,10 @@ update msg model =
                 { model | debounce = debounce, syncData = newSync } ! [ cmd ]
 
 
-pairedWith : String -> SyncData -> Model -> ( Model, Cmd Msg )
-pairedWith id syncData model =
+pairedWith : Time -> String -> SyncData -> Model -> ( Model, Cmd Msg )
+pairedWith timestamp id syncData model =
     { model | onlineDevices = Set.insert id model.onlineDevices, syncData = SyncData.pairedWith id syncData model.syncData }
-        |> syncUpdate syncData
+        |> syncUpdate timestamp syncData
 
 
 syncToOthers : Model -> ( Model, Cmd Msg )
@@ -357,11 +374,11 @@ syncToOthers model =
         ( { model | debounce = debounce }, cmd )
 
 
-syncUpdate : SyncData -> Model -> ( Model, Cmd Msg )
-syncUpdate syncData model =
+syncUpdate : Time -> SyncData -> Model -> ( Model, Cmd Msg )
+syncUpdate timestamp syncData model =
     let
         newSync =
-            SyncData.merge syncData model.syncData
+            SyncData.merge timestamp syncData model.syncData
 
         ( debounce, cmd ) =
             Debounce.push debounceConfig () model.debounce

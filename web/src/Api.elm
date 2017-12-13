@@ -6,6 +6,8 @@ import Json.Encode as JE exposing (Value)
 import Set exposing (Set)
 import RemoteData exposing (WebData)
 import RemoteData.Http
+import Task
+import Time exposing (Time)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -94,7 +96,7 @@ initPairing tagger uuid syncData =
         (JE.object [ ( "deviceId", JE.string uuid ), ( "syncData", SyncData.encode syncData ) ])
 
 
-pairWith : (Result Http.Error ( String, SyncData ) -> msg) -> String -> String -> SyncData -> Cmd msg
+pairWith : (Result Http.Error ( String, SyncData, Time ) -> msg) -> String -> String -> SyncData -> Cmd msg
 pairWith tagger myId token syncData =
     Http.post (apiUrl "/pairWith")
         (Http.jsonBody
@@ -109,7 +111,13 @@ pairWith tagger myId token syncData =
             (JD.field "otherId" JD.string)
             (JD.field "syncData" SyncData.decoder)
         )
-        |> Http.send tagger
+        |> Http.toTask
+        |> Task.andThen
+            (\( id, sync ) ->
+                Time.now
+                    |> Task.map (\time -> ( id, sync, time ))
+            )
+        |> Task.attempt tagger
 
 
 type ServerResponse

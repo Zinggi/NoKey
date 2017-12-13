@@ -1,4 +1,4 @@
-module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, encode2, decoder, get, update, equal, reset, decoder2)
+module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, encode2, decoder, get, update, equal, reset, decoder2, fromDict)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -53,6 +53,11 @@ encode2 encodeKey encodeValue dict =
 init : Seed -> ORDict comparable value
 init seed =
     { keys = ORSet.init seed, store = Dict.empty }
+
+
+fromDict : Seed -> Dict comparable value -> ORDict comparable value
+fromDict seed =
+    Dict.foldl insert (init seed)
 
 
 insert : comparable -> value -> ORDict comparable value -> ORDict comparable value
