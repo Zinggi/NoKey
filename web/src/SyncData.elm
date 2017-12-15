@@ -24,13 +24,19 @@ type alias SyncData =
     {- Dict (SiteName, UserName) (Dict DeviceID Share)
        TODO: the dict should contain encryptedShares instead of the shares directly
     -}
-    , savedSites : ORDict ( String, String ) (TimestampedVersionRegister (Dict String SecretSharing.Share))
+    , savedSites : ORDict ( String, String ) (TimestampedVersionRegister SiteMeta)
 
     -- private data
     , id : String
     , seed : Seed
     , synchedWith : Set String
     , myShares : Dict ( String, String ) SecretSharing.Share
+    }
+
+
+type alias SiteMeta =
+    { sharesForOthers : Dict String SecretSharing.Share
+    , requiredParts : Int
     }
 
 
@@ -48,6 +54,11 @@ init seed uuid =
 knownIds : SyncData -> List String
 knownIds sync =
     ORDict.get sync.knownIds |> Dict.keys
+
+
+knownOtherIds : SyncData -> List String
+knownOtherIds sync =
+    ORDict.get sync.knownIds |> Dict.remove sync.id |> Dict.keys
 
 
 removeDevice : String -> SyncData -> SyncData
@@ -79,8 +90,8 @@ pairedWith uuid hisSync mySync =
             mySync
 
 
-insertSite : Time -> String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData
-insertSite timestamp siteName userName shares sync =
+insertSite : Time -> Int -> String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData
+insertSite timestamp reqParts siteName userName shares sync =
     let
         ( myShares, sharesForOthers ) =
             case Dict.get sync.id shares of
@@ -92,7 +103,10 @@ insertSite timestamp siteName userName shares sync =
                         ( sync.myShares, shares )
     in
         { sync
-            | savedSites = ORDict.insert ( siteName, userName ) (TimestampedVersionRegister.init timestamp sharesForOthers) sync.savedSites
+            | savedSites =
+                ORDict.insert ( siteName, userName )
+                    (TimestampedVersionRegister.init timestamp { sharesForOthers = sharesForOthers, requiredParts = reqParts })
+                    sync.savedSites
             , synchedWith = Set.empty
             , myShares = myShares
         }
@@ -100,12 +114,12 @@ insertSite timestamp siteName userName shares sync =
 
 {-| mapSavedSites (\siteName userName hasShare -> ..)
 -}
-mapSavedSites : (String -> String -> Bool -> a) -> SyncData -> List a
+mapSavedSites : (String -> String -> Int -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
 mapSavedSites f sync =
-    (ORDict.get sync.savedSites)
+    (ORDict.getWith TimestampedVersionRegister.get sync.savedSites)
         |> Dict.foldl
             (\( siteName, userName ) value acc ->
-                f siteName userName (Dict.member ( siteName, userName ) sync.myShares) :: acc
+                f siteName userName value.requiredParts (Dict.get ( siteName, userName ) sync.myShares) :: acc
             )
             []
 
@@ -113,23 +127,47 @@ mapSavedSites f sync =
 {-| **CAUTION**
 The order of arguments matter, e.g.
 `newA = merge b a` means merge b into a to produce newA
-
-TODO: upon receive a savedSite for me, take my share out into myShares
-and remove it from the savedSites
-
 -}
 merge : Time -> SyncData -> SyncData -> SyncData
 merge timestamp other my =
-    adjustSynchedWith other
-        my
-        { my
-            | knownIds =
-                ORDict.merge SingleVersionRegister.merge other.knownIds my.knownIds
-            , savedSites =
-                ORDict.merge TimestampedVersionRegister.merge
-                    other.savedSites
-                    my.savedSites
-        }
+    let
+        newSavedSites =
+            ORDict.merge TimestampedVersionRegister.merge
+                other.savedSites
+                my.savedSites
+
+        ( myShares, sharesForOthers ) =
+            getMyShares my.id my.myShares (ORDict.getWith TimestampedVersionRegister.get newSavedSites)
+    in
+        adjustSynchedWith other
+            my
+            { my
+                | knownIds =
+                    ORDict.merge SingleVersionRegister.merge other.knownIds my.knownIds
+                , savedSites = ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp) sharesForOthers newSavedSites
+                , myShares = myShares
+            }
+
+
+getMyShares :
+    String
+    -> Dict ( String, String ) SecretSharing.Share
+    -> Dict ( String, String ) SiteMeta
+    -> ( Dict ( String, String ) SecretSharing.Share, Dict ( String, String ) SiteMeta )
+getMyShares id myOldShares savedSites =
+    Dict.foldl
+        (\( siteName, userName ) meta ( myShares, other ) ->
+            case Dict.get id meta.sharesForOthers of
+                Just share ->
+                    ( Dict.insert ( siteName, userName ) share myShares
+                    , Dict.insert ( siteName, userName ) { meta | sharesForOthers = Dict.remove id meta.sharesForOthers } other
+                    )
+
+                Nothing ->
+                    ( myShares, other )
+        )
+        ( myOldShares, savedSites )
+        savedSites
 
 
 adjustSynchedWith : SyncData -> SyncData -> SyncData -> SyncData
@@ -194,8 +232,15 @@ decoder =
         (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder JD.string))
         (JD.field "savedSites" <|
             ORDict.decoder2 (decodeTuple JD.string)
-                (TimestampedVersionRegister.decoder (JD.dict SecretSharing.shareDecoder))
+                (TimestampedVersionRegister.decoder siteMetaDecoder)
         )
+
+
+siteMetaDecoder : Decoder SiteMeta
+siteMetaDecoder =
+    JD.map2 SiteMeta
+        (JD.field "sharesForOthers" <| JD.dict SecretSharing.shareDecoder)
+        (JD.field "requiredParts" JD.int)
 
 
 encode : SyncData -> Value
@@ -207,7 +252,15 @@ encode s =
         , ( "savedSites"
           , ORDict.encode2
                 (\t -> encodeTuple JE.string t |> JE.encode 0)
-                (TimestampedVersionRegister.encode (JE.dict identity SecretSharing.encodeShare))
+                (TimestampedVersionRegister.encode encodeSiteMeta)
                 s.savedSites
           )
+        ]
+
+
+encodeSiteMeta : SiteMeta -> Value
+encodeSiteMeta meta =
+    JE.object
+        [ ( "sharesForOthers", JE.dict identity SecretSharing.encodeShare meta.sharesForOthers )
+        , ( "requiredParts", JE.int meta.requiredParts )
         ]

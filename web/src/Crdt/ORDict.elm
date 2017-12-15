@@ -1,4 +1,4 @@
-module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, encode2, decoder, get, update, equal, reset, decoder2, fromDict)
+module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, encode2, decoder, get, update, equal, reset, decoder2, fromDict, getWith, updateWithDict)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -82,24 +82,52 @@ update key f dict =
     }
 
 
+updateWithDict : (a -> b -> b) -> Dict comparable a -> ORDict comparable b -> ORDict comparable b
+updateWithDict f dict ordict =
+    Dict.foldl
+        (\key value acc ->
+            update key (f value) acc
+        )
+        ordict
+        dict
+
+
 remove : comparable -> ORDict comparable value -> ORDict comparable value
 remove key dict =
     { keys = ORSet.remove key dict.keys, store = Dict.remove key dict.store }
 
 
-get : ORDict comparable value -> Dict comparable value
-get dict =
+getWith : (a -> b) -> ORDict comparable a -> Dict comparable b
+getWith f dict =
     Set.foldl
         (\key st ->
             case Dict.get key dict.store of
                 Just v ->
-                    Dict.insert key v st
+                    Dict.insert key (f v) st
 
                 Nothing ->
                     Debug.crash "should always have this value"
         )
         Dict.empty
         (ORSet.get dict.keys)
+
+
+get : ORDict comparable value -> Dict comparable value
+get =
+    getWith identity
+
+
+
+-- Set.foldl
+--     (\key st ->
+--         case Dict.get key dict.store of
+--             Just v ->
+--                 Dict.insert key v st
+--             Nothing ->
+--                 Debug.crash "should always have this value"
+--     )
+--     Dict.empty
+--     (ORSet.get dict.keys)
 
 
 {-| **CAUTION**

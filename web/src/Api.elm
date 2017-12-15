@@ -8,6 +8,7 @@ import RemoteData exposing (WebData)
 import RemoteData.Http
 import Task
 import Time exposing (Time)
+import Dict exposing (Dict)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -19,7 +20,9 @@ import Phoenix.Channel as Channel
 
 --
 
+import Helper exposing (encodeTuple, decodeTuple)
 import SyncData exposing (SyncData)
+import SecretSharing
 
 
 endPointUrl : String -> String -> String
@@ -49,21 +52,28 @@ socketUrl =
 removeDevice : msg -> String -> SyncData -> ( SyncData, Cmd msg )
 removeDevice msg uuid sync =
     ( SyncData.removeDevice uuid sync
-    , informOfRemove msg uuid
+    , informOfRemove msg sync.id uuid
     )
 
 
-informOfRemove : msg -> String -> Cmd msg
-informOfRemove msg uuid =
-    sendMsgTo msg uuid "GotRemoved" []
+informOfRemove : msg -> String -> String -> Cmd msg
+informOfRemove msg myId otherId =
+    sendMsgTo msg myId otherId "GotRemoved" []
 
 
-sendMsgTo : msg -> String -> String -> List ( String, Value ) -> Cmd msg
-sendMsgTo msg id type_ content =
-    Http.post (apiUrl ("/sendMsgTo/" ++ id))
-        (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: content)))
+sendMsgTo : msg -> String -> String -> String -> List ( String, Value ) -> Cmd msg
+sendMsgTo msg myId otherId type_ content =
+    Http.post (apiUrl ("/sendMsgTo/" ++ otherId))
+        (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: ( "from", JE.string myId ) :: content)))
         (JD.succeed ())
         |> Http.send (always msg)
+
+
+sendMsgToAll : msg -> SyncData -> String -> List ( String, Value ) -> Cmd msg
+sendMsgToAll msg sync type_ content =
+    List.map (\id -> sendMsgTo msg sync.id id type_ content)
+        (SyncData.knownOtherIds sync)
+        |> Cmd.batch
 
 
 syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
@@ -76,16 +86,16 @@ syncToOthers msg sync =
         , contactSet
             |> Set.foldl
                 (\id acc ->
-                    syncWith msg id sync :: acc
+                    syncWith msg sync.id id sync :: acc
                 )
                 []
             |> Cmd.batch
         )
 
 
-syncWith : msg -> String -> SyncData -> Cmd msg
-syncWith msg id sync =
-    sendMsgTo msg id "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
+syncWith : msg -> String -> String -> SyncData -> Cmd msg
+syncWith msg myId otherId sync =
+    sendMsgTo msg myId otherId "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
 
 
 initPairing : (WebData String -> msg) -> String -> SyncData -> Cmd msg
@@ -94,6 +104,27 @@ initPairing tagger uuid syncData =
         tagger
         (JD.at [ "token" ] JD.string)
         (JE.object [ ( "deviceId", JE.string uuid ), ( "syncData", SyncData.encode syncData ) ])
+
+
+requestShare : msg -> ( String, String ) -> SyncData -> Cmd msg
+requestShare msg key sync =
+    sendMsgToAll msg sync "RequestShare" [ ( "shareId", encodeTuple JE.string key ) ]
+
+
+grantRequest : msg -> { key : ( String, String ), id : String } -> SyncData -> Cmd msg
+grantRequest msg req sync =
+    case Dict.get req.key sync.myShares of
+        Just share ->
+            sendMsgTo msg
+                sync.id
+                req.id
+                "GrantedShareRequest"
+                [ ( "share", SecretSharing.encodeShare share )
+                , ( "shareId", encodeTuple JE.string req.key )
+                ]
+
+        Nothing ->
+            Cmd.none
 
 
 pairWith : (Result Http.Error ( String, SyncData, Time ) -> msg) -> String -> String -> SyncData -> Cmd msg
@@ -121,31 +152,42 @@ pairWith tagger myId token syncData =
 
 
 type ServerResponse
-    = PairedWith String SyncData
+    = PairedWith SyncData
     | SyncUpdate SyncData
+    | RequestShare ( String, String )
+    | GrantedShareRequest ( String, String ) SecretSharing.Share
     | GotRemoved
 
 
-serverResponseDecoder : JD.Decoder ServerResponse
+serverResponseDecoder : JD.Decoder ( String, ServerResponse )
 serverResponseDecoder =
-    JD.field "type" JD.string
-        |> JD.andThen
-            (\t ->
-                case t of
-                    "PairedWith" ->
-                        JD.map2 PairedWith
-                            (JD.field "otherId" JD.string)
-                            (JD.field "syncData" SyncData.decoder)
+    JD.map2 (,)
+        (JD.field "from" JD.string)
+        (JD.field "type" JD.string
+            |> JD.andThen
+                (\t ->
+                    case t of
+                        "PairedWith" ->
+                            JD.map PairedWith (JD.field "syncData" SyncData.decoder)
 
-                    "SyncUpdate" ->
-                        JD.map SyncUpdate (JD.field "syncData" SyncData.decoder)
+                        "SyncUpdate" ->
+                            JD.map SyncUpdate (JD.field "syncData" SyncData.decoder)
 
-                    "GotRemoved" ->
-                        JD.succeed GotRemoved
+                        "GotRemoved" ->
+                            JD.succeed GotRemoved
 
-                    other ->
-                        JD.fail ("no recognized type: " ++ other)
-            )
+                        "RequestShare" ->
+                            JD.map RequestShare (JD.field "shareId" (decodeTuple JD.string))
+
+                        "GrantedShareRequest" ->
+                            JD.map2 GrantedShareRequest
+                                (JD.field "shareId" (decodeTuple JD.string))
+                                (JD.field "share" SecretSharing.shareDecoder)
+
+                        other ->
+                            JD.fail ("no recognized type: " ++ other)
+                )
+        )
 
 
 connectPrivateSocket : (JE.Value -> msg) -> (JE.Value -> msg) -> String -> Sub msg

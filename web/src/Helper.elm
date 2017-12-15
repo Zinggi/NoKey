@@ -83,6 +83,16 @@ indexedMap f s =
 -- List
 
 
+maybeToList : Maybe a -> List a
+maybeToList mayA =
+    case mayA of
+        Just a ->
+            [ a ]
+
+        Nothing ->
+            []
+
+
 {-| merges a sorted list (from high to low) into another sorted list, dropping duplicates
 -}
 mergeLists : List Int -> List Int -> List Int
@@ -101,6 +111,18 @@ mergeLists a b =
 
         ( aas, [] ) ->
             aas
+
+
+
+-- Bool
+
+
+boolToInt : Bool -> Int
+boolToInt b =
+    if b then
+        1
+    else
+        0
 
 
 
