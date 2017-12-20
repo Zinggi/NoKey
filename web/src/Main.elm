@@ -14,12 +14,13 @@ import Date
 import Task
 
 
--- TODO: change random to a higher bit version
--- also adapt the UUID package
+-- TODO:
+-- adapt the UUID package to use pcg-extended
 -- see:
 --  https://github.com/danyx23/elm-uuid/issues/10
 --  https://github.com/mgold/elm-random-pcg/issues/18
 
+import Random.Pcg.Extended as RandomE
 import Random.Pcg as Random exposing (Generator, Seed)
 import Http
 import Uuid
@@ -45,7 +46,7 @@ type alias Model =
     , requirementsState : PW.State
     , pairingDialogue : Pairing.State
     , showPairingDialogue : Bool
-    , seed : Random.Seed
+    , seed : RandomE.Seed
     , onlineDevices : Devices
     , sitesState : SiteState
     , debounce : Debounce ()
@@ -113,25 +114,21 @@ type alias PasswordPart =
     { pw : Random.Seed, meta : PasswordMetaData, requirements : PasswordRequirements }
 
 
-splitPassword : PasswordMetaData -> PW.State -> Random.Seed -> PasswordPart
-splitPassword meta req seed =
-    -- TODO: the seed is the actual password!
-    -- since the seed IS the password, it should have at least as many bytes of randomness as the desired password length!
-    -- Use the seed that was used to generate the password and split it into parts.
-    -- Use Shamir's secret sharing algorithm
-    PasswordPart (seed) meta (PW.getRequirements req)
-
-
 randomUUID : Generator String
 randomUUID =
     Random.map Uuid.toString Uuid.uuidGenerator
 
 
-initModel : Int -> Model
-initModel randInt =
+initModel : Flags -> Model
+initModel { initialSeed } =
     let
+        -- TODO: ext is not yet used, use it to initialize Random.Pcg.Extended
+        ( base, ext ) =
+            initialSeed
+
         ( uuid, seed2 ) =
-            Random.step randomUUID (Random.initialSeed randInt)
+            -- TODO: replace with pcg-extended
+            Random.step randomUUID (Random.initialSeed base)
 
         ( indepSeed, seed3 ) =
             Random.step Random.independentSeed seed2
@@ -139,7 +136,7 @@ initModel randInt =
         { newSiteEntry = defaultMetaData
         , expandSiteEntry = False
         , requirementsState = PW.init
-        , seed = seed3
+        , seed = RandomE.initialSeed base ext
         , debounce = Debounce.init
         , uniqueIdentifyier = uuid
         , syncData = SyncData.init indepSeed uuid
@@ -159,12 +156,12 @@ debounceConfig =
 
 
 type alias Flags =
-    { initialSeed : Int }
+    { initialSeed : ( Int, List Int ) }
 
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( initModel flags.initialSeed, Cmd.none )
+    ( initModel flags, Cmd.none )
 
 
 type Msg
@@ -223,12 +220,7 @@ update msg model =
 
         AddPassword pw ->
             let
-                pwPart =
-                    -- TODO: what to do with the password parts?
-                    splitPassword model.newSiteEntry model.requirementsState model.seed
-
                 ( shares, seed2 ) =
-                    -- TODO: distribute shares to others
                     SecretSharing.splitString ( model.newSiteEntry.securityLevel, SyncData.knownIds model.syncData |> List.length ) pw model.seed
 
                 share =
@@ -553,7 +545,7 @@ clampedNumberInput toMsg ( min, default, max ) n =
             []
 
 
-newSiteForm : PW.State -> Bool -> PasswordMetaData -> Int -> Seed -> Html Msg
+newSiteForm : PW.State -> Bool -> PasswordMetaData -> Int -> RandomE.Seed -> Html Msg
 newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
     let
         pw =

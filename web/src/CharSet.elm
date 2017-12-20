@@ -2,7 +2,7 @@ module CharSet exposing (..)
 
 import Dict exposing (Dict)
 import Char
-import Random.Pcg as Random exposing (Generator)
+import Random.Pcg.Extended as Random exposing (Generator)
 import Interval exposing (IntervalList)
 
 

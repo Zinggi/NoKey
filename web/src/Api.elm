@@ -25,6 +25,16 @@ import SyncData exposing (SyncData)
 import SecretSharing
 
 
+{- TODO: some informal tests on bandwidth usage have shown that it increases exponentially with the number of devices.
+
+   | #devices         | 1 | 2 |  3 |  4 |
+   --------------------------------------
+   | #bandwidth in kb | 0 | 7 | 16 | 32 |
+
+
+-}
+
+
 endPointUrl : String -> String -> String
 endPointUrl pre path =
     -- TODO: change

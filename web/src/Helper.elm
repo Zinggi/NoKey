@@ -2,7 +2,7 @@ module Helper exposing (..)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
-import Random.Pcg as Random exposing (Generator)
+import Random.Pcg.Extended as Random exposing (Generator)
 import BigInt exposing (BigInt)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)

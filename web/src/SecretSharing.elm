@@ -3,7 +3,7 @@ module SecretSharing exposing (..)
 import BigInt exposing (BigInt)
 import Json.Decode as JD
 import Json.Encode as JE
-import Random.Pcg as Random exposing (Generator, Seed)
+import Random.Pcg.Extended as Random exposing (Generator, Seed)
 import String.UTF8 as UTF8
 
 

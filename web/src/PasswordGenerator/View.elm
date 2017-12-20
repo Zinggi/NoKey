@@ -4,7 +4,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onCheck, onInput)
 import Dict exposing (Dict)
-import Random.Pcg as Random exposing (Seed)
+import Random.Pcg.Extended as Random exposing (Seed)
 
 
 --
