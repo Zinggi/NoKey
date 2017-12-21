@@ -3,6 +3,12 @@ module TestUtils exposing (..)
 import BigInt exposing (BigInt)
 import Fuzz exposing (Fuzzer, tuple, int, string, intRange)
 import Random.Pcg as Random exposing (Seed)
+import Random.Pcg.Extended as RandomE
+
+
+seedE : Fuzzer RandomE.Seed
+seedE =
+    Fuzz.map2 RandomE.initialSeed int (Fuzz.list int)
 
 
 seed : Fuzzer Seed

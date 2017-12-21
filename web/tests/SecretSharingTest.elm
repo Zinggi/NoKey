@@ -42,7 +42,7 @@ suite2 =
 suite : Test
 suite =
     describe "SecretSharing"
-        [ fuzzWith { runs = 20 } (tuple3 ( numShares, smallPosBigInt, seed )) "secret should be recoverable from minimum number of shares" <|
+        [ fuzzWith { runs = 20 } (tuple3 ( numShares, smallPosBigInt, seedE )) "secret should be recoverable from minimum number of shares" <|
             \( ( m, n ), s, seed_ ) ->
                 SecretSharing.splitSecret ( m, n ) s seed_
                     |> Tuple.first

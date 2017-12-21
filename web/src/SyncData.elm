@@ -94,7 +94,7 @@ insertSite timestamp reqParts siteName userName shares sync =
                     ( Dict.insert ( siteName, userName ) share sync.myShares, Dict.remove sync.id shares )
 
                 Nothing ->
-                    Debug.log "This should never happen, but there is a save default, so don't crash" <|
+                    Debug.log "This should never happen, but there is a save default, so we don't crash" <|
                         ( sync.myShares, shares )
     in
         { sync

@@ -25,11 +25,23 @@ import SyncData exposing (SyncData)
 import SecretSharing
 
 
-{- TODO: some informal tests on bandwidth usage have shown that it increases exponentially with the number of devices.
+{- TODO: do some more exhaustive tests of performance
+
+    ## this test tested pairing n devices and changing each name to a three word sentance.
+    the minimum bandwidth would be: n*sizeOf3WordMsg + n*sizeOfPairing
 
    | #devices         | 1 | 2 |  3 |  4 |
    --------------------------------------
    | #bandwidth in kb | 0 | 7 | 16 | 32 |
+
+
+    ## This test starts from n devices paired possition,
+    then meassures how much bytes are transfered on typing a single letter as name.
+    minimum bandwidth would be: n*sizeOfSmallMessage
+    we seem to hit this limit
+
+   | 1 | 2 | 3 | 4 | 5
+   | 0 | 1 | 1 | 3 | 4
 
 
 -}

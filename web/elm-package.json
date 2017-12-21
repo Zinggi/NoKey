@@ -4,7 +4,8 @@
     "repository": "https://github.com/user/project.git",
     "license": "MIT",
     "source-directories": [
-        "src/"
+        "src/",
+        "lib/"
     ],
     "exposed-modules": [],
     "dependencies": {

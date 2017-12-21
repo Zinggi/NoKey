@@ -1,4 +1,4 @@
 {
-  "root": "../src",
+  "root": "../lib",
   "tests": ["Interval", "Crdt.GCounter", "Crdt.PNCounter", "Crdt.VClock", "Crdt.ORSet"]
 }

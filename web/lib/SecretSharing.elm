@@ -12,6 +12,14 @@ import String.UTF8 as UTF8
 import FiniteField exposing (Field, Prime, makeField, primeBiggerThan, secretPolynom, getPolynomialPoints, lagrangeInterpolation)
 
 
+{- TODO: use a smaller field and split multiple messages into smaller chuncks.
+   A good overview is: https://crypto.stackexchange.com/questions/39970/shamirs-secret-sharing-scheme-prime-security/40083#40083
+
+   Look into other finite fields, especially GF(2^256) looks interessting, as it may be more efficient.
+   This might be of help: https://crypto.stackexchange.com/questions/2700/galois-fields-in-cryptography
+-}
+
+
 type alias Share =
     { requiredParts : Int, x : Int, y : BigInt, prime : BigInt }
 
