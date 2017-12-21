@@ -49,18 +49,12 @@ const getRandom53bitInt = () => {
 // e.g. more than enough for 32 character passwords.
 const rands = getRandomInts(9);
 const flags = { initialSeed: [rands[0], rands.slice(1)] };
-console.log(flags);
+// console.log(flags);
 const app = Elm.Main.fullscreen(flags);
 
-/*app.ports.outPort.subscribe((it) => {
-    console.log(it);
-    console.log(it.kind);
-    if (it.kind == "GetNewRandom") {
-        app.ports.inPort.send({ kind: "GetRandomInt", randInt: getRandomInt() });
-    } else {
-        console.log("command ignored: ", it);
-    }
-});*/
+app.ports.setTitle.subscribe((title) => {
+    document.title = title;
+});
 
     </script>
 </body>

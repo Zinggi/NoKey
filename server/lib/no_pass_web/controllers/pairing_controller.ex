@@ -31,7 +31,7 @@ defmodule NoPassWeb.PairingController do
             json conn, %{error: "you can't pair with yourself!"}
           else 
             # send to b the information of a
-            NoPassWeb.Endpoint.broadcast!("private:" <> dev_id_b, "new_msg", %{type: "PairedWith", otherId: dev_id_a, syncData: sync_data_a})
+            NoPassWeb.Endpoint.broadcast!("private:" <> dev_id_b, "new_msg", %{type: "PairedWith", from: dev_id_a, syncData: sync_data_a})
             # send to a the info of b
             json conn, %{ otherId: dev_id_b, syncData: sync_data_b }
           end

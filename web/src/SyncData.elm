@@ -51,6 +51,11 @@ init seed uuid =
     }
 
 
+isKnownId : String -> SyncData -> Bool
+isKnownId id sync =
+    ORDict.get sync.knownIds |> Dict.member id
+
+
 knownIds : SyncData -> List String
 knownIds sync =
     ORDict.get sync.knownIds |> Dict.keys
@@ -78,16 +83,6 @@ gotRemoved sync =
 renameDevice : String -> SyncData -> SyncData
 renameDevice newName sync =
     { sync | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) sync.knownIds, synchedWith = Set.empty }
-
-
-pairedWith : String -> SyncData -> SyncData -> SyncData
-pairedWith uuid hisSync mySync =
-    case Dict.get uuid (ORDict.get hisSync.knownIds) of
-        Just v ->
-            { mySync | knownIds = ORDict.insert uuid v mySync.knownIds }
-
-        Nothing ->
-            mySync
 
 
 insertSite : Time -> Int -> String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData

@@ -18,7 +18,6 @@ import Task
 -- adapt the UUID package to use pcg-extended
 -- see:
 --  https://github.com/danyx23/elm-uuid/issues/10
---  https://github.com/mgold/elm-random-pcg/issues/18
 
 import Random.Pcg.Extended as RandomE
 import Random.Pcg as Random exposing (Generator, Seed)
@@ -38,6 +37,7 @@ import Api
 import Helper exposing (boolToInt, maybeToList)
 import SecretSharing
 import Crdt.ORDict as ORDict exposing (ORDict)
+import Ports
 
 
 type alias Model =
@@ -122,7 +122,6 @@ randomUUID =
 initModel : Flags -> Model
 initModel { initialSeed } =
     let
-        -- TODO: ext is not yet used, use it to initialize Random.Pcg.Extended
         ( base, ext ) =
             initialSeed
 
@@ -277,28 +276,45 @@ update msg model =
             model |> withCmd (withTimestamp (DecodeReceivedMessage msg))
 
         DecodeReceivedMessage msg timestamp ->
-            let
-                _ =
-                    Debug.log ("(at: " ++ toString (Date.fromTime timestamp) ++ ") received msg") msg
-            in
-                -- TODO: include senderID in message + reject messages from unknown sources
-                case JD.decodeValue Api.serverResponseDecoder msg of
-                    Ok ( id, Api.PairedWith syncData ) ->
-                        pairedWith timestamp id syncData model
+            -- TODO: Include authenticity to messages and reject not authentic messages
+            case JD.decodeValue Api.serverResponseDecoder msg of
+                Ok ( id, apiMsg ) ->
+                    let
+                        _ =
+                            Debug.log ("at:   " ++ toString (Date.fromTime timestamp) ++ "\nfrom: " ++ id ++ "\n\n") apiMsg
+                    in
+                        case apiMsg of
+                            Api.PairedWith syncData ->
+                                -- TODO: only accept a PairedWith message if we are expecting one.
+                                -- Otherwise anyone could pair with us, as long as they know our id
+                                pairedWith timestamp id syncData model
 
-                    Ok ( _, Api.SyncUpdate syncData ) ->
-                        syncUpdate timestamp syncData model
+                            other ->
+                                if SyncData.isKnownId id model.syncData then
+                                    case other of
+                                        Api.SyncUpdate syncData ->
+                                            syncUpdate timestamp syncData model
 
-                    Ok ( _, Api.GotRemoved ) ->
-                        { model | syncData = SyncData.gotRemoved model.syncData } |> noCmd
+                                        Api.GotRemoved ->
+                                            { model | syncData = SyncData.gotRemoved model.syncData } |> noCmd
 
-                    Ok ( id, Api.RequestShare key ) ->
-                        { model | shareRequests = { id = id, key = key } :: model.shareRequests } |> noCmd
+                                        Api.RequestShare key ->
+                                            { model | shareRequests = { id = id, key = key } :: model.shareRequests } |> noCmd
 
-                    Ok ( id, Api.GrantedShareRequest key share ) ->
-                        { model | sitesState = Dict.update key (Maybe.map (\a -> share :: a)) model.sitesState } |> noCmd
+                                        Api.GrantedShareRequest key share ->
+                                            { model | sitesState = Dict.update key (Maybe.map (\a -> share :: a)) model.sitesState } |> noCmd
 
-                    Err e ->
+                                        Api.PairedWith _ ->
+                                            -- TODO: refactor, split Api messages into Authenticated / Anonymous messages
+                                            Debug.crash "This can't happen, the branch is already covered by the surrounding case statement"
+                                else
+                                    model |> noCmd
+
+                Err e ->
+                    let
+                        _ =
+                            Debug.log "parse msg failed:" e
+                    in
                         model |> noCmd
 
         ReceiveToken token ->
@@ -352,7 +368,6 @@ update msg model =
                     |> addCmd [ removeCmd ]
 
         SetDeviceName newName ->
-            -- TODO: set page title to quickly see which tab is which
             let
                 newSync =
                     -- do not sync immediately to reduce #of messages.
@@ -360,6 +375,7 @@ update msg model =
             in
                 { model | syncData = newSync }
                     |> syncToOthers
+                    |> addCmd [ Ports.setTitle ("NoPass! (" ++ newName ++ ")") ]
 
         SyncToOthers msg ->
             -- delay the sync update to others, as we might get multiple updates in a short time, so wait until it settled.
@@ -392,7 +408,7 @@ update msg model =
 
 pairedWith : Time -> String -> SyncData -> Model -> ( Model, Cmd Msg )
 pairedWith timestamp id syncData model =
-    { model | onlineDevices = Set.insert id model.onlineDevices, syncData = SyncData.pairedWith id syncData model.syncData }
+    { model | onlineDevices = Set.insert id model.onlineDevices }
         |> syncUpdate timestamp syncData
 
 
