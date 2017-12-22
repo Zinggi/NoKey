@@ -20,9 +20,6 @@ standardRequirements =
     { forbidden = [], atLeastOneOf = [] }
 
 
-{-| TODO: the seed has to come from a secure source for it to be secure.
-Plus it should have way more bits than PCG uses, e.g. Pcg_32_k64 would be much better.
--}
 simpleRandomPassword : Int -> CharSet -> Generator (Result String String)
 simpleRandomPassword length allowedSymbols =
     CharSet.sampleRandom allowedSymbols

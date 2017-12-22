@@ -220,7 +220,12 @@ update msg model =
         AddPassword pw ->
             let
                 ( shares, seed2 ) =
-                    SecretSharing.splitString ( model.newSiteEntry.securityLevel, SyncData.knownIds model.syncData |> List.length ) pw model.seed
+                    SecretSharing.splitString
+                        ( model.newSiteEntry.securityLevel
+                        , SyncData.knownIds model.syncData |> List.length
+                        )
+                        pw
+                        model.seed
 
                 share =
                     List.map2
@@ -247,7 +252,10 @@ update msg model =
                 |> syncToOthers
 
         SiteNameChanged s ->
-            { model | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry, expandSiteEntry = not <| String.isEmpty s }
+            { model
+                | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry
+                , expandSiteEntry = not <| String.isEmpty s
+            }
                 |> noCmd
 
         SecurityLevelChanged n ->
@@ -281,13 +289,15 @@ update msg model =
                 Ok ( id, apiMsg ) ->
                     let
                         _ =
-                            Debug.log ("at:   " ++ toString (Date.fromTime timestamp) ++ "\nfrom: " ++ id ++ "\n\n") apiMsg
+                            Debug.log ("at:   " ++ toString (Date.fromTime timestamp) ++ "\nfrom: " ++ id ++ "\n\n")
+                                apiMsg
                     in
                         case apiMsg of
                             Api.PairedWith syncData ->
                                 -- TODO: only accept a PairedWith message if we are expecting one.
                                 -- Otherwise anyone could pair with us, as long as they know our id
-                                pairedWith timestamp id syncData model
+                                { model | pairingDialogue = Pairing.pairingCompleted (Ok id) model.pairingDialogue }
+                                    |> pairedWith timestamp id syncData
 
                             other ->
                                 if SyncData.isKnownId id model.syncData then
@@ -299,10 +309,17 @@ update msg model =
                                             { model | syncData = SyncData.gotRemoved model.syncData } |> noCmd
 
                                         Api.RequestShare key ->
-                                            { model | shareRequests = { id = id, key = key } :: model.shareRequests } |> noCmd
+                                            { model | shareRequests = { id = id, key = key } :: model.shareRequests }
+                                                |> noCmd
 
                                         Api.GrantedShareRequest key share ->
-                                            { model | sitesState = Dict.update key (Maybe.map (\a -> share :: a)) model.sitesState } |> noCmd
+                                            { model
+                                                | sitesState =
+                                                    Dict.update key
+                                                        (Maybe.map (\a -> share :: a))
+                                                        model.sitesState
+                                            }
+                                                |> noCmd
 
                                         Api.PairedWith _ ->
                                             -- TODO: refactor, split Api messages into Authenticated / Anonymous messages
@@ -340,10 +357,10 @@ update msg model =
 
         PairedWith res ->
             case res of
-                Ok ( id, known_ids, timestamp ) ->
+                Ok ( id, syncData, timestamp ) ->
                     model
                         |> (\m -> { m | pairingDialogue = Pairing.pairingCompleted (Ok id) m.pairingDialogue })
-                        |> pairedWith timestamp id known_ids
+                        |> pairedWith timestamp id syncData
 
                 Err e ->
                     model

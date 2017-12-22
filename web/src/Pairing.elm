@@ -5,6 +5,7 @@ import Html.Attributes as Attr
 import Html.Events exposing (onSubmit, onClick, onInput)
 import RemoteData exposing (WebData, RemoteData(..))
 import Http
+import QRCode
 
 
 type alias State =
@@ -83,6 +84,7 @@ view config diag =
         if config.doShow then
             -- TODO: display QR code
             -- probably using: pablohirafuji/elm-qrcode
+            -- for the scanner, I could use https://github.com/felipenmoura/qr-code-scanner
             Html.div []
                 [ Html.button [ onClick config.onGetTokenClicked ] [ Html.text "Get code" ]
                 , case ( diag.token, diag.tokenSubmitStatus ) of
@@ -105,7 +107,16 @@ view config diag =
                         inp True [ Html.text ("Something went wrong: " ++ toString e) ]
 
                     ( Success t, _ ) ->
-                        inp True [ Html.div [] [ Html.text "token: ", Html.span [] [ Html.text t ] ] ]
+                        inp True
+                            [ Html.div [] [ Html.text "Scan the QR code or type the words shown below." ]
+                            , Html.div []
+                                [ QRCode.encode t
+                                    |> Result.map QRCode.toSvg
+                                    |> Result.withDefault
+                                        (Html.text "Error while encoding to QRCode.")
+                                ]
+                            , Html.div [] [ Html.span [] [ Html.text t ] ]
+                            ]
                 ]
         else
             Html.text ""

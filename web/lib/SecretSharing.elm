@@ -9,11 +9,21 @@ import String.UTF8 as UTF8
 
 --
 
-import FiniteField exposing (Field, Prime, makeField, primeBiggerThan, secretPolynom, getPolynomialPoints, lagrangeInterpolation)
+import FiniteField
+    exposing
+        ( Field
+        , Prime
+        , makeField
+        , primeBiggerThan
+        , secretPolynom
+        , getPolynomialPoints
+        , lagrangeInterpolation
+        )
 
 
 {- TODO: use a smaller field and split multiple messages into smaller chuncks.
-   A good overview is: https://crypto.stackexchange.com/questions/39970/shamirs-secret-sharing-scheme-prime-security/40083#40083
+   A good overview is:
+    https://crypto.stackexchange.com/questions/39970/shamirs-secret-sharing-scheme-prime-security/40083#40083
 
    Look into other finite fields, especially GF(2^256) looks interessting, as it may be more efficient.
    This might be of help: https://crypto.stackexchange.com/questions/2700/galois-fields-in-cryptography
@@ -80,8 +90,13 @@ type alias Secret =
 stringToBigInt : String -> BigInt
 stringToBigInt s =
     UTF8.toBytes s
-        -- convert the string byte by byte, e.g. interpret the string as a base 256 number and convert this number to base 10
-        |> List.foldl (\elm acc -> BigInt.add (BigInt.mul acc (BigInt.fromInt 256)) (BigInt.fromInt elm)) (BigInt.fromInt 0)
+        -- convert the string byte by byte, e.g. interpret the string
+        -- as a base 256 number and convert this number to base 10
+        |> List.foldl
+            (\elm acc ->
+                BigInt.add (BigInt.mul acc (BigInt.fromInt 256)) (BigInt.fromInt elm)
+            )
+            (BigInt.fromInt 0)
 
 
 bigIntToString : BigInt -> String
