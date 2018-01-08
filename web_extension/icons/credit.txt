@@ -1,0 +1,2 @@
+./library.svg:
+    http://mapkeyicons.com/ (CC0)

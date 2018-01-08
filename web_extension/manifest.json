@@ -1,0 +1,33 @@
+{
+  "manifest_version": 2,
+
+  "name": "NoPass!",
+  "version": "0.1",
+
+  "description": "A distributed password manager without a master passwords",
+
+  "icons": {
+    "48": "icons/library.svg",
+    "96": "icons/library.svg"
+  },
+
+  "permissions": [
+    "activeTab"
+  ],
+
+  "browser_action": {
+    "default_icon": "icons/library.svg",
+    "default_title": "NoPass!",
+    "default_popup": "popup/main.html"
+  },
+
+  "web_accessible_resources": [
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_scripts/findPasswordFields.js"]
+    }
+  ]
+}
