@@ -1,10 +1,13 @@
-port module Ports exposing (setTitle)
+port module Ports exposing (setTitle, storeState)
 
--- import Json.Encode exposing (Value)
+import Json.Encode exposing (Value)
 
 
 port setTitle : String -> Cmd msg
 
 
+port storeState : Value -> Cmd msg
 
--- port onSessionChange : (Value -> msg) -> Sub msg
+
+
+-- port onStateChange : (Value -> msg) -> Sub msg

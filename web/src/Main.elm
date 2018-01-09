@@ -5,8 +5,8 @@ import Html.Attributes as Attr
 import Html.Events exposing (onInput, onSubmit, onClick)
 import Html.Lazy exposing (lazy, lazy2)
 import Html.Keyed
-import Json.Encode as JE
-import Json.Decode as JD
+import Json.Encode as JE exposing (Value)
+import Json.Decode as JD exposing (Decoder)
 import Dict exposing (Dict)
 import Set exposing (Set)
 import Time exposing (Time)
@@ -34,7 +34,7 @@ import PasswordGenerator.View as PW
 import Pairing
 import SyncData exposing (SyncData)
 import Api
-import Helper exposing (boolToInt, maybeToList)
+import Helper exposing (boolToInt, maybeToList, noCmd, withCmds, addCmds)
 import SecretSharing
 import Crdt.ORDict as ORDict exposing (ORDict)
 import Ports
@@ -58,6 +58,25 @@ type alias Model =
     -- CRDT for synchronisation
     , syncData : SyncData
     }
+
+
+type alias SaveState =
+    { syncData : SyncData, uuid : String }
+
+
+stateDecoder : Decoder SaveState
+stateDecoder =
+    JD.map2 SaveState
+        (JD.field "syncData" SyncData.completeDecoder)
+        (JD.field "uuid" JD.string)
+
+
+encodeState : Model -> Value
+encodeState { syncData, uniqueIdentifyier } =
+    JE.object
+        [ ( "syncData", SyncData.encodeComplete syncData )
+        , ( "uuid", JE.string uniqueIdentifyier )
+        ]
 
 
 type alias ShareRequest =
@@ -120,7 +139,7 @@ randomUUID =
 
 
 initModel : Flags -> Model
-initModel { initialSeed } =
+initModel { initialSeed, storedState } =
     let
         ( base, ext ) =
             initialSeed
@@ -131,20 +150,32 @@ initModel { initialSeed } =
 
         ( indepSeed, seed3 ) =
             Random.step Random.independentSeed seed2
+
+        makeInit mayId maySync =
+            { newSiteEntry = defaultMetaData
+            , expandSiteEntry = False
+            , requirementsState = PW.init
+            , seed = RandomE.initialSeed base ext
+            , debounce = Debounce.init
+            , uniqueIdentifyier = Maybe.withDefault uuid mayId
+            , syncData = Maybe.withDefault (SyncData.init indepSeed uuid) maySync
+            , onlineDevices = Set.empty
+            , pairingDialogue = Pairing.init
+            , showPairingDialogue = True
+            , shareRequests = []
+            , sitesState = Dict.empty
+            }
     in
-        { newSiteEntry = defaultMetaData
-        , expandSiteEntry = False
-        , requirementsState = PW.init
-        , seed = RandomE.initialSeed base ext
-        , debounce = Debounce.init
-        , uniqueIdentifyier = uuid
-        , syncData = SyncData.init indepSeed uuid
-        , onlineDevices = Set.empty
-        , pairingDialogue = Pairing.init
-        , showPairingDialogue = True
-        , shareRequests = []
-        , sitesState = Dict.empty
-        }
+        case JD.decodeValue stateDecoder storedState of
+            Ok { syncData, uuid } ->
+                makeInit (Just uuid) (Just syncData)
+
+            Err err ->
+                let
+                    _ =
+                        Debug.log "couldn't decode state" err
+                in
+                    makeInit Nothing Nothing
 
 
 debounceConfig : Debounce.Config Msg
@@ -155,12 +186,23 @@ debounceConfig =
 
 
 type alias Flags =
-    { initialSeed : ( Int, List Int ) }
+    { initialSeed : ( Int, List Int )
+    , storedState : Value
+    }
 
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( initModel flags, Cmd.none )
+    let
+        newModel =
+            initModel flags
+    in
+        newModel |> withCmds [ storeState newModel ]
+
+
+storeState : Model -> Cmd Msg
+storeState model =
+    Ports.storeState (encodeState model)
 
 
 type Msg
@@ -188,21 +230,6 @@ type Msg
     | GrantShareRequest ShareRequest
     | RejectShareRequest ShareRequest
     | NoOp
-
-
-noCmd : a -> ( a, Cmd msg )
-noCmd a =
-    ( a, Cmd.none )
-
-
-withCmd : Cmd msg -> a -> ( a, Cmd msg )
-withCmd cmd a =
-    ( a, cmd )
-
-
-addCmd : List (Cmd msg) -> ( a, Cmd msg ) -> ( a, Cmd msg )
-addCmd cmds ( a, cmd ) =
-    ( a, Cmd.batch (cmd :: cmds) )
 
 
 withTimestamp : (Time -> msg) -> Cmd msg
@@ -245,7 +272,7 @@ update msg model =
                     , seed = seed2
                 }
                     |> updateSeed
-                    |> withCmd (withTimestamp (InsertSite siteName userName share model.newSiteEntry.securityLevel))
+                    |> withCmds [ withTimestamp (InsertSite siteName userName share model.newSiteEntry.securityLevel) ]
 
         InsertSite siteName userName share requiredParts timestamp ->
             { model | syncData = SyncData.insertSite timestamp requiredParts siteName userName share model.syncData }
@@ -281,7 +308,7 @@ update msg model =
                 |> noCmd
 
         ReceiveMessage msg ->
-            model |> withCmd (withTimestamp (DecodeReceivedMessage msg))
+            model |> withCmds [ withTimestamp (DecodeReceivedMessage msg) ]
 
         DecodeReceivedMessage msg timestamp ->
             -- TODO: Include authenticity to messages and reject not authentic messages
@@ -344,7 +371,7 @@ update msg model =
         GetTokenClicked ->
             model
                 |> (\m -> { m | pairingDialogue = Pairing.getTockenClicked model.pairingDialogue })
-                |> withCmd (Api.initPairing ReceiveToken model.uniqueIdentifyier model.syncData)
+                |> withCmds [ Api.initPairing ReceiveToken model.uniqueIdentifyier model.syncData ]
 
         UpdatePairing s ->
             { model | pairingDialogue = s }
@@ -353,7 +380,7 @@ update msg model =
         TokenSubmitted ->
             model
                 |> (\m -> { m | pairingDialogue = Pairing.tokenSubmitted m.pairingDialogue })
-                |> withCmd (Api.pairWith PairedWith model.uniqueIdentifyier model.pairingDialogue.inputToken model.syncData)
+                |> withCmds [ Api.pairWith PairedWith model.uniqueIdentifyier model.pairingDialogue.inputToken model.syncData ]
 
         PairedWith res ->
             case res of
@@ -382,7 +409,7 @@ update msg model =
             in
                 { model | syncData = sync }
                     |> syncToOthers
-                    |> addCmd [ removeCmd ]
+                    |> addCmds [ removeCmd ]
 
         SetDeviceName newName ->
             let
@@ -392,7 +419,7 @@ update msg model =
             in
                 { model | syncData = newSync }
                     |> syncToOthers
-                    |> addCmd [ Ports.setTitle ("NoPass! (" ++ newName ++ ")") ]
+                    |> addCmds [ Ports.setTitle ("NoPass (" ++ newName ++ ")") ]
 
         SyncToOthers msg ->
             -- delay the sync update to others, as we might get multiple updates in a short time, so wait until it settled.
@@ -406,16 +433,20 @@ update msg model =
                         (Debounce.takeLast (always cmdToDebounce))
                         msg
                         model.debounce
+
+                newModel =
+                    { model | debounce = debounce, syncData = newSync }
             in
-                { model | debounce = debounce, syncData = newSync } ! [ cmd ]
+                newModel
+                    |> withCmds [ cmd, storeState newModel ]
 
         RequestPasswordPressed key ->
             { model | sitesState = Dict.insert key [] model.sitesState }
-                |> withCmd (Api.requestShare NoOp key model.syncData)
+                |> withCmds [ Api.requestShare NoOp key model.syncData ]
 
         GrantShareRequest req ->
             { model | shareRequests = List.filter (\it -> it /= req) model.shareRequests }
-                |> withCmd (Api.grantRequest NoOp req model.syncData)
+                |> withCmds [ Api.grantRequest NoOp req model.syncData ]
 
         RejectShareRequest req ->
             -- TODO: inform other of reject?

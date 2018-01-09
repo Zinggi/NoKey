@@ -1,4 +1,25 @@
-module Crdt.ORDict exposing (ORDict, init, insert, remove, merge, encode, encode2, decoder, get, update, equal, reset, decoder2, fromDict, getWith, updateWithDict)
+module Crdt.ORDict
+    exposing
+        ( ORDict
+        , init
+        , insert
+        , remove
+        , merge
+        , encode
+        , encode2
+        , decoder
+        , get
+        , update
+        , equal
+        , reset
+        , decoder2
+        , fromDict
+        , getWith
+        , updateWithDict
+        , encodeComplete
+        , completeDecoder
+        , completeDecoder2
+        )
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -33,10 +54,24 @@ decoder valueDecoder =
         (JD.field "store" (JD.dict valueDecoder))
 
 
+completeDecoder : Decoder value -> Decoder (ORDict String value)
+completeDecoder valueDecoder =
+    JD.map2 ORDict
+        (JD.field "keys" ORSet.completeDecoder)
+        (JD.field "store" (JD.dict valueDecoder))
+
+
 decoder2 : Decoder comparable -> Decoder value -> Decoder (ORDict comparable value)
 decoder2 keyDecoder valueDecoder =
     JD.map2 ORDict
         (JD.field "keys" (ORSet.customDecoder keyDecoder))
+        (JD.field "store" (JD.dict2 keyDecoder valueDecoder))
+
+
+completeDecoder2 : Decoder comparable -> Decoder value -> Decoder (ORDict comparable value)
+completeDecoder2 keyDecoder valueDecoder =
+    JD.map2 ORDict
+        (JD.field "keys" (ORSet.completeDecoder2 keyDecoder))
         (JD.field "store" (JD.dict2 keyDecoder valueDecoder))
 
 
@@ -48,6 +83,11 @@ encode encodeValue dict =
 encode2 : (comparable -> String) -> (value -> Value) -> ORDict comparable value -> Value
 encode2 encodeKey encodeValue dict =
     JE.object [ ( "keys", ORSet.encodeCustom encodeKey dict.keys ), ( "store", JE.dict encodeKey encodeValue dict.store ) ]
+
+
+encodeComplete : (comparable -> String) -> (value -> Value) -> ORDict comparable value -> Value
+encodeComplete encodeKey encodeValue dict =
+    JE.object [ ( "keys", ORSet.encodeComplete encodeKey dict.keys ), ( "store", JE.dict encodeKey encodeValue dict.store ) ]
 
 
 init : Seed -> ORDict comparable value

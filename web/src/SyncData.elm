@@ -3,6 +3,7 @@ module SyncData exposing (..)
 import Set exposing (Set)
 import Dict exposing (Dict)
 import Json.Decode as JD exposing (Decoder)
+import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
 import Random.Pcg as Random exposing (Seed)
@@ -11,7 +12,7 @@ import Time exposing (Time)
 
 --
 
-import Helper exposing (decodeTuple, decodeTuple2, encodeTuple, encodeTuple2)
+import Helper exposing (decodeTuple, decodeTuple2, encodeTuple, encodeTuple2, encodeSet, decodeSet)
 import SecretSharing
 import Crdt.ORDict as ORDict exposing (ORDict)
 import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersionRegister)
@@ -231,6 +232,29 @@ decoder =
         )
 
 
+completeDecoder : Decoder SyncData
+completeDecoder =
+    JD.map6
+        (\id knownIds savedSites myShares synchedWith seed ->
+            { id = id
+            , knownIds = knownIds
+            , savedSites = savedSites
+            , myShares = myShares
+            , synchedWith = synchedWith
+            , seed = seed
+            }
+        )
+        (JD.field "id" JD.string)
+        (JD.field "knownIds" <| ORDict.completeDecoder (SingleVersionRegister.decoder JD.string))
+        (JD.field "savedSites" <|
+            ORDict.completeDecoder2 (decodeTuple JD.string)
+                (TimestampedVersionRegister.decoder siteMetaDecoder)
+        )
+        (JD.field "myShares" <| JD.dict2 (decodeTuple JD.string) SecretSharing.shareDecoder)
+        (JD.field "synchedWith" <| decodeSet JD.string)
+        (JD.field "seed" Random.fromJson)
+
+
 siteMetaDecoder : Decoder SiteMeta
 siteMetaDecoder =
     JD.map2 SiteMeta
@@ -250,6 +274,23 @@ encode s =
                 (TimestampedVersionRegister.encode encodeSiteMeta)
                 s.savedSites
           )
+        ]
+
+
+encodeComplete : SyncData -> Value
+encodeComplete s =
+    JE.object
+        [ ( "knownIds", ORDict.encodeComplete identity (SingleVersionRegister.encode JE.string) s.knownIds )
+        , ( "id", JE.string s.id )
+        , ( "savedSites"
+          , ORDict.encodeComplete
+                (\t -> encodeTuple JE.string t |> JE.encode 0)
+                (TimestampedVersionRegister.encode encodeSiteMeta)
+                s.savedSites
+          )
+        , ( "myShares", JE.dict (\t -> encodeTuple JE.string t |> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
+        , ( "synchedWith", encodeSet JE.string s.synchedWith )
+        , ( "seed", Random.toJson s.seed )
         ]
 
 

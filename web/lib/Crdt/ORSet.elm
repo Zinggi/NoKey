@@ -1,4 +1,21 @@
-module Crdt.ORSet exposing (ORSet, init, add, remove, get, merge, decoder, encode, encodeCustom, equal, reset, customDecoder)
+module Crdt.ORSet
+    exposing
+        ( ORSet
+        , init
+        , add
+        , remove
+        , get
+        , merge
+        , decoder
+        , encode
+        , encodeCustom
+        , equal
+        , reset
+        , customDecoder
+        , encodeComplete
+        , completeDecoder
+        , completeDecoder2
+        )
 
 {-| This implements an Observed Remove Set, Conflict-free Replicated Data Structure (CRDT)
 
@@ -45,6 +62,20 @@ customDecoder keyDecoder =
         (JD.dict2 keyDecoder (decodeTuple (decodeSet JD.int)))
 
 
+completeDecoder : Decoder (ORSet String)
+completeDecoder =
+    JD.map2 (\d s -> { data = d, seed = s })
+        (JD.field "data" (JD.dict (decodeTuple (decodeSet JD.int))))
+        (JD.field "seed" Random.fromJson)
+
+
+completeDecoder2 : Decoder comparable -> Decoder (ORSet comparable)
+completeDecoder2 keyDecoder =
+    JD.map2 (\d s -> { data = d, seed = s })
+        (JD.field "data" (JD.dict2 keyDecoder (decodeTuple (decodeSet JD.int))))
+        (JD.field "seed" Random.fromJson)
+
+
 {-| This encoder won't encode the seed. Other clients don't need to know our internal seed.
 -}
 encode : ORSet String -> Value
@@ -55,6 +86,16 @@ encode =
 encodeCustom : (comparable -> String) -> ORSet comparable -> Value
 encodeCustom keyTrans set =
     JE.dict keyTrans (encodeTuple (encodeSet JE.int)) set.data
+
+
+{-| Encode with the seed
+-}
+encodeComplete : (comparable -> String) -> ORSet comparable -> Value
+encodeComplete keyTrans set =
+    JE.object
+        [ ( "data", JE.dict keyTrans (encodeTuple (encodeSet JE.int)) set.data )
+        , ( "seed", Random.toJson set.seed )
+        ]
 
 
 init : Seed -> ORSet comparable

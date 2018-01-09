@@ -8,6 +8,25 @@ import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 
 
+-- Update
+
+
+noCmd : a -> ( a, Cmd msg )
+noCmd a =
+    ( a, Cmd.none )
+
+
+withCmds : List (Cmd msg) -> a -> ( a, Cmd msg )
+withCmds cmds a =
+    ( a, Cmd.batch cmds )
+
+
+addCmds : List (Cmd msg) -> ( a, Cmd msg ) -> ( a, Cmd msg )
+addCmds cmds ( a, cmd ) =
+    ( a, Cmd.batch (cmd :: cmds) )
+
+
+
 -- Maybe
 
 

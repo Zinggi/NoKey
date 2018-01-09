@@ -82,9 +82,7 @@ view config diag =
                 )
     in
         if config.doShow then
-            -- TODO: display QR code
-            -- probably using: pablohirafuji/elm-qrcode
-            -- for the scanner, I could use https://github.com/felipenmoura/qr-code-scanner
+            -- TODO: Scan QR code, I could probably use https://github.com/felipenmoura/qr-code-scanner
             Html.div []
                 [ Html.button [ onClick config.onGetTokenClicked ] [ Html.text "Get code" ]
                 , case ( diag.token, diag.tokenSubmitStatus ) of
