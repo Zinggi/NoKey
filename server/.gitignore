@@ -14,3 +14,7 @@ erl_crash.dump
 # secrets files as long as you replace their contents by environment
 # variables.
 /config/*.secret.exs
+
+# these files are generated/copied from elsewhere
+priv/static/js/main.js
+priv/static/js/setup.js

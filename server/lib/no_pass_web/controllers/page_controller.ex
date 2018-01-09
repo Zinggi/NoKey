@@ -4,4 +4,8 @@ defmodule NoPassWeb.PageController do
   def index(conn, _params) do
     render conn, "index.html"
   end
+
+  def webApp(conn, _params) do
+    render conn, "webApp.html"
+  end
 end

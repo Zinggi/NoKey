@@ -17,9 +17,10 @@ defmodule NoPassWeb.Router do
     pipe_through :browser # Use the default browser stack
 
     get "/", PageController, :index
+    get "/webApp", PageController, :webApp
   end
 
-  # Other scopes may use custom stacks. 
+  # Other scopes may use custom stacks.
   scope "/api", NoPassWeb do
     pipe_through :api
 
