@@ -32,11 +32,10 @@ import Debounce exposing (Debounce)
 import PasswordGenerator exposing (PasswordRequirements)
 import PasswordGenerator.View as PW
 import Pairing
-import SyncData exposing (SyncData)
+import SyncData exposing (SyncData, OtherSharedData)
 import Api
 import Helper exposing (boolToInt, maybeToList, noCmd, withCmds, addCmds)
 import SecretSharing
-import Crdt.ORDict as ORDict exposing (ORDict)
 import Ports
 
 
@@ -101,17 +100,17 @@ type alias Devices =
     Set String
 
 
-devicesMap : (String -> String -> DeviceStatus -> b) -> ORDict String ( Int, String ) -> Devices -> List b
+devicesMap : (String -> String -> DeviceStatus -> b) -> Dict String String -> Devices -> List b
 devicesMap f known_ids devs =
     Dict.foldl
-        (\uuid ( _, name ) acc ->
+        (\uuid name acc ->
             if Set.member uuid devs then
                 f uuid name Online :: acc
             else
                 f uuid name Offline :: acc
         )
         []
-        (ORDict.get known_ids)
+        known_ids
 
 
 type DeviceStatus
@@ -209,6 +208,7 @@ init flags =
         newModel =
             initModel flags
     in
+        -- TODO: ask other devices for updates, e.g. only send our version (unless we know we had an offline change)
         newModel |> withCmds [ storeState newModel ]
 
 
@@ -232,7 +232,7 @@ type Msg
     | GetTokenClicked
     | UpdatePairing Pairing.State
     | TokenSubmitted
-    | PairedWith (Result Http.Error ( String, SyncData, Time ))
+    | PairedWith (Result Http.Error ( String, OtherSharedData, Time ))
     | RejoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
@@ -470,7 +470,7 @@ update msg model =
             resetModel model |> withCmds [ Ports.resetStorage () ]
 
 
-pairedWith : Time -> String -> SyncData -> Model -> ( Model, Cmd Msg )
+pairedWith : Time -> String -> OtherSharedData -> Model -> ( Model, Cmd Msg )
 pairedWith timestamp id syncData model =
     { model | onlineDevices = Set.insert id model.onlineDevices }
         |> syncUpdate timestamp syncData
@@ -485,7 +485,7 @@ syncToOthers model =
         ( { model | debounce = debounce }, cmd )
 
 
-syncUpdate : Time -> SyncData -> Model -> ( Model, Cmd Msg )
+syncUpdate : Time -> OtherSharedData -> Model -> ( Model, Cmd Msg )
 syncUpdate timestamp syncData model =
     let
         newSync =
@@ -514,7 +514,7 @@ view model =
             SyncData.knownIds model.syncData |> List.length
     in
         Html.div []
-            [ viewDevices model.uniqueIdentifyier model.syncData.knownIds model.onlineDevices
+            [ viewDevices model.uniqueIdentifyier (SyncData.knownDevices model.syncData) model.onlineDevices
             , Pairing.view (pairingConfig model.showPairingDialogue) model.pairingDialogue
             , Html.hr [] []
             , Html.div [] (List.map viewShareRequest model.shareRequests)
@@ -546,7 +546,7 @@ viewShareRequest req =
         ]
 
 
-viewDevices : String -> ORDict String ( Int, String ) -> Devices -> Html Msg
+viewDevices : String -> Dict String String -> Devices -> Html Msg
 viewDevices myId knownIds devs =
     Html.table []
         (Html.tr [] [ Html.th [] [ Html.text "name" ], Html.th [] [ Html.text "uuid" ] ]

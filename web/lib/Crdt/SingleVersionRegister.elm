@@ -1,4 +1,4 @@
-module Crdt.SingleVersionRegister exposing (SingleVersionRegister, init, update, merge, decoder, encode)
+module Crdt.SingleVersionRegister exposing (SingleVersionRegister, init, update, merge, decoder, encode, get)
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)

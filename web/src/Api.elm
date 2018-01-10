@@ -3,7 +3,6 @@ module Api exposing (..)
 import Http
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
-import Set exposing (Set)
 import RemoteData exposing (WebData)
 import RemoteData.Http
 import Task
@@ -21,7 +20,7 @@ import Phoenix.Channel as Channel
 --
 
 import Helper exposing (encodeTuple, decodeTuple)
-import SyncData exposing (SyncData)
+import SyncData exposing (SyncData, OtherSharedData)
 import SecretSharing
 
 
@@ -141,7 +140,7 @@ grantRequest msg req sync =
             Cmd.none
 
 
-pairWith : (Result Http.Error ( String, SyncData, Time ) -> msg) -> String -> String -> SyncData -> Cmd msg
+pairWith : (Result Http.Error ( String, OtherSharedData, Time ) -> msg) -> String -> String -> SyncData -> Cmd msg
 pairWith tagger myId token syncData =
     Http.post (apiUrl "/pairWith")
         (Http.jsonBody
@@ -169,8 +168,8 @@ pairWith tagger myId token syncData =
 
 
 type ServerResponse
-    = PairedWith SyncData
-    | SyncUpdate SyncData
+    = PairedWith OtherSharedData
+    | SyncUpdate OtherSharedData
     | RequestShare ( String, String )
     | GrantedShareRequest ( String, String ) SecretSharing.Share
     | GotRemoved
