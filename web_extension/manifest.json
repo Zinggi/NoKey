@@ -12,7 +12,7 @@
   },
 
   "permissions": [
-    "activeTab"
+    "storage"
   ],
 
   "browser_action": {

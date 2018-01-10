@@ -178,6 +178,18 @@ initModel { initialSeed, storedState } =
                     makeInit Nothing Nothing
 
 
+resetModel : Model -> Model
+resetModel model =
+    let
+        int32 =
+            (RandomE.int RandomE.minInt RandomE.maxInt)
+
+        ( initSeed, _ ) =
+            RandomE.step (RandomE.map2 (,) int32 (RandomE.list 8 int32)) model.seed
+    in
+        initModel { initialSeed = initSeed, storedState = JE.null }
+
+
 debounceConfig : Debounce.Config Msg
 debounceConfig =
     { strategy = Debounce.soon (1 * Time.second)
@@ -229,6 +241,7 @@ type Msg
     | RequestPasswordPressed ( String, String )
     | GrantShareRequest ShareRequest
     | RejectShareRequest ShareRequest
+    | ResetDevice
     | NoOp
 
 
@@ -453,6 +466,9 @@ update msg model =
             { model | shareRequests = List.filter (\it -> it /= req) model.shareRequests }
                 |> noCmd
 
+        ResetDevice ->
+            resetModel model |> withCmds [ Ports.resetStorage () ]
+
 
 pairedWith : Time -> String -> SyncData -> Model -> ( Model, Cmd Msg )
 pairedWith timestamp id syncData model =
@@ -509,6 +525,8 @@ view model =
                 Html.text "pair a device to save your first password"
             , Html.hr [] []
             , lazy2 viewSavedSites model.sitesState model.syncData
+            , Html.hr [] []
+            , Html.div [] [ Html.button [ onClick ResetDevice ] [ Html.text "Reset Device" ] ]
             ]
 
 

@@ -101,23 +101,15 @@ sendMsgToAll msg sync type_ content =
 syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
 syncToOthers msg sync =
     let
-        contactSet =
-            SyncData.getContactSet sync
+        ( contactSet, newSync ) =
+            SyncData.syncWithOthers sync
     in
-        ( SyncData.updateSynchedWith contactSet sync
-        , contactSet
-            |> Set.foldl
-                (\id acc ->
-                    syncWith msg sync.id id sync :: acc
-                )
-                []
-            |> Cmd.batch
-        )
+        ( newSync, List.map (\id -> syncWith msg id sync) contactSet |> Cmd.batch )
 
 
-syncWith : msg -> String -> String -> SyncData -> Cmd msg
-syncWith msg myId otherId sync =
-    sendMsgTo msg myId otherId "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
+syncWith : msg -> String -> SyncData -> Cmd msg
+syncWith msg otherId sync =
+    sendMsgTo msg sync.id otherId "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
 
 
 initPairing : (WebData String -> msg) -> String -> SyncData -> Cmd msg
@@ -160,9 +152,12 @@ pairWith tagger myId token syncData =
                 ]
             )
         )
-        (JD.map2 (,)
-            (JD.field "otherId" JD.string)
-            (JD.field "syncData" SyncData.decoder)
+        (JD.field "otherId" JD.string
+            |> JD.andThen
+                (\id ->
+                    (JD.field "syncData" (SyncData.decoder id))
+                        |> JD.map (\s -> ( id, s ))
+                )
         )
         |> Http.toTask
         |> Task.andThen
@@ -183,33 +178,35 @@ type ServerResponse
 
 serverResponseDecoder : JD.Decoder ( String, ServerResponse )
 serverResponseDecoder =
-    JD.map2 (,)
+    (JD.map2 (,)
         (JD.field "from" JD.string)
-        (JD.field "type" JD.string
-            |> JD.andThen
-                (\t ->
-                    case t of
-                        "PairedWith" ->
-                            JD.map PairedWith (JD.field "syncData" SyncData.decoder)
+        (JD.field "type" JD.string)
+    )
+        |> JD.andThen
+            (\( id, t ) ->
+                (case t of
+                    "PairedWith" ->
+                        JD.map PairedWith (JD.field "syncData" (SyncData.decoder id))
 
-                        "SyncUpdate" ->
-                            JD.map SyncUpdate (JD.field "syncData" SyncData.decoder)
+                    "SyncUpdate" ->
+                        JD.map SyncUpdate (JD.field "syncData" (SyncData.decoder id))
 
-                        "GotRemoved" ->
-                            JD.succeed GotRemoved
+                    "GotRemoved" ->
+                        JD.succeed GotRemoved
 
-                        "RequestShare" ->
-                            JD.map RequestShare (JD.field "shareId" (decodeTuple JD.string))
+                    "RequestShare" ->
+                        JD.map RequestShare (JD.field "shareId" (decodeTuple JD.string))
 
-                        "GrantedShareRequest" ->
-                            JD.map2 GrantedShareRequest
-                                (JD.field "shareId" (decodeTuple JD.string))
-                                (JD.field "share" SecretSharing.shareDecoder)
+                    "GrantedShareRequest" ->
+                        JD.map2 GrantedShareRequest
+                            (JD.field "shareId" (decodeTuple JD.string))
+                            (JD.field "share" SecretSharing.shareDecoder)
 
-                        other ->
-                            JD.fail ("no recognized type: " ++ other)
+                    other ->
+                        JD.fail ("no recognized type: " ++ other)
                 )
-        )
+                    |> JD.map (\res -> ( id, res ))
+            )
 
 
 connectPrivateSocket : (JE.Value -> msg) -> (JE.Value -> msg) -> String -> Sub msg

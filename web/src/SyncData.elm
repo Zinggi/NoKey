@@ -1,6 +1,5 @@
 module SyncData exposing (..)
 
-import Set exposing (Set)
 import Dict exposing (Dict)
 import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
@@ -17,8 +16,11 @@ import SecretSharing
 import Crdt.ORDict as ORDict exposing (ORDict)
 import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersionRegister)
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
+import Crdt.VClock as VClock exposing (VClock)
 
 
+{-| TODO: seperate private and true sync data, e.g. syncData we receive is different to our own data
+-}
 type alias SyncData =
     { knownIds : ORDict String (SingleVersionRegister String)
 
@@ -26,11 +28,12 @@ type alias SyncData =
        TODO: the dict should contain encryptedShares instead of the shares directly
     -}
     , savedSites : ORDict ( String, String ) (TimestampedVersionRegister SiteMeta)
+    , version : VClock
 
     -- private data
     , id : String
     , seed : Seed
-    , synchedWith : Set String
+    , synchedWith : Dict String VClock
     , myShares : Dict ( String, String ) SecretSharing.Share
     }
 
@@ -44,7 +47,8 @@ type alias SiteMeta =
 init : Seed -> String -> SyncData
 init seed uuid =
     { knownIds = ORDict.init seed |> ORDict.insert uuid (SingleVersionRegister.init "")
-    , synchedWith = Set.empty
+    , synchedWith = Dict.empty
+    , version = VClock.init
     , id = uuid
     , seed = seed
     , savedSites = ORDict.init seed
@@ -67,9 +71,16 @@ knownOtherIds sync =
     ORDict.get sync.knownIds |> Dict.remove sync.id |> Dict.keys
 
 
+incrementVersion : SyncData -> SyncData
+incrementVersion sync =
+    -- TODO: we only need to increment at most one higher than any of our synchedWith versions
+    -- (e.g. we don't need to increment if we are already higher or concurrent to all synchedWith)
+    { sync | version = VClock.increment sync.id sync.version }
+
+
 removeDevice : String -> SyncData -> SyncData
 removeDevice uuid sync =
-    { sync | knownIds = ORDict.remove uuid sync.knownIds, synchedWith = Set.empty }
+    incrementVersion { sync | knownIds = ORDict.remove uuid sync.knownIds }
 
 
 gotRemoved : SyncData -> SyncData
@@ -77,13 +88,16 @@ gotRemoved sync =
     let
         myName =
             ORDict.get sync.knownIds |> Dict.get sync.id |> Maybe.map Tuple.second |> Maybe.withDefault ""
+
+        newKnownIds =
+            ORDict.reset sync.knownIds |> ORDict.insert sync.id (SingleVersionRegister.init myName)
     in
-        { sync | knownIds = ORDict.reset sync.knownIds |> ORDict.insert sync.id (SingleVersionRegister.init myName), synchedWith = Set.empty }
+        incrementVersion { sync | knownIds = newKnownIds }
 
 
 renameDevice : String -> SyncData -> SyncData
 renameDevice newName sync =
-    { sync | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) sync.knownIds, synchedWith = Set.empty }
+    incrementVersion { sync | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) sync.knownIds }
 
 
 insertSite : Time -> Int -> String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData
@@ -98,14 +112,14 @@ insertSite timestamp reqParts siteName userName shares sync =
                     Debug.log "This should never happen, but there is a save default, so we don't crash" <|
                         ( sync.myShares, shares )
     in
-        { sync
-            | savedSites =
-                ORDict.insert ( siteName, userName )
-                    (TimestampedVersionRegister.init timestamp { sharesForOthers = sharesForOthers, requiredParts = reqParts })
-                    sync.savedSites
-            , synchedWith = Set.empty
-            , myShares = myShares
-        }
+        incrementVersion
+            { sync
+                | savedSites =
+                    ORDict.insert ( siteName, userName )
+                        (TimestampedVersionRegister.init timestamp { sharesForOthers = sharesForOthers, requiredParts = reqParts })
+                        sync.savedSites
+                , myShares = myShares
+            }
 
 
 {-| mapSavedSites (\siteName userName hasShare -> ..)
@@ -135,14 +149,14 @@ merge timestamp other my =
         ( myShares, sharesForOthers ) =
             getMyShares my.id my.myShares (ORDict.getWith TimestampedVersionRegister.get newSavedSites)
     in
-        adjustSynchedWith other
-            my
-            { my
-                | knownIds =
-                    ORDict.merge SingleVersionRegister.merge other.knownIds my.knownIds
-                , savedSites = ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp) sharesForOthers newSavedSites
-                , myShares = myShares
-            }
+        { my
+            | knownIds =
+                ORDict.merge SingleVersionRegister.merge other.knownIds my.knownIds
+            , savedSites = ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp) sharesForOthers newSavedSites
+            , myShares = myShares
+            , version = VClock.merge other.version my.version
+            , synchedWith = Dict.insert other.id other.version my.synchedWith
+        }
 
 
 getMyShares :
@@ -166,79 +180,57 @@ getMyShares id myOldShares savedSites =
         savedSites
 
 
-adjustSynchedWith : SyncData -> SyncData -> SyncData -> SyncData
-adjustSynchedWith other myOld myNew =
-    -- TODO: incorporate savedSites
-    -- TODO: refactor to use a version vector
-    -- e.g. have a single version vector for the version of the data + a dict of versions to keep track of who knows what.
-    { myNew
-        | synchedWith =
-            (if not <| ORDict.equal myNew.knownIds myOld.knownIds then
-                -- I got some new knowledge, assume nobody knows what I know.
-                -- TODO: updating others of the new state that I just received should not be my business,
-                -- it would be more efficient if I'd assume that others also get this update.
-                Set.empty
-             else
-                (if ORDict.equal other.knownIds myNew.knownIds then
-                    -- I didn't receive any new knowledge and the other does know as much as I do, so his information doesn't change anything.
-                    Set.insert other.id myNew.synchedWith
-                 else
-                    -- I didn't receive any new info and the other knows less than I, so let him know in my next update
-                    Set.remove other.id myNew.synchedWith
+syncWithOthers : SyncData -> ( List String, SyncData )
+syncWithOthers sync =
+    let
+        contactSet =
+            List.foldl
+                (\id l ->
+                    case Dict.get id sync.synchedWith of
+                        Just v ->
+                            if VClock.isBeforeOrEqual sync.version v then
+                                l
+                            else
+                                id :: l
+
+                        Nothing ->
+                            id :: l
                 )
-            )
-                |> (\sWith ->
-                        if ORDict.equal myNew.knownIds other.knownIds then
-                            Set.insert other.id sWith
-                        else
-                            sWith
-                   )
-    }
+                []
+                (knownOtherIds sync)
+    in
+        ( contactSet, { sync | synchedWith = List.foldl (\id -> Dict.insert id sync.version) sync.synchedWith contactSet } )
 
 
-getContactSet : SyncData -> Set String
-getContactSet sync =
-    Set.diff (ORDict.get sync.knownIds |> Dict.keys |> Set.fromList) (Set.insert sync.id sync.synchedWith)
-
-
-updateSynchedWith : Set String -> SyncData -> SyncData
-updateSynchedWith s sync =
-    { sync | synchedWith = Set.union s sync.synchedWith }
-
-
-resetSynchedWith : SyncData -> SyncData
-resetSynchedWith sync =
-    { sync | synchedWith = Set.empty }
-
-
-decoder : Decoder SyncData
-decoder =
+decoder : String -> Decoder SyncData
+decoder id =
     JD.map3
-        (\id knownIds savedSites ->
+        (\knownIds savedSites version ->
             { id = id
             , knownIds = knownIds
             , savedSites = savedSites
+            , version = version
             , myShares = Dict.empty
-            , synchedWith = Set.empty
+            , synchedWith = Dict.empty
             , seed = Random.initialSeed 0
             }
         )
-        -- TODO: don't decode id, get it from the sender
-        (JD.field "id" JD.string)
         (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder JD.string))
         (JD.field "savedSites" <|
             ORDict.decoder2 (decodeTuple JD.string)
                 (TimestampedVersionRegister.decoder siteMetaDecoder)
         )
+        (JD.field "version" VClock.decoder)
 
 
 completeDecoder : Decoder SyncData
 completeDecoder =
-    JD.map6
-        (\id knownIds savedSites myShares synchedWith seed ->
+    JD.map7
+        (\id knownIds savedSites myShares synchedWith seed version ->
             { id = id
             , knownIds = knownIds
             , savedSites = savedSites
+            , version = version
             , myShares = myShares
             , synchedWith = synchedWith
             , seed = seed
@@ -251,8 +243,9 @@ completeDecoder =
                 (TimestampedVersionRegister.decoder siteMetaDecoder)
         )
         (JD.field "myShares" <| JD.dict2 (decodeTuple JD.string) SecretSharing.shareDecoder)
-        (JD.field "synchedWith" <| decodeSet JD.string)
+        (JD.field "synchedWith" <| JD.dict VClock.decoder)
         (JD.field "seed" Random.fromJson)
+        (JD.field "version" VClock.decoder)
 
 
 siteMetaDecoder : Decoder SiteMeta
@@ -264,16 +257,15 @@ siteMetaDecoder =
 
 encode : SyncData -> Value
 encode s =
-    -- TODO: don't encode ID
     JE.object
         [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) s.knownIds )
-        , ( "id", JE.string s.id )
         , ( "savedSites"
           , ORDict.encode2
                 (\t -> encodeTuple JE.string t |> JE.encode 0)
                 (TimestampedVersionRegister.encode encodeSiteMeta)
                 s.savedSites
           )
+        , ( "version", VClock.encode s.version )
         ]
 
 
@@ -289,8 +281,9 @@ encodeComplete s =
                 s.savedSites
           )
         , ( "myShares", JE.dict (\t -> encodeTuple JE.string t |> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
-        , ( "synchedWith", encodeSet JE.string s.synchedWith )
+        , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
         , ( "seed", Random.toJson s.seed )
+        , ( "version", VClock.encode s.version )
         ]
 
 

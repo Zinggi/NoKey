@@ -1,4 +1,4 @@
-module Crdt.VClock exposing (VClock, PartialOrder(..), init, increment, compare, merge, encode, decoder)
+module Crdt.VClock exposing (VClock, PartialOrder(..), init, increment, compare, merge, encode, decoder, isBeforeOrEqual)
 
 import Dict exposing (Dict)
 import Json.Decode as JD exposing (Decoder)
@@ -78,6 +78,21 @@ compToOrder a b =
         Equal
     else
         After
+
+
+{-| `isBeforeOrEqual a b` checks if a <= b
+-}
+isBeforeOrEqual : VClock -> VClock -> Bool
+isBeforeOrEqual aC bC =
+    case compare aC bC of
+        Before ->
+            True
+
+        Equal ->
+            True
+
+        _ ->
+            False
 
 
 {-| compare a b

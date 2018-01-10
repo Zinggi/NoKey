@@ -41,7 +41,7 @@ const storeState = (state) => {
 const getState = (onGot) => {
     if (runsInsideExtension()) {
         browser.storage.local.get({state: null})
-            .then(onGot)
+            .then((state) => onGot(state.state))
             .catch(() => {
                 console.error("couldn't get storage!");
             });
@@ -52,6 +52,14 @@ const getState = (onGot) => {
         } else {
             onGot(JSON.parse(state));
         }
+    }
+};
+
+const resetStorage = () => {
+    if (runsInsideExtension()) {
+        browser.storage.local.clear();
+    } else {
+        window.localStorage.clear();
     }
 };
 
@@ -88,6 +96,7 @@ getState((state) => {
         storeState(state);
     });
 
+    app.ports.resetStorage.subscribe(resetStorage);
 });
 
 
