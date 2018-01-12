@@ -233,7 +233,7 @@ type Msg
     | UpdatePairing Pairing.State
     | TokenSubmitted
     | PairedWith (Result Http.Error ( String, OtherSharedData, Time ))
-    | RejoinChannel JE.Value
+    | JoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
     | SyncToOthers Debounce.Msg
@@ -345,6 +345,10 @@ update msg model =
                                         Api.SyncUpdate syncData ->
                                             syncUpdate timestamp syncData model
 
+                                        Api.NeedsUpdate version ->
+                                            { model | syncData = SyncData.receiveVersion id version model.syncData }
+                                                |> syncToOthers
+
                                         Api.GotRemoved ->
                                             { model | syncData = SyncData.gotRemoved model.syncData } |> noCmd
 
@@ -365,7 +369,11 @@ update msg model =
                                             -- TODO: refactor, split Api messages into Authenticated / Anonymous messages
                                             Debug.crash "This can't happen, the branch is already covered by the surrounding case statement"
                                 else
-                                    model |> noCmd
+                                    let
+                                        _ =
+                                            Debug.log ("unknown id: " ++ id)
+                                    in
+                                        model |> noCmd
 
                 Err e ->
                     let
@@ -407,13 +415,12 @@ update msg model =
                         |> (\m -> { m | pairingDialogue = Pairing.pairingCompleted (Err e) m.pairingDialogue })
                         |> noCmd
 
-        RejoinChannel v ->
+        JoinChannel v ->
             let
                 _ =
-                    Debug.log "RejoinChannel" ()
+                    Debug.log "(re)join channel" ()
             in
-                model
-                    |> syncToOthers
+                model |> withCmds [ Api.askForNewVersion NoOp model.syncData ]
 
         RemoveDevice uuid ->
             let
@@ -672,7 +679,7 @@ newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
 
 subs : Model -> Sub Msg
 subs model =
-    Api.connectPrivateSocket ReceiveMessage RejoinChannel model.uniqueIdentifyier
+    Api.connectPrivateSocket ReceiveMessage JoinChannel model.uniqueIdentifyier
 
 
 main : Program Flags Model Msg

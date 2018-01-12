@@ -19,6 +19,7 @@ module Crdt.ORDict
         , encodeComplete
         , completeDecoder
         , completeDecoder2
+        , resetExceptOne
         )
 
 import Dict exposing (Dict)
@@ -29,11 +30,22 @@ import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
 import Random.Pcg as Random exposing (Seed)
 import Crdt.ORSet as ORSet exposing (ORSet)
+import Helper exposing (removeAllExcept)
 
 
 type alias ORDict comparable value =
     { keys : ORSet comparable
     , store : Dict comparable value
+    }
+
+
+resetExceptOne : comparable -> ORDict comparable value -> ORDict comparable value
+resetExceptOne key dict =
+    { keys =
+        ORSet.resetExceptOne key dict.keys
+            |> ORSet.remove key
+            |> ORSet.add key
+    , store = removeAllExcept key dict.store
     }
 
 

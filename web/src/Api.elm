@@ -15,6 +15,7 @@ import Dict exposing (Dict)
 import Phoenix
 import Phoenix.Socket as Socket
 import Phoenix.Channel as Channel
+import Crdt.VClock as VClock exposing (VClock)
 
 
 --
@@ -97,18 +98,35 @@ sendMsgToAll msg sync type_ content =
         |> Cmd.batch
 
 
+sendMsgToGroup : msg -> String -> List String -> String -> List ( String, Value ) -> Cmd msg
+sendMsgToGroup msg myId otherIds type_ content =
+    List.map (\id -> sendMsgTo msg myId id type_ content) otherIds |> Cmd.batch
+
+
+askForNewVersion : msg -> SyncData -> Cmd msg
+askForNewVersion msg sync =
+    sendMsgToAll msg sync "NeedsUpdate" [ ( "version", SyncData.encodeVersion sync ) ]
+
+
+askForNewVersionFrom : msg -> List String -> SyncData -> Cmd msg
+askForNewVersionFrom msg otherIds sync =
+    sendMsgToGroup msg sync.id otherIds "NeedsUpdate" [ ( "version", SyncData.encodeVersion sync ) ]
+
+
 syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
 syncToOthers msg sync =
     let
-        ( contactSet, newSync ) =
+        ( ( needMine, needTheirs ), newSync ) =
             SyncData.syncWithOthers sync
     in
-        ( newSync, List.map (\id -> syncWith msg id sync) contactSet |> Cmd.batch )
+        ( newSync
+        , Cmd.batch [ syncWith msg needMine sync, askForNewVersionFrom msg needTheirs sync ]
+        )
 
 
-syncWith : msg -> String -> SyncData -> Cmd msg
-syncWith msg otherId sync =
-    sendMsgTo msg sync.id otherId "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
+syncWith : msg -> List String -> SyncData -> Cmd msg
+syncWith msg otherIds sync =
+    sendMsgToGroup msg sync.id otherIds "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
 
 
 initPairing : (WebData String -> msg) -> String -> SyncData -> Cmd msg
@@ -173,6 +191,7 @@ type ServerResponse
     | RequestShare ( String, String )
     | GrantedShareRequest ( String, String ) SecretSharing.Share
     | GotRemoved
+    | NeedsUpdate VClock
 
 
 serverResponseDecoder : JD.Decoder ( String, ServerResponse )
@@ -201,6 +220,9 @@ serverResponseDecoder =
                             (JD.field "shareId" (decodeTuple JD.string))
                             (JD.field "share" SecretSharing.shareDecoder)
 
+                    "NeedsUpdate" ->
+                        JD.map NeedsUpdate (JD.field "version" VClock.decoder)
+
                     other ->
                         JD.fail ("no recognized type: " ++ other)
                 )
@@ -209,7 +231,7 @@ serverResponseDecoder =
 
 
 connectPrivateSocket : (JE.Value -> msg) -> (JE.Value -> msg) -> String -> Sub msg
-connectPrivateSocket tagger onRejoin uuid =
+connectPrivateSocket tagger onJoin uuid =
     let
         socket =
             Socket.init socketUrl
@@ -220,6 +242,6 @@ connectPrivateSocket tagger onRejoin uuid =
                 |> Channel.on "new_msg" tagger
                 |> Channel.withDebug
                 |> Channel.withPayload (JE.object [ ( "uuid", JE.string uuid ) ])
-                |> Channel.onRejoin onRejoin
+                |> Channel.onJoin onJoin
     in
         Phoenix.connect socket [ channel ]

@@ -15,6 +15,7 @@ module Crdt.ORSet
         , encodeComplete
         , completeDecoder
         , completeDecoder2
+        , resetExceptOne
         )
 
 {-| This implements an Observed Remove Set, Conflict-free Replicated Data Structure (CRDT)
@@ -31,7 +32,7 @@ import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
 import Random.Pcg as Random exposing (Seed)
-import Helper exposing (decodeTuple, encodeTuple, encodeSet, decodeSet)
+import Helper exposing (decodeTuple, encodeTuple, encodeSet, decodeSet, removeAllExcept)
 
 
 type alias ORSet comparable =
@@ -43,6 +44,11 @@ type alias ORSet comparable =
 reset : ORSet comparable -> ORSet comparable
 reset set =
     { set | data = Dict.empty }
+
+
+resetExceptOne : comparable -> ORSet comparable -> ORSet comparable
+resetExceptOne key set =
+    { set | data = removeAllExcept key set.data }
 
 
 equal : ORSet comparable -> ORSet comparable -> Bool

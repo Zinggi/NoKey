@@ -70,6 +70,16 @@ filterDict sets =
             )
 
 
+removeAllExcept : comparable -> Dict comparable value -> Dict comparable value
+removeAllExcept key dict =
+    case Dict.get key dict of
+        Just v ->
+            Dict.singleton key v
+
+        Nothing ->
+            Dict.empty
+
+
 
 -- String
 

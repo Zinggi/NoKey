@@ -116,8 +116,10 @@ getName sync =
 
 gotRemoved : SyncData -> SyncData
 gotRemoved sync =
+    -- clear all data
     (init sync.seed sync.id)
-        |> renameDevice (getName sync)
+        -- keep version history of this device
+        |> updateShared (\s -> { s | knownIds = ORDict.resetExceptOne sync.id sync.shared.knownIds })
 
 
 renameDevice : String -> SyncData -> SyncData
@@ -178,9 +180,14 @@ merge timestamp other my =
                 , savedSites = ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp) sharesForOthers newSavedSites
                 , version = VClock.merge other.shared.version my.shared.version
                 }
-            , synchedWith = Dict.insert other.id other.shared.version my.synchedWith
             , myShares = myShares
         }
+            |> receiveVersion other.id other.shared.version
+
+
+receiveVersion : String -> VClock -> SyncData -> SyncData
+receiveVersion from version sync =
+    { sync | synchedWith = Dict.insert from version sync.synchedWith }
 
 
 getMyShares :
@@ -204,26 +211,31 @@ getMyShares id myOldShares savedSites =
         savedSites
 
 
-syncWithOthers : SyncData -> ( List String, SyncData )
+syncWithOthers : SyncData -> ( ( List String, List String ), SyncData )
 syncWithOthers sync =
     let
-        contactSet =
+        contactSets =
             List.foldl
-                (\id l ->
+                (\id ( needMine, needTheirs ) ->
                     case Dict.get id sync.synchedWith of
                         Just v ->
-                            if VClock.isBeforeOrEqual sync.shared.version v then
-                                l
+                            if VClock.isBefore sync.shared.version v then
+                                ( needMine, id :: needTheirs )
+                            else if VClock.isEqual sync.shared.version v then
+                                ( needMine, needTheirs )
                             else
-                                id :: l
+                                ( id :: needMine, needTheirs )
 
                         Nothing ->
-                            id :: l
+                            ( id :: needMine, needTheirs )
                 )
-                []
+                ( [], [] )
                 (knownOtherIds sync)
     in
-        ( contactSet, { sync | synchedWith = List.foldl (\id -> Dict.insert id sync.shared.version) sync.synchedWith contactSet } )
+        ( contactSets
+          -- assume it gets delivered
+        , { sync | synchedWith = List.foldl (\id -> Dict.insert id sync.shared.version) sync.synchedWith (Tuple.first contactSets) }
+        )
 
 
 decoder : String -> Decoder OtherSharedData
@@ -307,9 +319,14 @@ encodeComplete s =
           )
         , ( "myShares", JE.dict (\t -> encodeTuple JE.string t |> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
         , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
-        , ( "version", VClock.encode s.shared.version )
+        , ( "version", encodeVersion s )
         , ( "seed", Random.toJson s.seed )
         ]
+
+
+encodeVersion : SyncData -> Value
+encodeVersion sync =
+    VClock.encode sync.shared.version
 
 
 encodeSiteMeta : SiteMeta -> Value
