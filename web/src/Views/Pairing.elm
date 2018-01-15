@@ -1,4 +1,4 @@
-module Pairing exposing (State, Config, view, receivedToken, init, tokenSubmitted, pairingCompleted, getTockenClicked)
+module Views.Pairing exposing (State, Config, view, receivedToken, init, tokenSubmitted, pairingCompleted, getTockenClicked)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -25,7 +25,6 @@ type alias Config msg =
     { onGetTokenClicked : msg
     , onSubmitToken : msg
     , toMsg : State -> msg
-    , doShow : Bool
     }
 
 
@@ -61,12 +60,13 @@ tokenSubmitted s =
     { s | tokenSubmitStatus = Submitted }
 
 
+pairingCompleted : Result Http.Error String -> State -> State
 pairingCompleted a s =
     { s | tokenSubmitStatus = Answer a }
 
 
-view : Config msg -> State -> Html msg
-view config diag =
+view : Config msg -> Bool -> State -> Html msg
+view config doShow diag =
     let
         inp isEnabled rest =
             Html.form [ onSubmit config.onSubmitToken ]
@@ -81,7 +81,7 @@ view config diag =
                     ++ rest
                 )
     in
-        if config.doShow then
+        if doShow then
             -- TODO: Scan QR code, I could probably use https://github.com/felipenmoura/qr-code-scanner
             Html.div []
                 [ Html.button [ onClick config.onGetTokenClicked ] [ Html.text "Get code" ]

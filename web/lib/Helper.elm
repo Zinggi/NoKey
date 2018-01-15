@@ -3,9 +3,13 @@ module Helper exposing (..)
 import Dict exposing (Dict)
 import Set exposing (Set)
 import Random.Pcg.Extended as Random exposing (Generator)
+import Random.Pcg as RandomP
 import BigInt exposing (BigInt)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
+import Uuid
+import Time exposing (Time)
+import Task
 
 
 -- Update
@@ -24,6 +28,12 @@ withCmds cmds a =
 addCmds : List (Cmd msg) -> ( a, Cmd msg ) -> ( a, Cmd msg )
 addCmds cmds ( a, cmd ) =
     ( a, Cmd.batch (cmd :: cmds) )
+
+
+withTimestamp : (Time -> msg) -> Cmd msg
+withTimestamp toMsg =
+    Time.now
+        |> Task.perform (toMsg)
 
 
 
@@ -194,6 +204,11 @@ encodeSet valueEncoder set =
 
 
 -- Random
+
+
+randomUUID : RandomP.Generator String
+randomUUID =
+    RandomP.map Uuid.toString Uuid.uuidGenerator
 
 
 flatten : List (Generator a) -> Generator (List a)

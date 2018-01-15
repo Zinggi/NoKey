@@ -1,4 +1,4 @@
-module SyncData exposing (..)
+module Data.Sync exposing (..)
 
 import Dict exposing (Dict)
 import Json.Decode as JD exposing (Decoder)

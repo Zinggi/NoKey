@@ -1,14 +1,10 @@
-module PasswordGenerator.View exposing (..)
+module Views.PasswordGenerator exposing (State, init, view, getNextPassword, getRequirements)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events exposing (onCheck, onInput)
 import Dict exposing (Dict)
 import Random.Pcg.Extended as Random exposing (Seed)
-
-
---
-
 import PasswordGenerator as PG exposing (PasswordRequirements)
 import CharSet exposing (CharSet)
 import Interval
@@ -87,6 +83,7 @@ viewSets toMsg sets =
             )
 
 
+customSet : (String -> msg) -> String -> Html msg
 customSet toMsg set =
     Html.div []
         [ Html.text "Custom: "

@@ -1,4 +1,4 @@
-module Api exposing (..)
+module Protocol.Api exposing (..)
 
 import Http
 import Json.Decode as JD exposing (Decoder)
@@ -21,7 +21,7 @@ import Crdt.VClock as VClock exposing (VClock)
 --
 
 import Helper exposing (encodeTuple, decodeTuple)
-import SyncData exposing (SyncData, OtherSharedData)
+import Data.Sync exposing (SyncData, OtherSharedData)
 import SecretSharing
 
 
@@ -73,7 +73,7 @@ socketUrl =
 
 removeDevice : msg -> String -> SyncData -> ( SyncData, Cmd msg )
 removeDevice msg uuid sync =
-    ( SyncData.removeDevice uuid sync
+    ( Data.Sync.removeDevice uuid sync
     , informOfRemove msg sync.id uuid
     )
 
@@ -94,7 +94,7 @@ sendMsgTo msg myId otherId type_ content =
 sendMsgToAll : msg -> SyncData -> String -> List ( String, Value ) -> Cmd msg
 sendMsgToAll msg sync type_ content =
     List.map (\id -> sendMsgTo msg sync.id id type_ content)
-        (SyncData.knownOtherIds sync)
+        (Data.Sync.knownOtherIds sync)
         |> Cmd.batch
 
 
@@ -105,19 +105,19 @@ sendMsgToGroup msg myId otherIds type_ content =
 
 askForNewVersion : msg -> SyncData -> Cmd msg
 askForNewVersion msg sync =
-    sendMsgToAll msg sync "NeedsUpdate" [ ( "version", SyncData.encodeVersion sync ) ]
+    sendMsgToAll msg sync "NeedsUpdate" [ ( "version", Data.Sync.encodeVersion sync ) ]
 
 
 askForNewVersionFrom : msg -> List String -> SyncData -> Cmd msg
 askForNewVersionFrom msg otherIds sync =
-    sendMsgToGroup msg sync.id otherIds "NeedsUpdate" [ ( "version", SyncData.encodeVersion sync ) ]
+    sendMsgToGroup msg sync.id otherIds "NeedsUpdate" [ ( "version", Data.Sync.encodeVersion sync ) ]
 
 
 syncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
 syncToOthers msg sync =
     let
         ( ( needMine, needTheirs ), newSync ) =
-            SyncData.syncWithOthers sync
+            Data.Sync.syncWithOthers sync
     in
         ( newSync
         , Cmd.batch [ syncWith msg needMine sync, askForNewVersionFrom msg needTheirs sync ]
@@ -126,7 +126,7 @@ syncToOthers msg sync =
 
 syncWith : msg -> List String -> SyncData -> Cmd msg
 syncWith msg otherIds sync =
-    sendMsgToGroup msg sync.id otherIds "SyncUpdate" [ ( "syncData", SyncData.encode sync ) ]
+    sendMsgToGroup msg sync.id otherIds "SyncUpdate" [ ( "syncData", Data.Sync.encode sync ) ]
 
 
 initPairing : (WebData String -> msg) -> String -> SyncData -> Cmd msg
@@ -134,7 +134,7 @@ initPairing tagger uuid syncData =
     RemoteData.Http.post (apiUrl "/initPairing")
         tagger
         (JD.at [ "token" ] JD.string)
-        (JE.object [ ( "deviceId", JE.string uuid ), ( "syncData", SyncData.encode syncData ) ])
+        (JE.object [ ( "deviceId", JE.string uuid ), ( "syncData", Data.Sync.encode syncData ) ])
 
 
 requestShare : msg -> ( String, String ) -> SyncData -> Cmd msg
@@ -165,14 +165,14 @@ pairWith tagger myId token syncData =
             (JE.object
                 [ ( "deviceId", JE.string myId )
                 , ( "token", JE.string token )
-                , ( "syncData", SyncData.encode syncData )
+                , ( "syncData", Data.Sync.encode syncData )
                 ]
             )
         )
         (JD.field "otherId" JD.string
             |> JD.andThen
                 (\id ->
-                    (JD.field "syncData" (SyncData.decoder id))
+                    (JD.field "syncData" (Data.Sync.decoder id))
                         |> JD.map (\s -> ( id, s ))
                 )
         )
@@ -194,6 +194,11 @@ type ServerResponse
     | NeedsUpdate VClock
 
 
+decodeServerResponse : Value -> Result String ( String, ServerResponse )
+decodeServerResponse msg =
+    JD.decodeValue serverResponseDecoder msg
+
+
 serverResponseDecoder : JD.Decoder ( String, ServerResponse )
 serverResponseDecoder =
     (JD.map2 (,)
@@ -204,10 +209,10 @@ serverResponseDecoder =
             (\( id, t ) ->
                 (case t of
                     "PairedWith" ->
-                        JD.map PairedWith (JD.field "syncData" (SyncData.decoder id))
+                        JD.map PairedWith (JD.field "syncData" (Data.Sync.decoder id))
 
                     "SyncUpdate" ->
-                        JD.map SyncUpdate (JD.field "syncData" (SyncData.decoder id))
+                        JD.map SyncUpdate (JD.field "syncData" (Data.Sync.decoder id))
 
                     "GotRemoved" ->
                         JD.succeed GotRemoved
