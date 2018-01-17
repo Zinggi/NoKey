@@ -25,7 +25,7 @@
   ],
 
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["build/background.js", "build/setup.js","background.js"]
   },
 
   "content_scripts": [

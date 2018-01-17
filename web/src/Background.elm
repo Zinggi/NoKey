@@ -24,9 +24,30 @@ import Data.Storage
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
+import PortUtils
 
 
 -- Model
+
+
+decodeModel : Value -> Result String Model
+decodeModel value =
+    Ok (PortUtils.fromJs value)
+
+
+encodeModel : Model -> Value
+encodeModel model =
+    PortUtils.toJs model
+
+
+encodeMsg : Msg -> Value
+encodeMsg msg =
+    PortUtils.toJs msg
+
+
+decodeMsg : Value -> Msg
+decodeMsg value =
+    PortUtils.fromJs value
 
 
 type alias Model =
@@ -97,7 +118,7 @@ initModel { initialSeed, storedState } =
     in
         case Data.Storage.decode storedState of
             Ok { syncData, uniqueIdentifyier } ->
-                makeInit (Just uuid) (Just syncData)
+                makeInit (Just uniqueIdentifyier) (Just syncData)
 
             Err err ->
                 let
@@ -153,7 +174,7 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    (case msg of
         NoOp ->
             model |> noCmd
 
@@ -375,6 +396,8 @@ update msg model =
 
         ResetDevice ->
             resetModel model |> withCmds [ Ports.resetStorage () ]
+    )
+        |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (encodeModel newModel) ] ))
 
 
 updateSeed : Model -> Model
@@ -437,4 +460,8 @@ storeState model =
 
 subs : Model -> Sub Msg
 subs model =
-    Api.connectPrivateSocket ReceiveMessage JoinChannel model.uniqueIdentifyier
+    [ Api.connectPrivateSocket ReceiveMessage JoinChannel model.uniqueIdentifyier
+    , Ports.onStateRequest (always NoOp)
+    , Ports.onReceiveMsg decodeMsg
+    ]
+        |> Sub.batch

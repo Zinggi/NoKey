@@ -1,15 +1,15 @@
 {
     "version": "1.0.0",
-    "summary": "pw",
+    "summary": "helpful summary of your project, less than 80 characters",
     "repository": "https://github.com/user/project.git",
-    "license": "MIT",
+    "license": "BSD3",
     "source-directories": [
-        "src/",
-        "lib/"
+        ".",
+        "../web/src/",
+        "../web/lib/"
     ],
     "exposed-modules": [],
     "dependencies": {
-        "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "Zinggi/elm-random-pcg-extended": "2.0.0 <= v < 3.0.0",
         "danyx23/elm-uuid": "2.1.1 <= v < 3.0.0",
         "elm-community/json-extra": "2.6.0 <= v < 3.0.0",

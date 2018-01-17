@@ -76,28 +76,35 @@ const getRandomInts = (n) => {
 // e.g. more than enough for 32 character passwords.
 const rands = getRandomInts(9);
 
-getState((state) => {
-    console.log("stored state: ", state);
-    const flags = {
-        initialSeed: [rands[0], rands.slice(1)],
-        storedState: state
-    };
 
-    // console.log(flags);
-    const app = Elm.Main.fullscreen(flags);
+const setup = (startFn, onStart) => {
+    getState((state) => {
+        console.log("stored state: ", state);
+        const flags = {
+            initialSeed: [rands[0], rands.slice(1)],
+            storedState: state
+        };
 
-    app.ports.setTitle.subscribe((title) => {
-        document.title = title;
+        // console.log(flags);
+        const app = startFn(flags);
+
+        app.ports.setTitle.subscribe((title) => {
+            document.title = title;
+        });
+
+
+        app.ports.storeState.subscribe((state) => {
+            console.log("store state: ", state);
+            storeState(state);
+        });
+
+        app.ports.resetStorage.subscribe(resetStorage);
+
+        if (onStart) {
+            onStart(app);
+        }
     });
-
-
-    app.ports.storeState.subscribe((state) => {
-        console.log("store state: ", state);
-        storeState(state);
-    });
-
-    app.ports.resetStorage.subscribe(resetStorage);
-});
+};
 
 
 
