@@ -31,7 +31,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content_scripts/findPasswordFields.js"]
+      "js": ["build/popup.js", "content_scripts/findPasswordFields.js"]
     }
   ]
 }

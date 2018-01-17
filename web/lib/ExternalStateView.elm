@@ -1,7 +1,6 @@
 port module ExternalStateView exposing (Config, program, sendMsgToBackground, onNewState, getState)
 
-{-| TODO: this is a proof of concept, doesn't work yet!
-more here: <https://discourse.elm-lang.org/t/one-background-wroker-multiple-views-of-the-same-state-possible/540>
+{-| More info here: <https://discourse.elm-lang.org/t/one-background-wroker-multiple-views-of-the-same-state-possible/540>
 -}
 
 import Html exposing (Html)

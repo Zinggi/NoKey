@@ -70,6 +70,12 @@ viewDevices myId knownIds =
         )
 
 
+{-| TODO: fix input lag on input fields. Workaround:
+
+    https://github.com/elm-lang/html/issues/105#issuecomment-309524197
+    https://ellie-app.com/3fPSxX6VHK7a1/0
+
+-}
 viewDeviceEntry : String -> String -> String -> Html Msg
 viewDeviceEntry myId uuid name =
     tr []
