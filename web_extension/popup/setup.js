@@ -1,18 +1,16 @@
 const app = Elm.Popup.fullscreen();
-const bgWindow = browser.extension.getBackgroundPage();
-const backgroundApp = bgWindow.backgroundApp;
 
-backgroundApp.onSendOutNewState = (state) => {
-    // console.log("got new state, sending to app:", state);
+const port = browser.runtime.connect({name: "popup"});
+port.onMessage.addListener(function(state) {
+    // console.log("(popup) got new state", state);
     app.ports.onNewState.send(state);
-};
+});
 
 app.ports.getState.subscribe(() => {
-    // console.log("ask background for its state");
-    backgroundApp.ports.onStateRequest.send({});
+    // console.log("(popup) getState");
+    port.postMessage({type: "onStateRequest", data: {}});
 });
-app.ports.sendMsgToBackground.subscribe((msg) => {
-    // console.log("send msg to background:", msg);
-    backgroundApp.ports.onReceiveMsg.send(msg);
+app.ports.sendMsgToBackground.subscribe((msg) =>{
+    // console.log("(popup) sendMsgToBackground", msg);
+    port.postMessage({type: "onReceiveMsg", data: msg});
 });
-
