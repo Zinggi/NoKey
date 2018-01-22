@@ -22,6 +22,7 @@ type alias Model model =
 
 init : ( Model model, Cmd (Msg msg) )
 init =
+    -- TODO: display loading icon (or nothing?) instead of this
     ( Err "not loaded yet", getState {} )
 
 
