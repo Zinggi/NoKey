@@ -22,6 +22,7 @@
   },
 
   "web_accessible_resources": [
+      "icons/library.svg"
   ],
 
   "background": {
@@ -31,7 +32,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["build/popup.js", "content_scripts/findPasswordFields.js", "content_scripts/pageUtils.js"]
+      "js": ["build/popup.js", "content_scripts/pageUtils.js"]
     }
   ]
 }
