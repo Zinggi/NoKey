@@ -1,4 +1,7 @@
-// console.log("(background) start background.js");
+import { setup } from '../web/setup.js';
+import Elm from './MainBackground.elm';
+
+console.log("(background) start background.js");
 
 setup(Elm.MainBackground.worker, (app) => {
     // console.log("(background) started", app);

@@ -107,4 +107,9 @@ const setup = (startFn, onStart) => {
 };
 
 
-
+if (typeof module === 'undefined') {
+    module = {};
+}
+module.exports = {
+    setup: setup
+};

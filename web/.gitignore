@@ -1,4 +1,7 @@
 elm-stuff/
 build/
 index.html
+.cache/
+dist/
+node_modules/
 documentation.json

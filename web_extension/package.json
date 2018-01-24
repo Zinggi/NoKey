@@ -1,0 +1,18 @@
+{
+  "name": "web_extension",
+  "version": "1.0.0",
+  "description": "",
+  "dependencies": {
+    "action-outside": "^1.0.2"
+  },
+  "devDependencies": {
+    "parcel-plugin-elm": "^0.1.2-alpha"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "./watch.sh",
+    "build": "./build.sh"
+  },
+  "author": "",
+  "license": "ISC"
+}

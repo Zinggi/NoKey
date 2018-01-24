@@ -1,48 +1,51 @@
 // This file has been adapted from https://github.com/perfectapi/CKP/blob/develop/keepass.js
 // All credit to the authers.
-var loginInputTypes = ['text', 'email', 'tel'];
-var config_passwordInputNames = ['passwd','password','pass'];
-var config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name'];
+import ActionOutside from 'action-outside';
+import Elm from '../Popup.elm';
+
+const loginInputTypes = ['text', 'email', 'tel'];
+const config_passwordInputNames = ['passwd','password','pass'];
+const config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name'];
 const config_buttonSignUpNames = ['signup', 'sign up', 'register', 'create'];
 const config_buttonLogInNames = ['login', 'log in'];
 
-function readInputNames(input) {
+const readInputNames = (input) => {
     return [input.name,input.getAttribute('autocomplete'),input.id];
-}
+};
 
-function isGoodName(name, goodNames) {
+const isGoodName = (name, goodNames) => {
     if (!name) return false;
     let nm = name.toLowerCase();
     return goodNames.some((n) => { return nm.indexOf(n.toLowerCase()) >= 0; });
-}
+};
 
-function hasGoodName(fieldNames, goodFieldNames) {
+const hasGoodName = (fieldNames, goodFieldNames) => {
     return fieldNames.some((fn) => { return isGoodName(fn, goodFieldNames); });
-}
+};
 
-function isPasswordInput(input) {
+const isPasswordInput = (input) => {
     if (input.type === 'password') {
         return true;
     } else if (input.type === 'text') {
-        return hasGoodName(readInputNames(input), config_passwordInputNames)
+        return hasGoodName(readInputNames(input), config_passwordInputNames);
     }
     return false;
-}
+};
 
-function isLoginInput(input) {
+const isLoginInput = (input) => {
     return (loginInputTypes.indexOf(input.type) >= 0 &&
         hasGoodName(readInputNames(input), config_loginInputNames));
-}
+};
 
-function getLoginInputs() {
+const getLoginInputs = () => {
     return [].filter.call(document.getElementsByTagName('input'), isLoginInput);
-}
+};
 
-function getPasswordInputs() {
+const getPasswordInputs = () => {
     return [].filter.call(document.getElementsByTagName('input'), isPasswordInput);
-}
+};
 
-function injectIcon(isPw, isSignUp) {
+const injectIcon = (isPw, isSignUp) => {
     return (input) => {
         if (typeof input.noPass_injected !== "undefined") {
             return;
@@ -76,13 +79,13 @@ function injectIcon(isPw, isSignUp) {
         // });
         // input.addEventListener("mousemove", onIconHover);
         input.addEventListener("click", onIconClick);
-    }
-}
+    };
+};
 
 const onIconClick = (event) => {
     console.log("on icon click", event);
     openPopup(event.target);
-}
+};
 
 const findForms = (logins, pws) => {
     let groups = { forms: [] };
@@ -95,7 +98,7 @@ const findForms = (logins, pws) => {
         }
     };
     const addFromList = (list, isLogin) => {
-        for (elem of list) {
+        for (const elem of list) {
             const form = elem.form;
             const ind = groups.forms.indexOf(form);
             if (ind != -1) {
@@ -104,7 +107,7 @@ const findForms = (logins, pws) => {
             } else {
                 // groups[i] = [elem];
                 groups[i] = { logins: [], pws: [] };
-                pushElem(elem, isLogin, groups[i])
+                pushElem(elem, isLogin, groups[i]);
 
                 groups.forms.push(form);
                 i++;
@@ -135,7 +138,7 @@ const isSignUp = (form) => {
     const otherButtons = form.querySelectorAll("button");
     const buttonLikes = form.querySelectorAll("[role=button]");
     const classifyList = (list) => {
-        for (b of list) {
+        for (const b of list) {
             if (isLogInButton(b)) {
                 return false;
             } else if (isSignUpButton(b)) {
@@ -145,7 +148,7 @@ const isSignUp = (form) => {
         return null;
     };
     const firstNonNull = (list, fn) => {
-        for (l of list) {
+        for (const l of list) {
             const ret = fn(l);
             if (ret !== null) {
                 return ret;
@@ -168,34 +171,40 @@ const onNodeAdded = () => {
     const logins = getLoginInputs();
     const pws = getPasswordInputs();
     const groups = classifyGroups(findForms(logins, pws));
-    console.log(groups);
 
-    for (key in groups) {
+    for (const key in groups) {
         const group = groups[key];
         group.logins.forEach(injectIcon(false, group.isSignUp));
         group.pws.forEach(injectIcon(true, group.isSignUp));
-        // logins.forEach(injectIcon(false));
-        // pws.forEach(injectIcon(true));
     }
 
-}
+};
 
 let popupLoaded = false;
 let popupVisible = false;
 let popupContainer = null;
+let actionOutsidePopup = null;
 
 const openPopup = (elem) => {
-    if (popupLoaded) {
-    } else {
+    if (!popupLoaded) {
         popupLoaded = true;
-        popupVisible = true;
         let [container, elmNode] = makeContainer();
         popupContainer = container;
+        actionOutsidePopup = new ActionOutside(popupContainer, () => {
+            popupVisible = false;
+            popupContainer.style.display = 'none';
+            actionOutsidePopup.listen(false);
+        });
         document.body.appendChild(popupContainer);
-        const rect = elem.getBoundingClientRect();
-        moveContainer(rect.bottom, rect.left);
         startElm(elmNode);
     }
+
+    popupVisible = true;
+    actionOutsidePopup.listen(true);
+    popupContainer.style.display = '';
+
+    const rect = elem.getBoundingClientRect();
+    moveContainer(rect.bottom, rect.left);
 };
 
 const startElm = (elmNode) => {
@@ -241,14 +250,7 @@ const onWindowLoad = () => {
     var obs = new MutationObserver(onNodeAdded);
     obs.observe(document, { childList: true, subtree: true });
     onNodeAdded();
-}
-
-
-// TODO: we need to close the popup on unfocus.
-// use this library: https://github.com/saschageyer/action-outside
-//
-// setup bundler for npm scripts and imports:
-// https://parceljs.org/getting_started.html
+};
 
 
 if (document.readyState === 'complete') {
@@ -256,3 +258,4 @@ if (document.readyState === 'complete') {
 } else {
     window.onload = onWindowLoad;
 }
+

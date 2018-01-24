@@ -1,3 +1,5 @@
+import Elm from '../Popup.elm';
+
 const app = Elm.Popup.fullscreen();
 
 const port = browser.runtime.connect({name: "popup"});
