@@ -1,7 +1,7 @@
 // This file has been adapted from https://github.com/perfectapi/CKP/blob/develop/keepass.js
 // All credit to the authers.
 import ActionOutside from 'action-outside';
-import Elm from '../Popup.elm';
+import Elm from '../build/apps.js';
 
 const loginInputTypes = ['text', 'email', 'tel'];
 const config_passwordInputNames = ['passwd','password','pass'];
@@ -50,8 +50,7 @@ const injectIcon = (isPw, isSignUp) => {
         if (typeof input.noPass_injected !== "undefined") {
             return;
         }
-        console.log("Inject icon: ", input.id || input.name, "  is pw: ", isPw);
-        input.noPass_injected = true;
+        // TODO: remove colors
         if (isSignUp === true) {
             if (isPw) {
                 input.style.background = "limegreen";
@@ -66,7 +65,11 @@ const injectIcon = (isPw, isSignUp) => {
             }
         } else {
             console.log("we don't know if this is a sign up or login page!");
+            return;
         }
+        console.log("Inject icon: ", input.id || input.name, "  is pw: ", isPw);
+        input.noPass_injected = true;
+
 
         const iconPath = browser.extension.getURL('icons/library.svg');
         input.style.backgroundRepeat = "no-repeat";
@@ -78,13 +81,11 @@ const injectIcon = (isPw, isSignUp) => {
         //   if (e.target !== popup_target) resetIcon(e.target);
         // });
         // input.addEventListener("mousemove", onIconHover);
-        input.addEventListener("click", onIconClick);
+        input.addEventListener("click", (event) => {
+            console.log("on icon click", event);
+            openPopup(event.target, isPw, isSignUp);
+        });
     };
-};
-
-const onIconClick = (event) => {
-    console.log("on icon click", event);
-    openPopup(event.target);
 };
 
 const findForms = (logins, pws) => {
@@ -181,50 +182,68 @@ const onNodeAdded = () => {
 };
 
 let popupLoaded = false;
-let popupVisible = false;
 let popupContainer = null;
 let actionOutsidePopup = null;
 
-const openPopup = (elem) => {
+const openPopup = (elem, isPw, isSignUp) => {
     if (!popupLoaded) {
+        console.log("first");
         popupLoaded = true;
-        let [container, elmNode] = makeContainer();
+        let [container, elmNodes] = makeContainer();
         popupContainer = container;
         actionOutsidePopup = new ActionOutside(popupContainer, () => {
-            popupVisible = false;
             popupContainer.style.display = 'none';
+            Array.from(popupContainer.children).forEach((c) => { c.style.display = 'none'; });
             actionOutsidePopup.listen(false);
         });
         document.body.appendChild(popupContainer);
-        startElm(elmNode);
+        startElm(elmNodes);
     }
+    console.log("always???");
 
-    popupVisible = true;
+
     actionOutsidePopup.listen(true);
-    popupContainer.style.display = '';
+    showContainer(popupContainer, isPw, isSignUp);
 
     const rect = elem.getBoundingClientRect();
     moveContainer(rect.bottom, rect.left);
 };
 
-const startElm = (elmNode) => {
-    const app = Elm.Popup.embed(elmNode);
+const showContainer = (popupContainer, isPw, isSignUp) => {
+    popupContainer.style.display = '';
+    console.log(popupContainer.children);
+    const elementToShow = popupContainer.children[(+isPw)*2 + (+isSignUp)];
+    elementToShow.style.display = '';
+};
 
-    // wire up the ports
+const startElm = (elmNodes) => {
     const port = browser.runtime.connect({name: window.location.href + Math.random() });
-    port.onMessage.addListener(function(state) {
-        // console.log("(content) got new state", state);
-        app.ports.onNewState.send(state);
-    });
+    console.log(Elm);
+    const popup = (node) => {
+        const app = Elm.Popup.embed(node);
+        // wire up the ports
+        port.onMessage.addListener((state) => {
+            // console.log("(content) got new state", state);
+            app.ports.onNewState.send(state);
+        });
 
-    app.ports.getState.subscribe(() => {
-        // console.log("(content) getState");
-        port.postMessage({type: "onStateRequest", data: {}});
-    });
-    app.ports.sendMsgToBackground.subscribe((msg) =>{
-        // console.log("(content) sendMsgToBackground", msg);
-        port.postMessage({type: "onReceiveMsg", data: msg});
-    });
+        app.ports.getState.subscribe(() => {
+            // console.log("(content) getState");
+            port.postMessage({type: "onStateRequest", data: {}});
+        });
+        app.ports.sendMsgToBackground.subscribe((msg) =>{
+            // console.log("(content) sendMsgToBackground", msg);
+            port.postMessage({type: "onReceiveMsg", data: msg});
+        });
+        return app;
+    };
+    const pw = (node) => {
+        const app = Elm.GeneratePassword.embed(node);
+        return app;
+    };
+    for (let i = 0; i < elmNodes.length; i++) {
+        const app = [popup, popup, popup, pw][i](elmNodes[i]);
+    }
 };
 
 const moveContainer = (bottom, left) => {
@@ -240,10 +259,14 @@ const makeContainer = () => {
     container.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
     container.style.padding = "5px";
 
-    const elmNode = document.createElement('div');
-    container.appendChild(elmNode);
+    const elmNodes = [0,1,2,3].map(() => document.createElement('div'));
+    elmNodes.forEach((node) => {
+        node.style.display = 'none';
+        container.appendChild(node);
+    });
+    // container.appendChild(elmNode);
 
-    return [container, elmNode];
+    return [container, elmNodes];
 };
 
 const onWindowLoad = () => {
@@ -251,6 +274,15 @@ const onWindowLoad = () => {
     obs.observe(document, { childList: true, subtree: true });
     onNodeAdded();
 };
+
+
+// TODO: isolate styles:
+//  iframes:
+//      https://github.com/anderspitman/octopress-blog/blob/dbd21b2a76ea57cf4e967fd44a204c610b35325f/source/_posts/2014-08-04-chrome-extension-content-script-stylesheet-isolation.markdown
+//      https://www.sitepoint.com/chrome-extensions-bridging-the-gap-between-layers/
+//      https://stackoverflow.com/questions/12783217/how-to-really-isolate-stylesheets-in-the-google-chrome-extension#20241247
+//  js lib:
+//      https://github.com/liviavinci/Boundary
 
 
 if (document.readyState === 'complete') {

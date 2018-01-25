@@ -19,6 +19,12 @@ type alias State =
     }
 
 
+
+-- type Msg =
+--     ToggleDetails
+--     | CheckToggle Bool String CharSet
+
+
 type alias Select =
     Dict String ( Bool, CharSet )
 

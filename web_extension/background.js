@@ -1,5 +1,5 @@
 import { setup } from '../web/setup.js';
-import Elm from './MainBackground.elm';
+import Elm from './build/apps.js';
 
 console.log("(background) start background.js");
 
