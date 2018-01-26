@@ -6,6 +6,7 @@ import Html.Lazy exposing (..)
 import Html.Events exposing (..)
 import Html.Attributes as Attr exposing (..)
 import Html.Keyed
+import Element
 import Random.Pcg.Extended as Random exposing (Seed)
 import SecretSharing
 
@@ -13,6 +14,7 @@ import SecretSharing
 --
 
 import Helper exposing (..)
+import Styles
 import Data.Sync exposing (SyncData)
 import Data.RequestPassword as RequestPassword
 import Data.PasswordMeta exposing (PasswordMetaData)
@@ -168,7 +170,7 @@ newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
                      , clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
                      , text "Password length: "
                      , clampedNumberInput PasswordLengthChanged ( 4, 16, 512 ) entry.length
-                     , Views.PasswordGenerator.view NewPasswordRequirements requirementsState
+                     , Views.PasswordGenerator.view NewPasswordRequirements requirementsState |> Element.layout Styles.stylesheet
                      ]
                         ++ case pw of
                             Ok thePw ->

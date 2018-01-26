@@ -34,10 +34,10 @@ specialChars =
 commonCharSets : Dict String CharSet
 commonCharSets =
     Dict.fromList
-        [ ( "numbers", numbers )
-        , ( "lowercase", lowercase )
-        , ( "uppercase", uppercase )
-        , ( "specialChars", specialChars )
+        [ ( "0-9", numbers )
+        , ( "a-z", lowercase )
+        , ( "A-Z", uppercase )
+        , ( toString specialChars, specialChars )
         ]
 
 
@@ -46,6 +46,12 @@ fromString str =
     String.toList str
         |> List.map Char.toCode
         |> Interval.fromList
+
+
+toString : CharSet -> String
+toString set =
+    Interval.map Char.fromCode set
+        |> String.fromList
 
 
 sampleRandom : CharSet -> Generator (Result String Char)
