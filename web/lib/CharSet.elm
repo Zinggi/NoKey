@@ -37,7 +37,7 @@ commonCharSets =
         [ ( "0-9", numbers )
         , ( "a-z", lowercase )
         , ( "A-Z", uppercase )
-        , ( toString specialChars, specialChars )
+        , ( "!\"#$%…", specialChars )
         ]
 
 

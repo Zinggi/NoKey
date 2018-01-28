@@ -8,7 +8,8 @@ import Dict exposing (Dict)
 import Random.Pcg.Extended as Random exposing (Seed)
 import Element exposing (..)
 import Element.Input as Input
-import Element.Attributes exposing (..)
+import Element.Background as Background
+import Html
 
 
 --
@@ -17,7 +18,7 @@ import PasswordGenerator as PG exposing (PasswordRequirements)
 import CharSet exposing (CharSet)
 import Interval
 import Helper exposing (..)
-import Styles exposing (..)
+import Styles
 
 
 type alias State =
@@ -33,11 +34,37 @@ type Msg
     = SetIncludeCustom String
     | SetExcludeCustom String
     | SetCustom String
+    | SetAllowed String Bool
+    | SetAtLeastOneOff String Bool
 
 
 update : Msg -> State -> State
 update msg state =
-    state
+    case msg of
+        SetIncludeCustom s ->
+            { state | includeCustom = s }
+
+        SetExcludeCustom s ->
+            { state | excludeCustom = s }
+
+        SetCustom s ->
+            { state | custom = s }
+
+        SetAllowed s b ->
+            { state | allowedSets = setSet s b state.allowedSets }
+
+        SetAtLeastOneOff s b ->
+            { state | atLeastOneOf = setSet s b state.atLeastOneOf }
+
+
+setSet key b set =
+    Dict.update key (Maybe.map (\( _, s ) -> ( b, s ))) set
+
+
+isSelected key select =
+    Dict.get key select
+        |> Maybe.map (\( b, s ) -> b)
+        |> Maybe.withDefault False
 
 
 
@@ -69,45 +96,74 @@ init =
 --         { forbiddenSets = cSet, customForbidden = "", atLeastOneOf = cSet, customAtLeastOneOf = "" }
 
 
-view : (State -> msg) -> State -> Element Style v msg
+view : (State -> msg) -> State -> Element msg
 view toMsg state =
-    column None
-        []
+    column
+        Styles.background
         [ text "Allowed Characters"
         , allowedChars state
         , text "At least one of"
         , atLeastOneOf state
+        , text (toString (getRequirements state))
         ]
         |> Element.map (\msg -> update msg state |> toMsg)
 
 
 allowedChars state =
-    column None
+    column
         []
-        [ toggleSets
+        [ toggleSets SetAllowed state.allowedSets
         , myInput SetIncludeCustom "Include custom" state.includeCustom
         , myInput SetExcludeCustom "Exclude custom" state.excludeCustom
         ]
 
 
 atLeastOneOf state =
-    column None
+    column
         []
-        [ toggleSets, myInput SetCustom "Custom" state.custom ]
+        [ toggleSets SetAtLeastOneOff state.atLeastOneOf, myInput SetCustom "Custom" state.custom ]
 
 
-toggleSets =
-    el None [] (text "TODO")
+toggleSets toMsg set =
+    row [] (List.map (\l -> setBox toMsg l set) [ "A-Z", "a-z", "0-9", "!\"#$%…" ])
+
+
+
+-- column []
+-- [ row [] [ setBox "A-Z" state.allowedSets, setBox "a-z" state.allowedSets ]
+-- , row [] [ setBox "0-9" state.allowedSets, setBox "!\"#$%…" state.allowedSets ]
+-- ]
+
+
+setBox toMsg label set =
+    myCheckBox (toMsg label) label (isSelected label set)
+
+
+myCheckBox onChange label checked =
+    Input.checkbox []
+        { onChange = Just onChange
+        , icon = Nothing
+        , checked = checked
+        , label = Input.labelRight [] (text label)
+        , notice = Nothing
+        }
 
 
 myInput onChange label value =
-    Input.text None
+    Input.text
         []
-        { onChange = onChange
-        , value = value
-        , label = Input.labelLeft (text label)
-        , options = []
+        { onChange = Just onChange
+        , text = value
+        , label = Input.labelLeft [] (text label)
+        , placeholder = Nothing
+        , notice = Nothing
         }
+
+
+{-| TODO: Remove, for dev only
+-}
+main =
+    Html.beginnerProgram { view = view identity >> Element.layout [], update = (\msg model -> msg), model = init }
 
 
 

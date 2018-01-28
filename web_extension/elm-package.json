@@ -20,7 +20,7 @@
         "gilbertkennen/bigint": "1.0.1 <= v < 2.0.0",
         "jinjor/elm-debounce": "2.1.2 <= v < 3.0.0",
         "krisajenkins/remotedata": "4.3.3 <= v < 5.0.0",
-        "mdgriffith/style-elements": "4.3.0 <= v < 5.0.0",
+        "mdgriffith/stylish-elephants": "4.0.0 <= v < 5.0.0",
         "mgold/elm-random-pcg": "5.0.2 <= v < 6.0.0",
         "ohanhi/remotedata-http": "2.1.0 <= v < 3.0.0",
         "pablohirafuji/elm-qrcode": "2.2.0 <= v < 3.0.0",
