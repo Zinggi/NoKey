@@ -1,12 +1,22 @@
 module Styles exposing (..)
 
 import Color
+import Element exposing (..)
 import Element.Font as Font
 import Element.Background as Background
+import Scale
+
+
+scaled =
+    Scale.modular 16 1.618 >> round
 
 
 backgroundColor =
     Color.rgb 255 241 222
+
+
+white =
+    Color.rgb 255 255 255
 
 
 errorColor =
@@ -27,6 +37,10 @@ textColor =
 
 background =
     [ Background.color backgroundColor, Font.color textColor, normalFont ]
+
+
+groupHeading =
+    [ normalFont, Font.bold, alignLeft ]
 
 
 normalFont =

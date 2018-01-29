@@ -170,7 +170,7 @@ newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
                      , clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
                      , text "Password length: "
                      , clampedNumberInput PasswordLengthChanged ( 4, 16, 512 ) entry.length
-                     , Views.PasswordGenerator.view NewPasswordRequirements requirementsState |> Element.layout Styles.stylesheet
+                     , Views.PasswordGenerator.view NewPasswordRequirements requirementsState |> Element.layout []
                      ]
                         ++ case pw of
                             Ok thePw ->
