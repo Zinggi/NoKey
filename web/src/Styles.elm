@@ -4,19 +4,40 @@ import Color
 import Element exposing (..)
 import Element.Font as Font
 import Element.Background as Background
+import Element.Border as Border
 import Scale
 
 
 scaled =
-    Scale.modular 16 1.618 >> round
+    Scale.modular 14 1.414 >> round
+
+
+paddingScale =
+    Scale.modular 6 1.414 >> round
+
+
+
+-- Colors
 
 
 backgroundColor =
     Color.rgb 255 241 222
 
 
+disabledColor =
+    Color.rgb 150 150 150
+
+
 white =
     Color.rgb 255 255 255
+
+
+black =
+    Color.rgb 0 0 0
+
+
+thinLineColor =
+    Color.rgba 0 0 0 0.25
 
 
 errorColor =
@@ -35,12 +56,22 @@ textColor =
     Color.rgb 1 58 76
 
 
+borderStyle =
+    [ Border.width 1
+    , Border.color thinLineColor
+    , Border.mouseOverColor black
+
+    -- TODO: the Element should also have rounded corner, open an issue?
+    , Border.rounded 4
+    ]
+
+
 background =
     [ Background.color backgroundColor, Font.color textColor, normalFont ]
 
 
 groupHeading =
-    [ normalFont, Font.bold, alignLeft ]
+    [ normalFont, Font.bold, alignLeft, Font.size (scaled 1) ]
 
 
 normalFont =

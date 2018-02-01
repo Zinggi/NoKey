@@ -1,152 +1,114 @@
-module Views.PasswordGenerator exposing (State, init, view, getNextPassword, getRequirements)
+module Views.PasswordGenerator exposing (State, init, view, nextPassword)
 
 -- import Html exposing (Html)
 -- import Html.Attributes as Attr
 -- import Html.Events exposing (onCheck, onInput)
 
-import Dict exposing (Dict)
-import Random.Pcg.Extended as Random exposing (Seed)
 import Element exposing (..)
 import Element.Input as Input
 import Element.Background as Background
 import Html
-import Html.Attributes as Attr
+import Random.Pcg.Extended as Random exposing (Seed)
 
 
 --
 
-import PasswordGenerator as PG exposing (PasswordRequirements)
-import CharSet exposing (CharSet)
-import Interval
-import Helper exposing (..)
+import Views.PasswordRequirements as PwReq
 import Elements
 import Styles
 
 
 type alias State =
-    { allowedSets : Select
-    , atLeastOneOf : Select
-    , includeCustom : String
-    , excludeCustom : String
-    , custom : String
+    { showMore : Bool
+    , length : Int
+    , requirements : PwReq.State
+    , seed : Seed
     }
 
 
 type Msg
-    = SetIncludeCustom String
-    | SetExcludeCustom String
-    | SetCustom String
-    | SetAllowed String Bool
-    | SetAtLeastOneOff String Bool
+    = PwReq PwReq.State
+    | SetIsOpen Bool
+    | UpdateLength Int
+    | NextPw
+    | Reset
 
 
 update : Msg -> State -> State
 update msg state =
     case msg of
-        SetIncludeCustom s ->
-            { state | includeCustom = s }
+        PwReq s ->
+            { state | requirements = s }
 
-        SetExcludeCustom s ->
-            { state | excludeCustom = s }
+        UpdateLength i ->
+            { state | length = i }
 
-        SetCustom s ->
-            { state | custom = s }
+        SetIsOpen b ->
+            { state | showMore = b }
 
-        SetAllowed s b ->
-            { state | allowedSets = setSet s b state.allowedSets }
+        NextPw ->
+            nextPassword state
 
-        SetAtLeastOneOff s b ->
-            { state | atLeastOneOf = setSet s b state.atLeastOneOf }
-
-
-setSet key b set =
-    Dict.update key (Maybe.map (\( _, s ) -> ( b, s ))) set
+        Reset ->
+            { state | requirements = PwReq.init }
 
 
-isSelected key select =
-    Dict.get key select
-        |> Maybe.map (\( b, s ) -> b)
-        |> Maybe.withDefault False
+init : Seed -> State
+init seed =
+    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first }
 
 
-getRequirements : State -> PasswordRequirements
-getRequirements state =
-    { forbidden = getForbidden state.allowedSets state.includeCustom state.excludeCustom
-    , atLeastOneOf = CharSet.fromString state.custom :: filterDict state.atLeastOneOf
-    }
-
-
-
--- type Msg =
---     ToggleDetails
---     | CheckToggle Bool String CharSet
-
-
-type alias Select =
-    Dict String ( Bool, CharSet )
-
-
-init : State
-init =
-    let
-        mkSet b =
-            Dict.map (\key s -> ( b, s )) CharSet.commonCharSets
-    in
-        { allowedSets = mkSet True, atLeastOneOf = mkSet False, includeCustom = "", excludeCustom = "", custom = "" }
-
-
-getNextPassword : State -> Int -> Seed -> ( Result String String, Seed )
-getNextPassword reqs length =
-    Random.step (PG.randomPassword length (getRequirements reqs))
-
-
-getForbidden sets include exclude =
-    Interval.unionIntervalList
-        (CharSet.fromString exclude)
-        (filterDict (Dict.map (\k ( b, s ) -> ( not b, s )) sets)
-            |> Interval.union
-            |> Interval.subtract (CharSet.fromString include)
-        )
+nextPassword : State -> State
+nextPassword state =
+    { state | seed = PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.second }
 
 
 
 -- View
 
 
-view : (State -> msg) -> State -> Element msg
-view toMsg state =
-    column
-        Styles.background
-        [ allowedChars state
-        , atLeastOneOf state
+view : (String -> msg) -> (State -> msg) -> State -> Element msg
+view onAcceptPw toMsg state =
+    let
+        ( isOk, pw, error ) =
+            case PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.first of
+                Ok p ->
+                    ( True, p, "" )
 
-        -- , text (toString (getRequirements state))
-        ]
-        |> Element.map (\msg -> update msg state |> toMsg)
-
-
-allowedChars state =
-    Elements.inputGroup "Allowed Characters"
-        [ toggleSets SetAllowed state.allowedSets
-        , Elements.input SetIncludeCustom "Include custom" state.includeCustom
-        , Elements.input SetExcludeCustom "Exclude custom" state.excludeCustom
-        ]
-
-
-atLeastOneOf state =
-    Elements.inputGroup "At least one of"
-        [ toggleSets SetAtLeastOneOff state.atLeastOneOf, Elements.input SetCustom "Custom" state.custom ]
-
-
-toggleSets toMsg set =
-    row [] (List.map (\l -> setBox toMsg l set) [ "A-Z", "a-z", "0-9", "!\"#$%…" ])
-
-
-setBox toMsg label set =
-    Elements.checkBox (toMsg label) label (isSelected label set)
-
-
-{-| TODO: Remove, for dev only
--}
-main =
-    Html.beginnerProgram { view = view identity >> Element.layout [], update = (\msg model -> msg), model = init }
+                Err e ->
+                    ( False, "", e )
+    in
+        Elements.container
+            [ row []
+                [ el [ alignLeft ] <|
+                    if isOk then
+                        Elements.wrapInBorder (Elements.h3 pw)
+                    else
+                        Elements.text error
+                ]
+            , Elements.inputGroup "Length"
+                [ row []
+                    [ Elements.clampedNumberInput UpdateLength ( 6, 16, 32 ) state.length
+                        |> Element.map (\msg -> update msg state |> toMsg)
+                    , el [ alignRight ]
+                        (row [ spacing (Styles.scaled 1) ] <|
+                            if isOk then
+                                [ Elements.button (Just NextPw) "Next"
+                                    |> Element.map (\msg -> update msg state |> toMsg)
+                                , Elements.button (Just (onAcceptPw pw)) "Ok"
+                                ]
+                            else
+                                [ Elements.button (Just Reset) "Reset"
+                                    |> Element.map (\msg -> update msg state |> toMsg)
+                                ]
+                        )
+                    ]
+                ]
+            , Elements.toggleMoreButton SetIsOpen "show more" "show less" state.showMore
+                |> Element.map (\msg -> update msg state |> toMsg)
+            , if state.showMore then
+                PwReq.view PwReq state.requirements
+                    |> Element.map (\msg -> update msg state |> toMsg)
+              else
+                empty
+            ]

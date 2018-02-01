@@ -105,7 +105,7 @@ initModel { initialSeed, storedState } =
         makeInit mayId maySync =
             { newSiteEntry = Data.PasswordMeta.default
             , expandSiteEntry = False
-            , requirementsState = PW.init
+            , requirementsState = PW.init (RandomE.initialSeed base ext)
             , seed = RandomE.initialSeed base ext
             , debounce = Debounce.init
             , uniqueIdentifyier = Maybe.withDefault uuid mayId
@@ -229,7 +229,6 @@ update msg model =
 
         NewPasswordRequirements state ->
             { model | requirementsState = state }
-                |> updateSeed
                 |> noCmd
 
         PasswordLengthChanged l ->
@@ -402,9 +401,10 @@ update msg model =
 
 updateSeed : Model -> Model
 updateSeed model =
+    -- TODO:
     { model
-        | seed =
-            Tuple.second <| PW.getNextPassword model.requirementsState model.newSiteEntry.length model.seed
+        | seed = RandomE.step (RandomE.int 1 42) model.seed |> Tuple.second
+        , requirementsState = PW.nextPassword model.requirementsState
     }
 
 

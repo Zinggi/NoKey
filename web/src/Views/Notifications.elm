@@ -1,22 +1,26 @@
 module Views.Notifications exposing (view)
 
-import Html exposing (..)
-import Html.Events exposing (..)
+-- import Html exposing (..)
+-- import Html.Events exposing (..)
+
+import Element exposing (..)
+import Elements
 import Data.Notifications as Notifications exposing (..)
 
 
-view : (Id -> msg) -> (Id -> ShareRequest -> msg) -> Notifications -> Html msg
+view : (Id -> msg) -> (Id -> ShareRequest -> msg) -> Notifications -> Element msg
 view onRejectRequest onGrantRequest ns =
-    div [] (Notifications.map (viewEntry onRejectRequest onGrantRequest) ns)
+    column [] (Notifications.map (viewEntry onRejectRequest onGrantRequest) ns)
 
 
 viewEntry onRejectRequest onGrantRequest id n =
     case n of
         ShareRequestT req ->
-            div []
-                [ div [] [ b [] [ text req.id ], Html.text (" wants to view password for: " ++ toString req.key) ]
-                , div []
-                    [ button [ onClick (onRejectRequest id) ] [ Html.text "Reject" ]
-                    , button [ onClick (onGrantRequest id req) ] [ Html.text "Grant" ]
+            column []
+                [ column [] [ Elements.h4 req.id ]
+                , Elements.text (" wants to view password for: " ++ toString req.key)
+                , column []
+                    [ Elements.button (Just (onRejectRequest id)) "Reject"
+                    , Elements.button (Just (onGrantRequest id req)) "Grant"
                     ]
                 ]
