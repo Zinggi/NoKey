@@ -148,9 +148,3 @@ toggleSets toMsg disabled set =
 
 setBox toMsg isDisabled label set =
     Elements.checkBox (toMsg label) isDisabled label (isSelected label set)
-
-
-{-| TODO: Remove, for dev only
--}
-main =
-    Html.beginnerProgram { view = view identity >> Element.layout Styles.background, update = (\msg model -> msg), model = init }

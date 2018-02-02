@@ -53,6 +53,14 @@ crashOnNothing s ma =
             Debug.crash s
 
 
+boolToMaybe : Bool -> a -> Maybe a
+boolToMaybe b a =
+    if b then
+        Just a
+    else
+        Nothing
+
+
 
 -- Result
 

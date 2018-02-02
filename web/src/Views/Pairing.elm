@@ -9,6 +9,8 @@ import RemoteData exposing (WebData, RemoteData(..))
 import Http
 import QRCode
 import Elements
+import Helper exposing (boolToMaybe)
+import Styles
 
 
 type alias State =
@@ -73,9 +75,11 @@ view config doShow diag =
     let
         inp isEnabled rest =
             column []
-                -- TODO: Html.form [ onSubmit config.onSubmitToken ]
-                (Elements.textInput (\s -> config.toMsg (update (SetInput s) diag)) "enter token" diag.inputToken
-                    -- TODO:  Attr.disabled (not isEnabled)
+                -- TODO: onEnter/onSubmit config.onSubmitToken
+                (row [ spacing (Styles.paddingScale 1) ]
+                    [ Elements.textInput (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag))) "enter token" diag.inputToken
+                    , Elements.button (boolToMaybe isEnabled config.onSubmitToken) "submit"
+                    ]
                     :: rest
                 )
     in

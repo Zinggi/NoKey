@@ -2,6 +2,7 @@ module MainView exposing (view)
 
 import Dict exposing (Dict)
 import Html exposing (Html)
+import Html.Attributes as Attr
 import Element exposing (..)
 import Element.Keyed
 import Element.Lazy exposing (lazy)
@@ -20,17 +21,8 @@ import Data.PasswordMeta exposing (PasswordMetaData)
 import Views.Pairing
 import Views.Notifications
 import Views.PasswordGenerator
+import Views.Devices
 import Background exposing (Model, Msg(..))
-
-
-devicesMap : (String -> String -> b) -> Dict String String -> List b
-devicesMap f known_ids =
-    Dict.foldl
-        (\uuid name acc ->
-            f uuid name :: acc
-        )
-        []
-        known_ids
 
 
 view : Model -> Html Msg
@@ -39,20 +31,24 @@ view model =
         numberOfKnownDevices =
             Data.Sync.knownIds model.syncData |> List.length
     in
-        column []
-            [ viewDevices model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
-            , Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
-            , Elements.line
-            , Views.Notifications.view RejectShareRequest GrantShareRequest model.notifications
-            , Elements.line
-            , if numberOfKnownDevices >= 2 then
-                newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry numberOfKnownDevices model.seed
-              else
-                text "pair a device to save your first password"
-            , Elements.line
-            , lazy (\( a, b ) -> viewSavedSites a b) ( model.sitesState, model.syncData )
-            , Elements.line
-            , Elements.button (Just ResetDevice) "Reset Device"
+        row
+            [ alignTop ]
+            [ column [ attribute (Attr.style [ ( "maxWidth", "800px" ) ]) ]
+                [ Views.Devices.view model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
+                , Elements.line
+                , Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
+                , Elements.line
+                , Views.Notifications.view RejectShareRequest GrantShareRequest model.notifications
+                , Elements.line
+                , if numberOfKnownDevices >= 2 then
+                    newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry numberOfKnownDevices model.seed
+                  else
+                    text "pair a device to save your first password"
+                , Elements.line
+                , lazy (\( a, b ) -> viewSavedSites a b) ( model.sitesState, model.syncData )
+                , Elements.line
+                , Elements.button (Just ResetDevice) "Reset Device"
+                ]
             ]
             |> Element.layout Styles.background
 
@@ -60,36 +56,6 @@ view model =
 pairingConfig : Views.Pairing.Config Msg
 pairingConfig =
     { onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
-
-
-viewDevices : String -> Dict String String -> Element Msg
-viewDevices myId knownIds =
-    Elements.table [ ( "name", .name ), ( "uuid", .uuid ) ]
-        (devicesMap (viewDeviceEntry myId) knownIds)
-
-
-{-| TODO: fix input lag on input fields. Workaround:
-
-    https://github.com/elm-lang/html/issues/105#issuecomment-309524197
-    https://ellie-app.com/3fPSxX6VHK7a1/0
-
--}
-viewDeviceEntry : String -> String -> String -> { name : Element Msg, uuid : Element Msg }
-viewDeviceEntry myId uuid name =
-    { name =
-        if myId == uuid then
-            Elements.textInput SetDeviceName "Name your device.." name
-        else
-            Elements.text name
-    , uuid =
-        row [] <|
-            Elements.text uuid
-                :: (if myId /= uuid then
-                        [ Elements.button (Just (RemoveDevice uuid)) "Remove!" ]
-                    else
-                        []
-                   )
-    }
 
 
 viewSavedSites : RequestPassword.State -> SyncData -> Element Msg
@@ -130,8 +96,6 @@ newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> Int -
 newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
     column []
         [ column []
-            -- TODO
-            -- Html.form [ onSubmit GenerateNewPassword ]
             [ Elements.input SiteNameChanged "New Site: " "example.com" entry.siteName
             ]
         , (if not expandSiteEntry then

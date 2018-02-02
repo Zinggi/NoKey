@@ -51,6 +51,18 @@ text txt =
     el [ Font.size (Styles.scaled 1), alignLeft ] (Element.text txt)
 
 
+italicText txt =
+    el [ Font.size (Styles.scaled 1), alignLeft, Font.italic ] (Element.text txt)
+
+
+h1 txt =
+    el [ Font.size (Styles.scaled 4), Font.bold, alignLeft ] (Element.text txt)
+
+
+h2 txt =
+    el [ Font.size (Styles.scaled 3), Font.bold, alignLeft ] (Element.text txt)
+
+
 h3 txt =
     el [ Font.size (Styles.scaled 2), Font.bold, alignLeft ] (Element.text txt)
 
@@ -62,19 +74,20 @@ h4 txt =
 button onPress txt =
     Input.button []
         { label =
-            el
-                [ Background.color <|
-                    case onPress of
-                        Nothing ->
-                            Styles.disabledColor
+            (el
+                (padding (Styles.paddingScale 1)
+                    :: (Background.color <|
+                            case onPress of
+                                Nothing ->
+                                    Styles.disabledColor
 
-                        Just _ ->
-                            Styles.accentColor
-                ]
-                (el
-                    (padding (Styles.paddingScale 1) :: Styles.borderStyle)
-                    (text txt)
+                                Just _ ->
+                                    Styles.accentColor
+                       )
+                    :: Styles.borderStyle
                 )
+                (text txt)
+            )
         , onPress = onPress
         }
 
@@ -133,6 +146,7 @@ clampedNumberInput toMsg ( min, default, max ) n =
                 , height (px (Styles.scaled 2))
                 , padding 0
                 , Font.size (Styles.scaled 1)
+                , attribute (Attr.disabled (min == max))
                 ]
                 { onChange = Just toNumber
                 , text = toString m
@@ -165,19 +179,21 @@ input onChange label placeholder value =
                 if placeholder == "" then
                     Nothing
                 else
-                    Just <| Input.placeholder [] (text placeholder)
+                    Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
             , notice = Nothing
             }
         ]
 
 
+{-| TODO: unify textInput and input? What is the difference?
+-}
 textInput onChange placeholder value =
     Input.text
-        [ padding 0 ]
-        { onChange = Just onChange
+        [ padding 0, attribute (Attr.disabled (onChange == Nothing)) ]
+        { onChange = onChange
         , text = value
-        , label = Input.labelLeft [] (empty)
-        , placeholder = Just (Input.placeholder [] (text placeholder))
+        , label = Input.labelLeft [ padding 0 ] (empty)
+        , placeholder = Just (Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder))
         , notice = Nothing
         }
 
@@ -195,3 +211,7 @@ table headers data =
                 )
                 headers
         }
+
+
+miniPage title children =
+    column [ spacing (Styles.paddingScale 1) ] (h2 title :: children)

@@ -150,7 +150,6 @@ type Msg
     | PasswordLengthChanged Int
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
-    | GenerateNewPassword
     | UserNameChanged String
     | ReceiveMessage JE.Value
     | DecodeReceivedMessage JE.Value Time
@@ -221,10 +220,6 @@ update msg model =
 
         SecurityLevelChanged n ->
             { model | newSiteEntry = (\e -> { e | securityLevel = n }) model.newSiteEntry }
-                |> noCmd
-
-        GenerateNewPassword ->
-            updateSeed model
                 |> noCmd
 
         NewPasswordRequirements state ->

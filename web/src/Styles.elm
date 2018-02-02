@@ -5,6 +5,7 @@ import Element exposing (..)
 import Element.Font as Font
 import Element.Background as Background
 import Element.Border as Border
+import Html.Attributes as Attr
 import Scale
 
 
@@ -60,14 +61,16 @@ borderStyle =
     [ Border.width 1
     , Border.color thinLineColor
     , Border.mouseOverColor black
-
-    -- TODO: the Element should also have rounded corner, open an issue?
     , Border.rounded 4
     ]
 
 
 background =
-    [ Background.color backgroundColor, Font.color textColor, normalFont ]
+    [ Background.color backgroundColor
+    , Font.color textColor
+    , normalFont
+    , padding (paddingScale 3)
+    ]
 
 
 groupHeading =
