@@ -1,4 +1,4 @@
-port module Ports exposing (setTitle, storeState, resetStorage, onStateRequest, sendOutNewState, onReceiveMsg)
+port module Ports exposing (..)
 
 import Json.Encode exposing (Value)
 
@@ -25,6 +25,16 @@ port onStateRequest : ({} -> msg) -> Sub msg
 {-| this gets called when another view wants to send a msg to the background app
 -}
 port onReceiveMsg : (Value -> msg) -> Sub msg
+
+
+{-| This should be answered with accountsForSite
+-}
+port onRequestAccountsForSite : (String -> msg) -> Sub msg
+
+
+{-| This sends out the accounts that we have saved for a site, as an answer to onRequestAccountsForSite
+-}
+port accountsForSite : List String -> Cmd msg
 
 
 

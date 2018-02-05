@@ -2,12 +2,38 @@
 // All credit to the authers.
 import ActionOutside from 'action-outside';
 import Elm from '../build/apps.js';
+import setup from '../../web/setup.js';
 
 const loginInputTypes = ['text', 'email', 'tel'];
 const config_passwordInputNames = ['passwd','password','pass'];
 const config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name'];
 const config_buttonSignUpNames = ['signup', 'sign up', 'register', 'create'];
 const config_buttonLogInNames = ['login', 'log in'];
+
+
+/*
+ * parseUrl("https://gist.github.com/jlong/2428561?foo=bar#test")
+ *      =>
+ *  {
+ *      hash: "#test",
+ *      search: "?foo=bar",
+ *      pathname: "/jlong/2428561",
+ *      port: "",
+ *      hostname: "gist.github.com",
+ *      host: "gist.github.com",
+ *      password: "",
+ *      username: "",
+ *      protocol: "https:",
+ *      origin: "https://gist.github.com",
+ *      href: "https://gist.github.com/jlong/2428561?foo=bar#test"
+ *  }
+ *
+ */
+const parseUrl = (url) => {
+    const link = new URL(url);
+    return link;
+};
+
 
 const readInputNames = (input) => {
     return [input.name,input.getAttribute('autocomplete'),input.id];
@@ -45,11 +71,11 @@ const getPasswordInputs = () => {
     return [].filter.call(document.getElementsByTagName('input'), isPasswordInput);
 };
 
-const injectIcon = (isPw, isSignUp) => {
+const injectIcon = (isPw, isSignUp, accounts) => {
     return (input) => {
-        if (typeof input.noPass_injected !== "undefined") {
+        if (typeof input.noPass_injected !== "undefined")
             return;
-        }
+
         // TODO: remove colors
         if (isSignUp === true) {
             if (isPw) {
@@ -70,21 +96,24 @@ const injectIcon = (isPw, isSignUp) => {
         console.log("Inject icon: ", input.id || input.name, "  is pw: ", isPw);
         input.noPass_injected = true;
 
+        const addIcon = isSignUp || (accounts.length !== 0);
 
-        const iconPath = browser.extension.getURL('icons/library.svg');
-        input.style.backgroundRepeat = "no-repeat";
-        input.style.backgroundAttachment = "scroll";
-        input.style.backgroundSize = "16px 16px";
-        input.style.backgroundPosition = "calc(100% - 4px) 50%";
-        input.style.backgroundImage = "url('" + iconPath + "')";
-        // input.addEventListener("mouseout", (e) => {
-        //   if (e.target !== popup_target) resetIcon(e.target);
-        // });
-        // input.addEventListener("mousemove", onIconHover);
-        input.addEventListener("click", (event) => {
-            console.log("on icon click", event);
-            openPopup(event.target, isPw, isSignUp);
-        });
+        if (addIcon) {
+            const iconPath = browser.extension.getURL('icons/library.svg');
+            input.style.backgroundRepeat = "no-repeat";
+            input.style.backgroundAttachment = "scroll";
+            input.style.backgroundSize = "16px 16px";
+            input.style.backgroundPosition = "calc(100% - 4px) 50%";
+            input.style.backgroundImage = "url('" + iconPath + "')";
+            // input.addEventListener("mouseout", (e) => {
+            //   if (e.target !== popup_target) resetIcon(e.target);
+            // });
+            // input.addEventListener("mousemove", onIconHover);
+            input.addEventListener("click", (event) => {
+                console.log("on icon click", event);
+                openPopup(event.target, isPw, isSignUp);
+            });
+        }
     };
 };
 
@@ -107,7 +136,7 @@ const findForms = (logins, pws) => {
                 // groups[ind].push(elem);
             } else {
                 // groups[i] = [elem];
-                groups[i] = { logins: [], pws: [] };
+                groups[i] = { logins: [], pws: [], form: form };
                 pushElem(elem, isLogin, groups[i]);
 
                 groups.forms.push(form);
@@ -132,7 +161,7 @@ const isLogInButton = (button) => {
     return hasGoodName(readButtonNames(button), config_buttonLogInNames);
 };
 
-const isSignUp = (form) => {
+const getSubmitButtons = (form) => {
     const submitInputs = form.querySelectorAll("input[type=submit]");
     const submitButtons = form.querySelectorAll("button[type=submit]");
     const otherInputs = form.querySelectorAll("input[type=button]");
@@ -141,49 +170,99 @@ const isSignUp = (form) => {
     const classifyList = (list) => {
         for (const b of list) {
             if (isLogInButton(b)) {
-                return false;
+                return [false, b];
             } else if (isSignUpButton(b)) {
-                return true;
+                return [true, b];
             }
         }
         return null;
     };
-    const firstNonNull = (list, fn) => {
+    const collect = (list, fn) => {
+        let btns = [];
+        let isSignUps = [];
         for (const l of list) {
             const ret = fn(l);
             if (ret !== null) {
-                return ret;
+                const [isSignUp, btn] = ret;
+                btns.push(btn);
+                isSignUps.push(isSignUp);
             }
         }
-        return null;
+        if (btns.length === 0) {
+            return null;
+        } else {
+            return [isSignUps[0], btns];
+        }
     };
-    return firstNonNull([submitInputs, submitButtons, otherInputs, otherButtons, buttonLikes], classifyList);
+    return collect([submitInputs, submitButtons, otherInputs, otherButtons, buttonLikes], classifyList);
 };
 
 const classifyGroups = (groups) => {
     for (let i = 0; i < groups.forms.length; i++) {
-        groups[i].isSignUp = isSignUp(groups.forms[i]);
+        const [isSignUp, submitButtons] = getSubmitButtons(groups.forms[i]);
+        groups[i].isSignUp = isSignUp;
+        groups[i].submitButtons = submitButtons;
+        groups[i].mainLogin = groups[i].logins[0];
+        groups[i].mainPw = groups[i].pws[0];
     }
     delete groups.forms;
     return groups;
 };
 
-const onNodeAdded = () => {
+
+const getFormData = (group) => {
+    const login = group.mainLogin.value;
+    const pw = group.mainPw.value;
+    return { pw: pw, login: login };
+};
+
+const onNodeAdded = (accounts) => () => {
     const logins = getLoginInputs();
     const pws = getPasswordInputs();
     const groups = classifyGroups(findForms(logins, pws));
 
+    const hijackedOnSubmit = (group) => (event) => {
+        const data = getFormData(group);
+        port.postMessage({ type: "didSubmit", data: data });
+    };
+
     for (const key in groups) {
         const group = groups[key];
-        group.logins.forEach(injectIcon(false, group.isSignUp));
-        group.pws.forEach(injectIcon(true, group.isSignUp));
-    }
 
+        // skip if we already injected the icon
+        if (typeof group.form.noPass_injected !== "undefined") continue;
+        group.form.noPass_injected = true;
+
+        console.log("group", group);
+
+        group.logins.forEach(injectIcon(false, group.isSignUp, accounts));
+        group.pws.forEach(injectIcon(true, group.isSignUp, accounts));
+
+        group.form.addEventListener('submit', hijackedOnSubmit(group), false);
+        for (const b of group.submitButtons) {
+            b.addEventListener('click', hijackedOnSubmit(group), false);
+        }
+        // TODO: what if we press enter inside the form?
+    }
 };
 
 let popupLoaded = false;
 let popupContainer = null;
 let actionOutsidePopup = null;
+let currentInput = null;
+let port = null;
+
+const fillCurrentInput = (content) => {
+    if (!currentInput)
+        return;
+    currentInput.value = content;
+};
+
+const closePopup = () => {
+    popupContainer.style.display = 'none';
+    Array.from(popupContainer.children).forEach((c) => { c.style.display = 'none'; });
+    actionOutsidePopup.listen(false);
+};
 
 const openPopup = (elem, isPw, isSignUp) => {
     if (!popupLoaded) {
@@ -191,11 +270,7 @@ const openPopup = (elem, isPw, isSignUp) => {
         popupLoaded = true;
         let [container, elmNodes] = makeContainer();
         popupContainer = container;
-        actionOutsidePopup = new ActionOutside(popupContainer, () => {
-            popupContainer.style.display = 'none';
-            Array.from(popupContainer.children).forEach((c) => { c.style.display = 'none'; });
-            actionOutsidePopup.listen(false);
-        });
+        actionOutsidePopup = new ActionOutside(popupContainer, closePopup);
         document.body.appendChild(popupContainer);
         startElm(elmNodes);
     }
@@ -203,28 +278,30 @@ const openPopup = (elem, isPw, isSignUp) => {
 
 
     actionOutsidePopup.listen(true);
-    showContainer(popupContainer, isPw, isSignUp);
+    showContainer(elem, popupContainer, isPw, isSignUp);
 
     const rect = elem.getBoundingClientRect();
     moveContainer(rect.bottom, rect.left);
 };
 
-const showContainer = (popupContainer, isPw, isSignUp) => {
+const showContainer = (elem, popupContainer, isPw, isSignUp) => {
     popupContainer.style.display = '';
     console.log(popupContainer.children);
     const elementToShow = popupContainer.children[(+isPw)*2 + (+isSignUp)];
     elementToShow.style.display = '';
+    currentInput = elem;
 };
 
 const startElm = (elmNodes) => {
-    const port = browser.runtime.connect({name: window.location.href + Math.random() });
     console.log(Elm);
     const popup = (node) => {
         const app = Elm.Popup.embed(node);
         // wire up the ports
-        port.onMessage.addListener((state) => {
-            // console.log("(content) got new state", state);
-            app.ports.onNewState.send(state);
+        port.onMessage.addListener((msg) => {
+            if (msg.type == "onNewState") {
+                // console.log("(content) got new state", state);
+                app.ports.onNewState.send(msg.data);
+            }
         });
 
         app.ports.getState.subscribe(() => {
@@ -238,7 +315,18 @@ const startElm = (elmNodes) => {
         return app;
     };
     const pw = (node) => {
-        const app = Elm.GeneratePassword.embed(node);
+        const rands = setup.getRandomInts(9);
+        const flags = {
+            initialSeed: [rands[0], rands.slice(1)]
+        };
+
+        const app = Elm.GeneratePassword.embed(node, flags);
+        app.ports.onAcceptPw.subscribe((pw) => {
+            console.log("On accept: ", pw);
+            closePopup();
+            fillCurrentInput(pw);
+        });
+
         return app;
     };
     for (let i = 0; i < elmNodes.length; i++) {
@@ -257,7 +345,6 @@ const makeContainer = () => {
     container.style.background = "white";
     container.style.zIndex = "2147483647"; // OVER 9000!!!!
     container.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
-    container.style.padding = "5px";
 
     const elmNodes = [0,1,2,3].map(() => document.createElement('div'));
     elmNodes.forEach((node) => {
@@ -269,10 +356,22 @@ const makeContainer = () => {
     return [container, elmNodes];
 };
 
+const getCurrentSite = () => {
+    return document.location.hostname;
+};
+
 const onWindowLoad = () => {
-    var obs = new MutationObserver(onNodeAdded);
-    obs.observe(document, { childList: true, subtree: true });
-    onNodeAdded();
+    port = browser.runtime.connect({name: window.location.href + Math.random() });
+    port.postMessage({type: "getAccountsForSite", data: getCurrentSite()});
+    port.onMessage.addListener((msg) => {
+        if (msg.type == "onGetAccountsForSite") {
+            const accounts = msg.data;
+            console.log("known accounts:", accounts);
+            var obs = new MutationObserver(onNodeAdded(accounts));
+            obs.observe(document, { childList: true, subtree: true });
+            onNodeAdded(accounts)();
+        }
+    });
 };
 
 

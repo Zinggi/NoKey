@@ -75,6 +75,14 @@ initShared seed uuid =
     }
 
 
+getAccountsForSite : String -> SyncData -> List String
+getAccountsForSite site sync =
+    savedSites sync
+        |> Dict.filter (\( siteName, userName ) value -> site == siteName)
+        |> Dict.keys
+        |> List.map (\( siteName, userName ) -> userName)
+
+
 updateShared : (SharedData -> SharedData) -> SyncData -> SyncData
 updateShared f sync =
     { sync
@@ -87,6 +95,11 @@ updateShared f sync =
 isKnownId : String -> SyncData -> Bool
 isKnownId id sync =
     ORDict.get sync.shared.knownIds |> Dict.member id
+
+
+savedSites : SyncData -> Dict ( String, String ) SiteMeta
+savedSites sync =
+    ORDict.getWith TimestampedVersionRegister.get sync.shared.savedSites
 
 
 knownDevices : SyncData -> Dict String String

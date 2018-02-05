@@ -86,7 +86,7 @@ init =
         mkSet b =
             Dict.map (\key s -> ( b, s )) CharSet.commonCharSets
     in
-        { allowedSets = mkSet True, atLeastOneOf = mkSet False, includeCustom = "", excludeCustom = "", custom = "" }
+        { allowedSets = mkSet True, atLeastOneOf = mkSet True, includeCustom = "", excludeCustom = "", custom = "" }
 
 
 getNextPassword : Int -> State -> Seed -> ( Result String String, Seed )

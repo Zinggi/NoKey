@@ -168,6 +168,7 @@ type Msg
     | GrantShareRequest Notifications.Id ShareRequest
     | RejectShareRequest Notifications.Id
     | ResetDevice
+    | SendOutAccountsFor String
     | NoOp
 
 
@@ -390,6 +391,9 @@ update msg model =
 
         ResetDevice ->
             resetModel model |> withCmds [ Ports.resetStorage () ]
+
+        SendOutAccountsFor site ->
+            model |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
     )
         |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (encodeModel newModel) ] ))
 
@@ -458,5 +462,6 @@ subs model =
     [ Api.connectPrivateSocket ReceiveMessage JoinChannel model.uniqueIdentifyier
     , Ports.onStateRequest (always NoOp)
     , Ports.onReceiveMsg decodeMsg
+    , Ports.onRequestAccountsForSite SendOutAccountsFor
     ]
         |> Sub.batch
