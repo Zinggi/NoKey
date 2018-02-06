@@ -1,6 +1,7 @@
 port module Ports exposing (..)
 
 import Json.Encode exposing (Value)
+import Data.Notifications exposing (SiteEntry)
 
 
 port setTitle : String -> Cmd msg
@@ -35,6 +36,16 @@ port onRequestAccountsForSite : (String -> msg) -> Sub msg
 {-| This sends out the accounts that we have saved for a site, as an answer to onRequestAccountsForSite
 -}
 port accountsForSite : List String -> Cmd msg
+
+
+{-| gets called when we register to a new site
+-}
+port onAddSiteEntry : (SiteEntry -> msg) -> Sub msg
+
+
+{-| Call this whenever the notification count changes
+-}
+port notificationCount : Int -> Cmd msg
 
 
 

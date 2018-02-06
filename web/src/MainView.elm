@@ -18,6 +18,7 @@ import Elements
 import Data.Sync exposing (SyncData)
 import Data.RequestPassword as RequestPassword
 import Data.PasswordMeta exposing (PasswordMetaData)
+import Data.Notifications as Notifications
 import Views.Pairing
 import Views.Notifications
 import Views.PasswordGenerator
@@ -34,23 +35,35 @@ view model =
         row
             [ alignTop ]
             [ column [ attribute (Attr.style [ ( "maxWidth", "800px" ) ]) ]
-                [ Views.Devices.view model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
-                , Elements.line
-                , Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
-                , Elements.line
-                , Views.Notifications.view RejectShareRequest GrantShareRequest model.notifications
-                , Elements.line
-                , if numberOfKnownDevices >= 2 then
-                    newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry numberOfKnownDevices model.seed
-                  else
-                    text "pair a device to save your first password"
-                , Elements.line
-                , lazy (\( a, b ) -> viewSavedSites a b) ( model.sitesState, model.syncData )
-                , Elements.line
-                , Elements.button (Just ResetDevice) "Reset Device"
-                ]
+                (if Notifications.count model.notifications > 0 then
+                    [ Views.Notifications.view notificationsConfig model.notifications numberOfKnownDevices model.notificationsView ]
+                 else
+                    [ Views.Devices.view model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
+                    , Elements.line
+                    , Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
+                    , Elements.line
+                    , if numberOfKnownDevices >= 2 then
+                        newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry numberOfKnownDevices model.seed
+                      else
+                        text "pair a device to save your first password"
+                    , Elements.line
+                    , lazy (\( a, b ) -> viewSavedSites a b) ( model.sitesState, model.syncData )
+                    , Elements.line
+                    , Elements.button (Just ResetDevice) "Reset Device"
+                    ]
+                )
             ]
             |> Element.layout Styles.background
+
+
+notificationsConfig : Views.Notifications.Config Msg
+notificationsConfig =
+    { onRejectRequest = RejectShareRequest
+    , onGrantRequest = GrantShareRequest
+    , onDismiss = DismissNotification
+    , onSaveEntry = SaveEntry
+    , toMsg = UpdateNotifications
+    }
 
 
 pairingConfig : Views.Pairing.Config Msg
@@ -96,13 +109,13 @@ newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> Int -
 newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
     column []
         [ column []
-            [ Elements.input SiteNameChanged "New Site: " "example.com" entry.siteName
+            [ Elements.inputWithLabel (Just SiteNameChanged) "New Site: " "example.com" entry.siteName
             ]
         , (if not expandSiteEntry then
             empty
            else
             column []
-                ([ Elements.input UserNameChanged "Login name" "" entry.userName
+                ([ Elements.inputWithLabel (Just UserNameChanged) "Login name" "" entry.userName
                  , Elements.text "Security Level: "
 
                  -- TODO: limit max by number of available devices.

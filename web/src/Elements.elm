@@ -94,7 +94,7 @@ button onPress txt =
 
 inputGroup heading contents =
     column [ padding (Styles.scaled 1), spacing (Styles.paddingScale 1), alignLeft ]
-        ((el Styles.groupHeading (h4 (heading ++ ":"))) :: contents)
+        ((el Styles.groupHeading (h4 (heading))) :: contents)
 
 
 container contents =
@@ -127,13 +127,13 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
 
 
 clampedNumberInput : (Int -> msg) -> ( Int, Int, Int ) -> Int -> Element msg
-clampedNumberInput toMsg ( min, default, max ) n =
+clampedNumberInput onChange ( min, default, max ) n =
     let
         m =
             clamp min max n
 
         toNumber s =
-            String.toInt s |> Result.map (clamp min max) |> Result.withDefault default |> toMsg
+            String.toInt s |> Result.map (clamp min max) |> Result.withDefault default |> onChange
 
         inp length t =
             Input.text
@@ -167,33 +167,50 @@ wrapInBorder ele =
     el [ Border.width 1, Border.rounded 4, padding (Styles.paddingScale 1) ] ele
 
 
-input onChange label placeholder value =
+withLabel label ele =
     row []
         [ el [ width (fillPortion 1) ] (text label)
-        , Input.text
-            [ width (fillPortion 3), padding 0 ]
-            { onChange = Just onChange
-            , text = value
-            , label = Input.labelLeft [] (empty {- el [ width (px 200) ] (text label) -})
-            , placeholder =
-                if placeholder == "" then
-                    Nothing
-                else
-                    Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
-            , notice = Nothing
-            }
+        , el [ width (fillPortion 3) ] ele
         ]
 
 
-{-| TODO: unify textInput and input? What is the difference?
--}
+buttonRow attrs btns =
+    row ([ padding (Styles.paddingScale 3) ] ++ attrs) (List.intersperse spacer btns)
+
+
+spacer =
+    el [ width fill ] empty
+
+
+inputWithLabel onChange label placeholder value =
+    row []
+        [ el [ width (fillPortion 1) ] (text label)
+        , inputHelper Input.text [ width (fillPortion 3) ] onChange placeholder value
+        ]
+
+
 textInput onChange placeholder value =
-    Input.text
-        [ padding 0, attribute (Attr.disabled (onChange == Nothing)) ]
+    inputHelper Input.text [] onChange placeholder value
+
+
+passwordEntry onChange label value =
+    row []
+        [ el [ width (fillPortion 1), attribute (Attr.type_ "password"), attribute (Attr.name "password") ] (text label)
+        , inputHelper Input.currentPassword [ width (fillPortion 3) ] onChange "********" value
+        ]
+
+
+inputHelper fn attr onChange placeholder value =
+    fn
+        (attr ++ [ padding 0, attribute (Attr.disabled (onChange == Nothing)) ])
         { onChange = onChange
         , text = value
         , label = Input.labelLeft [ padding 0 ] (empty)
-        , placeholder = Just (Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder))
+        , placeholder =
+            if placeholder == "" then
+                Nothing
+            else
+                Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
         , notice = Nothing
         }
 

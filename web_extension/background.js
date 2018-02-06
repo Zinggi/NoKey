@@ -27,7 +27,7 @@ setup(Elm.MainBackground.worker, (app) => {
                 app.ports.onRequestAccountsForSite.send(msg.data);
             } else if (msg.type === "didSubmit") {
                 console.log("didSubmit", msg.data);
-                // TODO: ask if we want to store this, e.g. open add new site dialog in popup, then store.
+                app.ports.onAddSiteEntry.send(msg.data);
             }
         });
         port.onDisconnect.addListener(() => {
@@ -42,6 +42,20 @@ setup(Elm.MainBackground.worker, (app) => {
             type: "onGetAccountsForSite",
             data: accounts
         });
+    });
+
+    app.ports.notificationCount.subscribe((count) => {
+        console.log("notificationCount: ", count);
+        browser.browserAction.setBadgeBackgroundColor({color: "red"});
+        if (count > 0) {
+            browser.browserAction.setBadgeText({text: ""+count});
+            // this is the tooltip
+            browser.browserAction.setTitle({title: "NoKey: User interaction required"});
+
+        } else {
+            browser.browserAction.setBadgeText({text: ""});
+            browser.browserAction.setTitle({title: "NoKey"});
+        }
     });
 
     app.ports.sendOutNewState.subscribe((state) => {
@@ -59,5 +73,4 @@ setup(Elm.MainBackground.worker, (app) => {
 });
 
 
-browser.browserAction.setBadgeText({text: "test"});
-browser.browserAction.setBadgeBackgroundColor({color: "green"});
+

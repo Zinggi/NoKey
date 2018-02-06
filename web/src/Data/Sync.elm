@@ -54,6 +54,9 @@ type alias SharedData =
 type alias SiteMeta =
     { sharesForOthers : Dict String SecretSharing.Share
     , requiredParts : Int
+
+    -- TODO: add a hash of the password, so that we can tell when loging in to a site,
+    -- wheater we have a new password or the old one
     }
 
 
@@ -168,12 +171,19 @@ insertSite timestamp reqParts siteName userName shares sync =
 -}
 mapSavedSites : (String -> String -> Int -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
 mapSavedSites f sync =
-    (ORDict.getWith TimestampedVersionRegister.get sync.shared.savedSites)
+    (savedSites sync)
         |> Dict.foldl
             (\( siteName, userName ) value acc ->
                 f siteName userName value.requiredParts (Dict.get ( siteName, userName ) sync.myShares) :: acc
             )
             []
+
+
+getPasswordHashFor : String -> String -> SyncData -> Maybe String
+getPasswordHashFor siteName userName sync =
+    savedSites sync
+        |> Dict.get ( siteName, userName )
+        |> Maybe.map ({- TODO: should retrieve password hash -} always "TODO")
 
 
 merge : Time -> OtherSharedData -> SyncData -> SyncData

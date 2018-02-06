@@ -12,7 +12,9 @@
     <script src="build/main.js"></script>
     <script src="setup.js"></script>
     <script>
-        setup(Elm.Main.fullscreen);
+        setup(Elm.Main.fullscreen, (app) => {
+            window.elmApp = app;
+        });
     </script>
 </body>
 </html>

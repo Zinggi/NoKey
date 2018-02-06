@@ -18,7 +18,8 @@ import Helper exposing (..)
 import Ports
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.RequestPassword
-import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest)
+import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest, SiteEntry)
+import Views.Notifications
 import Data.Sync exposing (SyncData, OtherSharedData)
 import Data.Storage
 import Protocol.Api as Api
@@ -60,6 +61,7 @@ type alias Model =
     , sitesState : Data.RequestPassword.State
     , debounce : Debounce ()
     , notifications : Notifications
+    , notificationsView : Views.Notifications.State
 
     -- These ones should be serialized:
     , uniqueIdentifyier : String
@@ -113,6 +115,7 @@ initModel { initialSeed, storedState } =
             , pairingDialogue = Views.Pairing.init
             , showPairingDialogue = True
             , notifications = Notifications.init
+            , notificationsView = Views.Notifications.init
             , sitesState = Dict.empty
             }
     in
@@ -169,6 +172,10 @@ type Msg
     | RejectShareRequest Notifications.Id
     | ResetDevice
     | SendOutAccountsFor String
+    | AddSiteEntry SiteEntry
+    | UpdateNotifications Views.Notifications.State
+    | SaveEntry Notifications.Id SiteEntry
+    | DismissNotification Notifications.Id
     | NoOp
 
 
@@ -180,33 +187,21 @@ update msg model =
 
         AddPassword pw ->
             let
-                ( shares, seed2 ) =
-                    SecretSharing.splitString
-                        ( model.newSiteEntry.securityLevel
-                        , Data.Sync.knownIds model.syncData |> List.length
-                        )
-                        pw
-                        model.seed
-
-                share =
-                    List.map2
-                        (\id share ->
-                            ( id, share )
-                        )
-                        (Data.Sync.knownIds model.syncData)
-                        shares
-                        |> Dict.fromList
-
                 { userName, siteName } =
                     model.newSiteEntry
             in
-                { model
-                    | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry
-                    , expandSiteEntry = False
-                    , seed = seed2
-                }
-                    |> updateSeed
-                    |> withCmds [ withTimestamp (InsertSite siteName userName share model.newSiteEntry.securityLevel) ]
+                saveEntry { login = userName, site = siteName, password = pw, securityLevel = model.newSiteEntry.securityLevel } model
+                    |> mapModel updateSeed
+
+        SaveEntry id entry ->
+            -- TODO
+            saveEntry entry model
+                |> andThenUpdate (updateNotifications (Notifications.remove id))
+                |> mapModel updateSeed
+
+        DismissNotification id ->
+            model
+                |> updateNotifications (Notifications.remove id)
 
         InsertSite siteName userName share requiredParts timestamp ->
             { model | syncData = Data.Sync.insertSite timestamp requiredParts siteName userName share model.syncData }
@@ -269,8 +264,8 @@ update msg model =
                                             { model | syncData = Data.Sync.gotRemoved model.syncData } |> noCmd
 
                                         Api.RequestShare key ->
-                                            { model | notifications = Notifications.newShareRequest id key model.notifications }
-                                                |> noCmd
+                                            model
+                                                |> updateNotifications (Notifications.newShareRequest id key)
 
                                         Api.GrantedShareRequest key share ->
                                             { model
@@ -381,26 +376,85 @@ update msg model =
                 |> withCmds [ Api.requestShare NoOp key model.syncData ]
 
         GrantShareRequest id req ->
-            { model | notifications = Notifications.remove id model.notifications }
-                |> withCmds [ Api.grantRequest NoOp req model.syncData ]
+            model
+                |> updateNotifications (Notifications.remove id)
+                |> addCmds [ Api.grantRequest NoOp req model.syncData ]
 
         RejectShareRequest id ->
             -- TODO: inform other of reject?
-            { model | notifications = Notifications.remove id model.notifications }
-                |> noCmd
+            model
+                |> updateNotifications (Notifications.remove id)
 
         ResetDevice ->
-            resetModel model |> withCmds [ Ports.resetStorage () ]
+            resetModel model
+                |> withCmds [ Ports.resetStorage () ]
 
         SendOutAccountsFor site ->
-            model |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
+            model
+                |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
+
+        AddSiteEntry entry ->
+            case Data.Sync.getPasswordHashFor entry.site entry.login model.syncData of
+                Just hash ->
+                    -- TODO: compare hashed password and compare with password hash to see if old or update
+                    if {- TODO: hash == pwHash entry.password -} False then
+                        -- Ignore, since we already have that password
+                        model |> noCmd
+                    else
+                        -- Update existing entry
+                        model |> updateNotifications (Notifications.newSiteEntry entry False)
+
+                Nothing ->
+                    model
+                        |> updateNotifications (Notifications.newSiteEntry entry True)
+
+        UpdateNotifications n ->
+            { model | notificationsView = n } |> noCmd
     )
         |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (encodeModel newModel) ] ))
 
 
+saveEntry : SiteEntry -> Model -> ( Model, Cmd Msg )
+saveEntry entry model =
+    let
+        ( shares, seed2 ) =
+            SecretSharing.splitString
+                ( entry.securityLevel
+                , Data.Sync.knownIds model.syncData |> List.length
+                )
+                entry.password
+                model.seed
+
+        share =
+            List.map2
+                (\id share ->
+                    ( id, share )
+                )
+                (Data.Sync.knownIds model.syncData)
+                shares
+                |> Dict.fromList
+    in
+        { model
+            | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry
+            , expandSiteEntry = False
+            , seed = seed2
+        }
+            |> withCmds [ withTimestamp (InsertSite entry.site entry.login share entry.securityLevel) ]
+
+
+updateNotifications : (Notifications -> Notifications) -> Model -> ( Model, Cmd Msg )
+updateNotifications f model =
+    let
+        newNot =
+            f model.notifications
+    in
+        { model | notifications = newNot }
+            |> withCmds [ Ports.notificationCount (Notifications.count newNot) ]
+
+
 updateSeed : Model -> Model
 updateSeed model =
-    -- TODO:
+    -- TODO: what is this used for? is it actually needed?
     { model
         | seed = RandomE.step (RandomE.int 1 42) model.seed |> Tuple.second
         , requirementsState = PW.nextPassword model.requirementsState
@@ -463,5 +517,6 @@ subs model =
     , Ports.onStateRequest (always NoOp)
     , Ports.onReceiveMsg decodeMsg
     , Ports.onRequestAccountsForSite SendOutAccountsFor
+    , Ports.onAddSiteEntry AddSiteEntry
     ]
         |> Sub.batch

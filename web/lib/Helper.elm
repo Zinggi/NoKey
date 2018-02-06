@@ -36,6 +36,20 @@ withTimestamp toMsg =
         |> Task.perform (toMsg)
 
 
+mapModel : (a -> b) -> ( a, c ) -> ( b, c )
+mapModel fn ( a, c ) =
+    ( fn a, c )
+
+
+andThenUpdate : (model -> ( model, Cmd msg )) -> ( model, Cmd msg ) -> ( model, Cmd msg )
+andThenUpdate fn ( m, cmd1 ) =
+    let
+        ( newM, cmd2 ) =
+            fn m
+    in
+        ( newM, Cmd.batch [ cmd1, cmd2 ] )
+
+
 
 -- Maybe
 

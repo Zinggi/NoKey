@@ -213,7 +213,7 @@ const classifyGroups = (groups) => {
 const getFormData = (group) => {
     const login = group.mainLogin.value;
     const pw = group.mainPw.value;
-    return { pw: pw, login: login };
+    return { password: pw, login: login, site: getCurrentSite(), securityLevel: 2 };
 };
 
 const onNodeAdded = (accounts) => () => {
