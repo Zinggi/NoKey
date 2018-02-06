@@ -50,8 +50,6 @@ viewEntry config id maxSecurityLevel n state =
                 ]
 
         ExternalSiteEntry entry isNew ->
-            -- TODO: Say "update" if already existing,
-            --   show "diff", e.g. show both old and new value
             column []
                 [ Elements.inputGroup
                     (if isNew then

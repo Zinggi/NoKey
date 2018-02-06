@@ -194,7 +194,6 @@ update msg model =
                     |> mapModel updateSeed
 
         SaveEntry id entry ->
-            -- TODO
             saveEntry entry model
                 |> andThenUpdate (updateNotifications (Notifications.remove id))
                 |> mapModel updateSeed

@@ -10,9 +10,9 @@ type alias TimestampedVersionRegister a =
     { version : VClock, timestamp : Time, value : a }
 
 
-init : Time -> a -> TimestampedVersionRegister a
-init t v =
-    { version = VClock.init, value = v, timestamp = t }
+init : String -> Time -> a -> TimestampedVersionRegister a
+init id t v =
+    { version = VClock.init |> VClock.increment id, value = v, timestamp = t }
 
 
 decoder : Decoder a -> Decoder (TimestampedVersionRegister a)

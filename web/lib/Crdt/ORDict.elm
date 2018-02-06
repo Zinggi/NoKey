@@ -19,6 +19,7 @@ module Crdt.ORDict
         , encodeComplete
         , completeDecoder
         , completeDecoder2
+        , updateOrInsert
         , resetExceptOne
         )
 
@@ -115,6 +116,23 @@ fromDict seed =
 insert : comparable -> value -> ORDict comparable value -> ORDict comparable value
 insert key value dict =
     { keys = ORSet.add key dict.keys, store = Dict.insert key value dict.store }
+
+
+updateOrInsert : comparable -> (a -> a) -> a -> ORDict comparable a -> ORDict comparable a
+updateOrInsert key f value dict =
+    { dict
+        | store =
+            Dict.update key
+                (\mv ->
+                    case mv of
+                        Just v ->
+                            Just (f v)
+
+                        Nothing ->
+                            Just value
+                )
+                dict.store
+    }
 
 
 update : comparable -> (a -> a) -> ORDict comparable a -> ORDict comparable a

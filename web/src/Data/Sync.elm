@@ -154,13 +154,17 @@ insertSite timestamp reqParts siteName userName shares sync =
                 Nothing ->
                     Debug.log "This should never happen, but there is a save default, so we don't crash" <|
                         ( sync.myShares, shares )
+
+        updateEntry fn =
+            fn sync.id timestamp { sharesForOthers = sharesForOthers, requiredParts = reqParts }
     in
         updateShared
             (\s ->
                 { s
                     | savedSites =
-                        ORDict.insert ( siteName, userName )
-                            (TimestampedVersionRegister.init timestamp { sharesForOthers = sharesForOthers, requiredParts = reqParts })
+                        ORDict.updateOrInsert ( siteName, userName )
+                            (updateEntry TimestampedVersionRegister.set)
+                            (updateEntry TimestampedVersionRegister.init)
                             s.savedSites
                 }
             )
