@@ -3,6 +3,14 @@ import Elm from './build/apps.js';
 
 console.log("(background) start background.js");
 
+const sendMsgToAll = (msg, ports) => {
+    for (let key in ports) {
+        if (ports[key]) {
+            ports[key].postMessage(msg);
+        }
+    }
+};
+
 
 setup(Elm.MainBackground.worker, (app) => {
     // console.log("(background) started", app);
@@ -44,6 +52,13 @@ setup(Elm.MainBackground.worker, (app) => {
         });
     });
 
+    // fillForm : { login : String, site : String, password : String } -> Cmd msg
+    app.ports.fillForm.subscribe((msg) => {
+        console.log("fill form:", msg);
+        sendMsgToAll({ type: "fillForm", data: msg }, ports);
+    });
+
+
     app.ports.notificationCount.subscribe((count) => {
         console.log("notificationCount: ", count);
         browser.browserAction.setBadgeBackgroundColor({color: "red"});
@@ -59,16 +74,8 @@ setup(Elm.MainBackground.worker, (app) => {
     });
 
     app.ports.sendOutNewState.subscribe((state) => {
+        sendMsgToAll({ type: "onNewState", data: state }, ports);
         // console.log("(background) want to sendOutNewState", state);
-        for (let key in ports) {
-            if (ports[key]) {
-                // console.log("(background) sent to " + key);
-                ports[key].postMessage({
-                    type: "onNewState",
-                    data: state
-                });
-            }
-        }
     });
 });
 

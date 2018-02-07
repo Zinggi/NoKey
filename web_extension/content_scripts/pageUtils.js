@@ -71,10 +71,11 @@ const getPasswordInputs = () => {
     return [].filter.call(document.getElementsByTagName('input'), isPasswordInput);
 };
 
-const injectIcon = (isPw, isSignUp, accounts) => {
+const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
     return (input) => {
-        if (typeof input.noPass_injected !== "undefined")
-            return;
+        if (typeof input.noPass_injected !== "undefined") return;
+        input.noPass_injected = true;
+        input.noPass_groupKey = groupKey;
 
         // TODO: remove colors
         if (isSignUp === true) {
@@ -94,9 +95,8 @@ const injectIcon = (isPw, isSignUp, accounts) => {
             return;
         }
         console.log("Inject icon: ", input.id || input.name, "  is pw: ", isPw);
-        input.noPass_injected = true;
 
-        const addIcon = isSignUp || (accounts.length !== 0);
+        const addIcon = true; // TODO: change back to: isSignUp || (accounts.length !== 0);
 
         if (addIcon) {
             const iconPath = browser.extension.getURL('icons/library.svg');
@@ -219,12 +219,13 @@ const getFormData = (group) => {
 const onNodeAdded = (accounts) => () => {
     const logins = getLoginInputs();
     const pws = getPasswordInputs();
-    const groups = classifyGroups(findForms(logins, pws));
+    groups = classifyGroups(findForms(logins, pws));
 
     const hijackedOnSubmit = (group) => (event) => {
         const data = getFormData(group);
         port.postMessage({ type: "didSubmit", data: data });
     };
+
 
     for (const key in groups) {
         const group = groups[key];
@@ -235,8 +236,8 @@ const onNodeAdded = (accounts) => () => {
 
         console.log("group", group);
 
-        group.logins.forEach(injectIcon(false, group.isSignUp, accounts));
-        group.pws.forEach(injectIcon(true, group.isSignUp, accounts));
+        group.logins.forEach(injectIcon(false, group.isSignUp, accounts, key));
+        group.pws.forEach(injectIcon(true, group.isSignUp, accounts, key));
 
         group.form.addEventListener('submit', hijackedOnSubmit(group), false);
         for (const b of group.submitButtons) {
@@ -251,11 +252,22 @@ let popupContainer = null;
 let actionOutsidePopup = null;
 let currentInput = null;
 let port = null;
+let groups = null;
+let currentGroup = null;
 
 const fillCurrentInput = (content) => {
-    if (!currentInput)
-        return;
+    if (!currentInput) return;
+
     currentInput.value = content;
+};
+
+const fillCurrentForm = (msg) => {
+    if (!groups || !currentGroup || msg.site !== getCurrentSite()) return;
+
+    closePopup();
+    const group = groups[currentGroup];
+    group.pws.forEach((elem) => elem.value = msg.password);
+    group.logins.forEach((elem) => elem.value = msg.login);
 };
 
 const closePopup = () => {
@@ -286,10 +298,11 @@ const openPopup = (elem, isPw, isSignUp) => {
 
 const showContainer = (elem, popupContainer, isPw, isSignUp) => {
     popupContainer.style.display = '';
-    console.log(popupContainer.children);
+    // console.log(popupContainer.children);
     const elementToShow = popupContainer.children[(+isPw)*2 + (+isSignUp)];
     elementToShow.style.display = '';
     currentInput = elem;
+    currentGroup = elem.noPass_groupKey;
 };
 
 const startElm = (elmNodes) => {
@@ -314,6 +327,28 @@ const startElm = (elmNodes) => {
         });
         return app;
     };
+    const empty = (node) => {
+        return {};
+    };
+    const fillLogin = (node) => {
+        const app = Elm.FillLogin.embed(node);
+        port.onMessage.addListener((msg) => {
+            if (msg.type == "onNewState") {
+                // console.log("(content) got new state", state);
+                app.ports.onNewState.send(msg.data);
+            }
+        });
+
+        app.ports.getState.subscribe(() => {
+            // console.log("(content, fillLogin) getState");
+            port.postMessage({type: "onStateRequest", data: {}});
+        });
+        app.ports.sendMsgToBackground.subscribe((msg) =>{
+            // console.log("(content) sendMsgToBackground", msg);
+            port.postMessage({type: "onReceiveMsg", data: msg});
+        });
+        return app;
+    };
     const pw = (node) => {
         const rands = setup.getRandomInts(9);
         const flags = {
@@ -330,8 +365,18 @@ const startElm = (elmNodes) => {
         return app;
     };
     for (let i = 0; i < elmNodes.length; i++) {
-        const app = [popup, popup, popup, pw][i](elmNodes[i]);
+        // [sign in: login, sign up: login, sign in: password, sign up: password]
+        const app = [fillLogin, empty, fillLogin, pw][i](elmNodes[i]);
     }
+
+    // wire up ports to fill form
+    // fillForm : { login : String, site : String, password : String } -> Cmd msg
+    port.onMessage.addListener((msg) => {
+        if (msg.type === "fillForm") {
+            console.log("fill form with:", msg);
+            fillCurrentForm(msg.data);
+        }
+    });
 };
 
 const moveContainer = (bottom, left) => {
@@ -351,7 +396,6 @@ const makeContainer = () => {
         node.style.display = 'none';
         container.appendChild(node);
     });
-    // container.appendChild(elmNode);
 
     return [container, elmNodes];
 };

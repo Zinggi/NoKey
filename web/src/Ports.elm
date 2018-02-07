@@ -48,5 +48,10 @@ port onAddSiteEntry : (SiteEntry -> msg) -> Sub msg
 port notificationCount : Int -> Cmd msg
 
 
+{-| should get called after we requested to get a password and fill the form
+-}
+port fillForm : { login : String, site : String, password : String } -> Cmd msg
+
+
 
 -- port onStateChange : (Value -> msg) -> Sub msg

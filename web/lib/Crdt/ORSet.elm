@@ -5,6 +5,7 @@ module Crdt.ORSet
         , add
         , remove
         , get
+        , member
         , merge
         , decoder
         , encode
@@ -203,3 +204,8 @@ get set =
         )
         Set.empty
         set.data
+
+
+member : comparable -> ORSet comparable -> Bool
+member key set =
+    Set.member key (get set)

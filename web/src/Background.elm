@@ -63,6 +63,9 @@ type alias Model =
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
 
+    -- Keep the current site, to provide site specific actions
+    , currentSite : Maybe String
+
     -- These ones should be serialized:
     , uniqueIdentifyier : String
 
@@ -116,7 +119,8 @@ initModel { initialSeed, storedState } =
             , showPairingDialogue = True
             , notifications = Notifications.init
             , notificationsView = Views.Notifications.init
-            , sitesState = Dict.empty
+            , sitesState = Data.RequestPassword.init
+            , currentSite = Nothing
             }
     in
         case Data.Storage.decode storedState of
@@ -167,7 +171,7 @@ type Msg
     | SetDeviceName String
     | SyncToOthers Debounce.Msg
     | InsertSite String String (Dict String SecretSharing.Share) Int Time
-    | RequestPasswordPressed ( String, String )
+    | RequestPasswordPressed ( String, String ) Bool
     | GrantShareRequest Notifications.Id ShareRequest
     | RejectShareRequest Notifications.Id
     | ResetDevice
@@ -267,13 +271,23 @@ update msg model =
                                                 |> updateNotifications (Notifications.newShareRequest id key)
 
                                         Api.GrantedShareRequest key share ->
-                                            { model
-                                                | sitesState =
-                                                    Dict.update key
-                                                        (Maybe.map (\a -> share :: a))
-                                                        model.sitesState
-                                            }
-                                                |> noCmd
+                                            let
+                                                newSitesState =
+                                                    Data.RequestPassword.addShare key share model.sitesState
+
+                                                newModel =
+                                                    { model | sitesState = newSitesState }
+
+                                                ( site, login ) =
+                                                    key
+                                            in
+                                                case Data.RequestPassword.getStatus key newSitesState of
+                                                    Data.RequestPassword.Done True pw ->
+                                                        -- TODO: if done and fillForm is set, call port to fill the form
+                                                        newModel |> withCmds [ Ports.fillForm { login = login, site = site, password = pw } ]
+
+                                                    _ ->
+                                                        newModel |> noCmd
 
                                         Api.PairedWith _ ->
                                             -- TODO: refactor, split Api messages into Authenticated / Anonymous messages
@@ -370,9 +384,34 @@ update msg model =
                 newModel
                     |> withCmds [ cmd, storeState newModel ]
 
-        RequestPasswordPressed key ->
-            { model | sitesState = Dict.insert key [] model.sitesState }
-                |> withCmds [ Api.requestShare NoOp key model.syncData ]
+        RequestPasswordPressed key fillForm ->
+            case Data.Sync.getSavedSite key model.syncData of
+                Just ( requiredParts, maybeMyShare ) ->
+                    let
+                        newSitesState =
+                            Data.RequestPassword.waitFor key fillForm requiredParts maybeMyShare model.sitesState
+
+                        newModel =
+                            { model | sitesState = newSitesState }
+
+                        ( site, login ) =
+                            key
+                    in
+                        case Data.RequestPassword.getStatus key newSitesState of
+                            Data.RequestPassword.Done True pw ->
+                                newModel
+                                    |> withCmds [ Ports.fillForm { password = pw, site = site, login = login } ]
+
+                            _ ->
+                                newModel
+                                    |> withCmds
+                                        [ -- TODO: this request should be sent multiple times, with a timeout
+                                          Api.requestShare NoOp key model.syncData
+                                        ]
+
+                Nothing ->
+                    -- TODO:
+                    Debug.crash "You somehow managed to press on RequestPassword for a site that we haven't saved!"
 
         GrantShareRequest id req ->
             model
@@ -389,7 +428,7 @@ update msg model =
                 |> withCmds [ Ports.resetStorage () ]
 
         SendOutAccountsFor site ->
-            model
+            { model | currentSite = Just site }
                 |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
 
         AddSiteEntry entry ->

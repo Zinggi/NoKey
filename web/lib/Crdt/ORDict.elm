@@ -120,8 +120,8 @@ insert key value dict =
 
 updateOrInsert : comparable -> (a -> a) -> a -> ORDict comparable a -> ORDict comparable a
 updateOrInsert key f value dict =
-    { dict
-        | store =
+    let
+        newStore =
             Dict.update key
                 (\mv ->
                     case mv of
@@ -132,7 +132,11 @@ updateOrInsert key f value dict =
                             Just value
                 )
                 dict.store
-    }
+    in
+        if ORSet.member key dict.keys then
+            { dict | store = newStore }
+        else
+            { keys = ORSet.add key dict.keys, store = newStore }
 
 
 update : comparable -> (a -> a) -> ORDict comparable a -> ORDict comparable a

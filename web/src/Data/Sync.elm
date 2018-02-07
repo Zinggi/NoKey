@@ -183,6 +183,13 @@ mapSavedSites f sync =
             []
 
 
+getSavedSite : ( String, String ) -> SyncData -> Maybe ( Int, Maybe SecretSharing.Share )
+getSavedSite key sync =
+    (savedSites sync)
+        |> Dict.get key
+        |> Maybe.map (\v -> ( v.requiredParts, Dict.get key sync.myShares ))
+
+
 getPasswordHashFor : String -> String -> SyncData -> Maybe String
 getPasswordHashFor siteName userName sync =
     savedSites sync

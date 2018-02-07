@@ -41,6 +41,8 @@ init =
 
 newSiteEntry : SiteEntry -> Bool -> Notifications -> Notifications
 newSiteEntry entry isNew ns =
+    -- TODO: only insert if not dublicate!
+    -- Also, only keep most recent entry for a specific site.
     { ns | data = Dict.insert ns.maxKey (ExternalSiteEntry entry isNew) ns.data, maxKey = ns.maxKey + 1 }
 
 

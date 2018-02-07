@@ -16,7 +16,7 @@ import Helper exposing (..)
 import Styles
 import Elements
 import Data.Sync exposing (SyncData)
-import Data.RequestPassword as RequestPassword
+import Data.RequestPassword as RequestPassword exposing (Status(..))
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
 import Views.Pairing
@@ -86,20 +86,18 @@ viewSavedSite sitesState siteName userName requiredParts mayShare =
                 [ Elements.text userName
                 , Elements.text (" -> has share: " ++ toString (Nothing /= mayShare))
                 ]
-            , case Dict.get ( siteName, userName ) sitesState of
-                Just recShares ->
-                    let
-                        shares =
-                            maybeToList mayShare ++ recShares
-                    in
-                        if (List.length shares) >= requiredParts then
-                            -- expensive operation
-                            Elements.text ("Password: " ++ toString (SecretSharing.joinToString shares))
-                        else
-                            Elements.text <| "Received " ++ toString (List.length shares) ++ "/" ++ toString requiredParts ++ " shares"
+            , case RequestPassword.getStatus ( siteName, userName ) sitesState of
+                NotRequested ->
+                    Elements.button (Just (RequestPasswordPressed ( siteName, userName ) False)) "Request password"
 
-                Nothing ->
-                    Elements.button (Just (RequestPasswordPressed ( siteName, userName ))) "Request password"
+                Waiting n m ->
+                    Elements.text ("Received " ++ toString n ++ "/" ++ toString m ++ " shares")
+
+                Done _ pw ->
+                    Elements.text ("Password: " ++ pw)
+
+                Error error ->
+                    Elements.text ("Couldn't recover password, reason:\n" ++ error)
             ]
         ]
         |> (\elem -> ( siteName ++ userName, elem ))
