@@ -30,7 +30,7 @@ update msg model =
             ( s, Cmd.none )
 
         OnAcceptPw pw ->
-            ( model, onAcceptPw pw )
+            ( PW.nextPassword model, onAcceptPw pw )
 
 
 view model =

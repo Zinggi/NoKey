@@ -3,12 +3,7 @@
 import ActionOutside from 'action-outside';
 import Elm from '../build/apps.js';
 import setup from '../../web/setup.js';
-
-const loginInputTypes = ['text', 'email', 'tel'];
-const config_passwordInputNames = ['passwd','password','pass'];
-const config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name'];
-const config_buttonSignUpNames = ['signup', 'sign up', 'register', 'create'];
-const config_buttonLogInNames = ['login', 'log in'];
+import pwLib from '../js/passwordManagerLib.js';
 
 
 /*
@@ -35,68 +30,31 @@ const parseUrl = (url) => {
 };
 
 
-const readInputNames = (input) => {
-    return [input.name,input.getAttribute('autocomplete'),input.id];
-};
-
-const isGoodName = (name, goodNames) => {
-    if (!name) return false;
-    let nm = name.toLowerCase();
-    return goodNames.some((n) => { return nm.indexOf(n.toLowerCase()) >= 0; });
-};
-
-const hasGoodName = (fieldNames, goodFieldNames) => {
-    return fieldNames.some((fn) => { return isGoodName(fn, goodFieldNames); });
-};
-
-const isPasswordInput = (input) => {
-    if (input.type === 'password') {
-        return true;
-    } else if (input.type === 'text') {
-        return hasGoodName(readInputNames(input), config_passwordInputNames);
-    }
-    return false;
-};
-
-const isLoginInput = (input) => {
-    return (loginInputTypes.indexOf(input.type) >= 0 &&
-        hasGoodName(readInputNames(input), config_loginInputNames));
-};
-
-const getLoginInputs = () => {
-    return [].filter.call(document.getElementsByTagName('input'), isLoginInput);
-};
-
-const getPasswordInputs = () => {
-    return [].filter.call(document.getElementsByTagName('input'), isPasswordInput);
-};
-
 const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
     return (input) => {
         if (typeof input.noPass_injected !== "undefined") return;
         input.noPass_injected = true;
         input.noPass_groupKey = groupKey;
 
-        // TODO: remove colors
+        // debug colors
         if (isSignUp === true) {
-            if (isPw) {
-                input.style.background = "limegreen";
-            } else {
-                input.style.background = "green";
-            }
+            // if (isPw) {
+            //     input.style.background = "limegreen";
+            // } else {
+            //     input.style.background = "green";
+            // }
         } else if (isSignUp === false) {
-            if (isPw) {
-                input.style.background = "orange";
-            } else {
-                input.style.background = "pink";
-            }
+            // if (isPw) {
+            //     input.style.background = "orange";
+            // } else {
+            //     input.style.background = "pink";
+            // }
         } else {
-            console.log("we don't know if this is a sign up or login page!");
+            console.log("we don't know if this is a sign up or login page!", input);
             return;
         }
-        console.log("Inject icon: ", input.id || input.name, "  is pw: ", isPw);
 
-        const addIcon = true; // TODO: change back to: isSignUp || (accounts.length !== 0);
+        const addIcon = isSignUp || (accounts.length !== 0);
 
         if (addIcon) {
             const iconPath = browser.extension.getURL('icons/library.svg');
@@ -117,109 +75,20 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
     };
 };
 
-const findForms = (logins, pws) => {
-    let groups = { forms: [] };
-    let i = 0;
-    const pushElem = (elem, isLogin, obj) => {
-        if (isLogin) {
-            obj.logins.push(elem);
-        } else {
-            obj.pws.push(elem);
-        }
-    };
-    const addFromList = (list, isLogin) => {
-        for (const elem of list) {
-            const form = elem.form;
-            const ind = groups.forms.indexOf(form);
-            if (ind != -1) {
-                pushElem(elem, isLogin, groups[ind]);
-                // groups[ind].push(elem);
-            } else {
-                // groups[i] = [elem];
-                groups[i] = { logins: [], pws: [], form: form };
-                pushElem(elem, isLogin, groups[i]);
-
-                groups.forms.push(form);
-                i++;
-            }
-        }
-    };
-    addFromList(logins, true);
-    addFromList(pws, false);
-    return groups;
-};
-
-const readButtonNames = (input) => {
-    return [input.name,input.value,input.id];
-};
-
-const isSignUpButton = (button) => {
-    return hasGoodName(readButtonNames(button), config_buttonSignUpNames);
-};
-
-const isLogInButton = (button) => {
-    return hasGoodName(readButtonNames(button), config_buttonLogInNames);
-};
-
-const getSubmitButtons = (form) => {
-    const submitInputs = form.querySelectorAll("input[type=submit]");
-    const submitButtons = form.querySelectorAll("button[type=submit]");
-    const otherInputs = form.querySelectorAll("input[type=button]");
-    const otherButtons = form.querySelectorAll("button");
-    const buttonLikes = form.querySelectorAll("[role=button]");
-    const classifyList = (list) => {
-        for (const b of list) {
-            if (isLogInButton(b)) {
-                return [false, b];
-            } else if (isSignUpButton(b)) {
-                return [true, b];
-            }
-        }
-        return null;
-    };
-    const collect = (list, fn) => {
-        let btns = [];
-        let isSignUps = [];
-        for (const l of list) {
-            const ret = fn(l);
-            if (ret !== null) {
-                const [isSignUp, btn] = ret;
-                btns.push(btn);
-                isSignUps.push(isSignUp);
-            }
-        }
-        if (btns.length === 0) {
-            return null;
-        } else {
-            return [isSignUps[0], btns];
-        }
-    };
-    return collect([submitInputs, submitButtons, otherInputs, otherButtons, buttonLikes], classifyList);
-};
-
-const classifyGroups = (groups) => {
-    for (let i = 0; i < groups.forms.length; i++) {
-        const [isSignUp, submitButtons] = getSubmitButtons(groups.forms[i]);
-        groups[i].isSignUp = isSignUp;
-        groups[i].submitButtons = submitButtons;
-        groups[i].mainLogin = groups[i].logins[0];
-        groups[i].mainPw = groups[i].pws[0];
-    }
-    delete groups.forms;
-    return groups;
-};
 
 
 const getFormData = (group) => {
+    // TODO: extract all login values, not just one
     const login = group.mainLogin.value;
     const pw = group.mainPw.value;
     return { password: pw, login: login, site: getCurrentSite(), securityLevel: 2 };
 };
 
 const onNodeAdded = (accounts) => () => {
-    const logins = getLoginInputs();
-    const pws = getPasswordInputs();
-    groups = classifyGroups(findForms(logins, pws));
+    console.log("onNodeAdded");
+
+    groups = pwLib.classifyForms();
+    console.log("groups:", groups);
 
     const hijackedOnSubmit = (group) => (event) => {
         const data = getFormData(group);
