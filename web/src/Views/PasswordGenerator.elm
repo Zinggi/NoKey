@@ -39,9 +39,10 @@ update msg state =
     case msg of
         PwReq s ->
             { state | requirements = s }
+                |> nextPassword
 
         UpdateLength i ->
-            { state | length = i }
+            { state | length = i } |> nextPassword
 
         SetIsOpen b ->
             { state | showMore = b }

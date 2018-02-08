@@ -6,7 +6,7 @@ module Views.Pairing exposing (State, Config, view, receivedToken, init, tokenSu
 
 import Element exposing (..)
 import RemoteData exposing (WebData, RemoteData(..))
-import Http
+import Http exposing (Error(..))
 import QRCode
 import Elements
 import Helper exposing (boolToMaybe)
@@ -104,7 +104,12 @@ view config doShow diag =
                         inp False [ Elements.text "wait for token..." ]
 
                     ( Failure e, _ ) ->
-                        inp True [ Elements.text ("Something went wrong: " ++ toString e) ]
+                        case e of
+                            NetworkError ->
+                                inp True [ Elements.text "Either you or the pairing server are offline. Sorry about that :(" ]
+
+                            _ ->
+                                inp True [ Elements.text ("Something went wrong: " ++ toString e) ]
 
                     ( Success t, _ ) ->
                         inp True

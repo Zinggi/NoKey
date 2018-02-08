@@ -56,7 +56,8 @@ type alias SiteMeta =
     , requiredParts : Int
 
     -- TODO: add a hash of the password, so that we can tell when loging in to a site,
-    -- wheater we have a new password or the old one
+    -- wheater we have a new password or the old one.
+    -- => problem: hash contains info about password! more on notes...
     }
 
 
@@ -194,7 +195,7 @@ getPasswordHashFor : String -> String -> SyncData -> Maybe String
 getPasswordHashFor siteName userName sync =
     savedSites sync
         |> Dict.get ( siteName, userName )
-        |> Maybe.map ({- TODO: should retrieve password hash -} always "TODO")
+        |> Maybe.map ({- TODO: should retrieve password hash, see above, there are some problems with this approach -} always "TODO")
 
 
 merge : Time -> OtherSharedData -> SyncData -> SyncData

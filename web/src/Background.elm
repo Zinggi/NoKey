@@ -98,7 +98,6 @@ initModel { initialSeed, storedState } =
 
         ( uuid, seed2 ) =
             -- TODO: replace with pcg-extended
-            -- TODO:
             -- adapt the UUID package to use pcg-extended
             -- see:
             --  https://github.com/danyx23/elm-uuid/issues/10
@@ -154,7 +153,6 @@ resetModel model =
 type Msg
     = AddPassword String
     | SiteNameChanged String
-    | PasswordLengthChanged Int
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
     | UserNameChanged String
@@ -200,7 +198,6 @@ update msg model =
         SaveEntry id entry ->
             saveEntry entry model
                 |> andThenUpdate (updateNotifications (Notifications.remove id))
-                |> mapModel updateSeed
 
         DismissNotification id ->
             model
@@ -223,11 +220,6 @@ update msg model =
 
         NewPasswordRequirements state ->
             { model | requirementsState = state }
-                |> noCmd
-
-        PasswordLengthChanged l ->
-            { model | newSiteEntry = (\e -> { e | length = l }) model.newSiteEntry }
-                |> updateSeed
                 |> noCmd
 
         UserNameChanged n ->
@@ -283,7 +275,7 @@ update msg model =
                                             in
                                                 case Data.RequestPassword.getStatus key newSitesState of
                                                     Data.RequestPassword.Done True pw ->
-                                                        -- TODO: if done and fillForm is set, call port to fill the form
+                                                        -- if done and fillForm is set, call port to fill the form
                                                         newModel |> withCmds [ Ports.fillForm { login = login, site = site, password = pw } ]
 
                                                     _ ->
@@ -410,7 +402,7 @@ update msg model =
                                         ]
 
                 Nothing ->
-                    -- TODO:
+                    -- TODO: should we really crash here?
                     Debug.crash "You somehow managed to press on RequestPassword for a site that we haven't saved!"
 
         GrantShareRequest id req ->
@@ -435,6 +427,7 @@ update msg model =
             case Data.Sync.getPasswordHashFor entry.site entry.login model.syncData of
                 Just hash ->
                     -- TODO: compare hashed password and compare with password hash to see if old or update
+                    -- See problem on notes...
                     if {- TODO: hash == pwHash entry.password -} False then
                         -- Ignore, since we already have that password
                         model |> noCmd
@@ -492,7 +485,8 @@ updateNotifications f model =
 
 updateSeed : Model -> Model
 updateSeed model =
-    -- TODO: what is this used for? is it actually needed?
+    -- We need this to advance the seed so that after we created and accepted a password,
+    -- we get a different series of random passswords
     { model
         | seed = RandomE.step (RandomE.int 1 42) model.seed |> Tuple.second
         , requirementsState = PW.nextPassword model.requirementsState
@@ -517,7 +511,8 @@ syncToOthers model =
 
 pairedWith : Time -> String -> OtherSharedData -> Model -> ( Model, Cmd Msg )
 pairedWith timestamp id syncData model =
-    -- TODO: delete? same as sync update
+    -- Currently does the same as syncUpdate, but it is only called after we pairedWith someone.
+    -- It might be the right place to add something more in the future
     model
         |> syncUpdate timestamp syncData
 

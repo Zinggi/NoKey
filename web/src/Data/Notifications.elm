@@ -39,11 +39,71 @@ init =
     { data = Dict.empty, maxKey = 0 }
 
 
+filter : (Notification -> Bool) -> Notifications -> List Notification
+filter f ns =
+    Dict.foldl
+        (\id n acc ->
+            if f n then
+                n :: acc
+            else
+                acc
+        )
+        []
+        ns.data
+
+
 newSiteEntry : SiteEntry -> Bool -> Notifications -> Notifications
 newSiteEntry entry isNew ns =
-    -- TODO: only insert if not dublicate!
-    -- Also, only keep most recent entry for a specific site.
-    { ns | data = Dict.insert ns.maxKey (ExternalSiteEntry entry isNew) ns.data, maxKey = ns.maxKey + 1 }
+    -- Only keep the most recent entry for a specific site.
+    replaceIfElseInsert
+        (\n ->
+            case n of
+                ExternalSiteEntry ent isN ->
+                    ent.site == entry.site
+
+                _ ->
+                    False
+        )
+        (ExternalSiteEntry entry isNew)
+        ns
+
+
+insert : Notification -> Notifications -> Notifications
+insert n ns =
+    { ns | data = Dict.insert ns.maxKey n ns.data, maxKey = ns.maxKey + 1 }
+
+
+member : Notification -> Notifications -> Bool
+member n ns =
+    Dict.filter (\id n_ -> n_ == n) ns.data
+        |> Dict.size
+        |> (\x -> x > 0)
+
+
+replaceIfElseInsert : (Notification -> Bool) -> Notification -> Notifications -> Notifications
+replaceIfElseInsert f n ns =
+    let
+        reducer id n_ ( acc, didReplace ) =
+            if f n_ then
+                ( Dict.insert id n acc, True )
+            else
+                ( Dict.insert id n_ acc, didReplace )
+
+        ( newData, didReplace ) =
+            Dict.foldl reducer ( Dict.empty, False ) ns.data
+    in
+        if didReplace then
+            { ns | data = newData }
+        else
+            insert n ns
+
+
+insertNoDuplicate : Notification -> Notifications -> Notifications
+insertNoDuplicate n ns =
+    if member n ns then
+        ns
+    else
+        insert n ns
 
 
 count : Notifications -> Int
@@ -63,7 +123,7 @@ remove id ns =
 
 newShareRequest : String -> ( String, String ) -> Notifications -> Notifications
 newShareRequest id key ns =
-    { ns | data = Dict.insert ns.maxKey (ShareRequestT { id = id, key = key }) ns.data, maxKey = ns.maxKey + 1 }
+    insertNoDuplicate (ShareRequestT { id = id, key = key }) ns
 
 
 map : (Id -> Notification -> b) -> Notifications -> List b

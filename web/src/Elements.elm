@@ -1,6 +1,5 @@
 module Elements exposing (..)
 
-import Color
 import Html.Attributes as Attr
 import Element exposing (..)
 import Element.Input as Input
@@ -10,6 +9,52 @@ import Element.Font as Font
 import Styles
 
 
+-- Wrappers
+
+
+inputGroup : String -> List (Element msg) -> Element msg
+inputGroup heading contents =
+    column [ padding (Styles.scaled 1), spacing (Styles.paddingScale 1), alignLeft ]
+        ((el Styles.groupHeading (h4 (heading))) :: contents)
+
+
+container : List (Element msg) -> Element msg
+container contents =
+    column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 1) ] contents
+
+
+miniPage : String -> List (Element msg) -> Element msg
+miniPage title children =
+    column [ spacing (Styles.paddingScale 1) ] (h2 title :: children)
+
+
+buttonRow : List (Attribute msg) -> List (Element msg) -> Element msg
+buttonRow attrs btns =
+    row ([ padding (Styles.paddingScale 3) ] ++ attrs) (List.intersperse spacer btns)
+
+
+
+-- Element wrappers
+
+
+wrapInBorder : Element msg -> Element msg
+wrapInBorder ele =
+    el [ Border.width 1, Border.rounded 4, padding (Styles.paddingScale 1) ] ele
+
+
+withLabel : String -> Element msg -> Element msg
+withLabel label ele =
+    row []
+        [ el [ width (fillPortion 1) ] (text label)
+        , el [ width (fillPortion 3) ] ele
+        ]
+
+
+
+-- Elements
+
+
+checkBox : (Bool -> msg) -> Bool -> String -> Bool -> Element msg
 checkBox onChange isDisabled label checked =
     Input.checkbox []
         { onChange =
@@ -43,34 +88,42 @@ checkBox onChange isDisabled label checked =
         }
 
 
+box : List (Attribute msg)
 box =
     [ width (px (Styles.scaled 1)), height (px (Styles.scaled 1)) ]
 
 
+text : String -> Element msg
 text txt =
     el [ Font.size (Styles.scaled 1), alignLeft ] (Element.text txt)
 
 
+italicText : String -> Element msg
 italicText txt =
     el [ Font.size (Styles.scaled 1), alignLeft, Font.italic ] (Element.text txt)
 
 
+h1 : String -> Element msg
 h1 txt =
     el [ Font.size (Styles.scaled 4), Font.bold, alignLeft ] (Element.text txt)
 
 
+h2 : String -> Element msg
 h2 txt =
     el [ Font.size (Styles.scaled 3), Font.bold, alignLeft ] (Element.text txt)
 
 
+h3 : String -> Element msg
 h3 txt =
     el [ Font.size (Styles.scaled 2), Font.bold, alignLeft ] (Element.text txt)
 
 
+h4 : String -> Element msg
 h4 txt =
     el [ Font.size (Styles.scaled 1), Font.bold, alignLeft ] (Element.text txt)
 
 
+button : Maybe msg -> String -> Element msg
 button onPress txt =
     Input.button []
         { label =
@@ -92,15 +145,7 @@ button onPress txt =
         }
 
 
-inputGroup heading contents =
-    column [ padding (Styles.scaled 1), spacing (Styles.paddingScale 1), alignLeft ]
-        ((el Styles.groupHeading (h4 (heading))) :: contents)
-
-
-container contents =
-    column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 1) ] contents
-
-
+toggleMoreButton : (Bool -> msg) -> String -> String -> Bool -> Element msg
 toggleMoreButton onOpen labelClosed labelOpen isOpen =
     Input.checkbox []
         { onChange = Just onOpen
@@ -155,33 +200,20 @@ clampedNumberInput onChange ( min, default, max ) n =
                 , notice = Nothing
                 }
     in
-        row [ alignLeft ]
-            [ inp 8 "range", inp 4 "number" ]
+        row [ alignLeft ] [ inp 8 "range", inp 4 "number" ]
 
 
+line : Element msg
 line =
     el [ height (px 1), Background.color Styles.black, width fill ] empty
 
 
-wrapInBorder ele =
-    el [ Border.width 1, Border.rounded 4, padding (Styles.paddingScale 1) ] ele
-
-
-withLabel label ele =
-    row []
-        [ el [ width (fillPortion 1) ] (text label)
-        , el [ width (fillPortion 3) ] ele
-        ]
-
-
-buttonRow attrs btns =
-    row ([ padding (Styles.paddingScale 3) ] ++ attrs) (List.intersperse spacer btns)
-
-
+spacer : Element msg
 spacer =
     el [ width fill ] empty
 
 
+inputWithLabel : Maybe (String -> msg) -> String -> String -> String -> Element msg
 inputWithLabel onChange label placeholder value =
     row []
         [ el [ width (fillPortion 1) ] (text label)
@@ -189,30 +221,17 @@ inputWithLabel onChange label placeholder value =
         ]
 
 
+textInput : Maybe (String -> msg) -> String -> String -> Element msg
 textInput onChange placeholder value =
     inputHelper Input.text [] onChange placeholder value
 
 
+passwordEntry : Maybe (String -> msg) -> String -> String -> Element msg
 passwordEntry onChange label value =
     row []
         [ el [ width (fillPortion 1), attribute (Attr.type_ "password"), attribute (Attr.name "password") ] (text label)
         , inputHelper Input.currentPassword [ width (fillPortion 3) ] onChange "********" value
         ]
-
-
-inputHelper fn attr onChange placeholder value =
-    fn
-        (attr ++ [ padding 0, attribute (Attr.disabled (onChange == Nothing)) ])
-        { onChange = onChange
-        , text = value
-        , label = Input.labelLeft [ padding 0 ] (empty)
-        , placeholder =
-            if placeholder == "" then
-                Nothing
-            else
-                Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
-        , notice = Nothing
-        }
 
 
 table : List ( String, a -> Element msg ) -> List a -> Element msg
@@ -230,5 +249,16 @@ table headers data =
         }
 
 
-miniPage title children =
-    column [ spacing (Styles.paddingScale 1) ] (h2 title :: children)
+inputHelper fn attr onChange placeholder value =
+    fn
+        (attr ++ [ padding 0, attribute (Attr.disabled (onChange == Nothing)) ])
+        { onChange = onChange
+        , text = value
+        , label = Input.labelLeft [ padding 0 ] (empty)
+        , placeholder =
+            if placeholder == "" then
+                Nothing
+            else
+                Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
+        , notice = Nothing
+        }

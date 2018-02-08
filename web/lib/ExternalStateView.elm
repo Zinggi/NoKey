@@ -22,7 +22,6 @@ type alias Model model =
 
 init : ( Model model, Cmd (Msg msg) )
 init =
-    -- TODO: display loading icon (or nothing?) instead of this
     ( Err "not loaded yet", getState {} )
 
 
@@ -58,6 +57,7 @@ view viewFn model =
             Html.map BackgroundMsg (viewFn m)
 
         Err e ->
+            -- TODO: display loading icon (or nothing?) instead of this
             Html.text e
 
 

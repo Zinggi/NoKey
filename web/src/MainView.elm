@@ -1,6 +1,5 @@
 module MainView exposing (view)
 
-import Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Element exposing (..)
@@ -12,7 +11,6 @@ import SecretSharing
 
 --
 
-import Helper exposing (..)
 import Styles
 import Elements
 import Data.Sync exposing (SyncData)
