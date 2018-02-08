@@ -1,12 +1,44 @@
 module Elements exposing (..)
 
 import Html.Attributes as Attr
+import Html.Events
+import Json.Decode as JD
 import Element exposing (..)
 import Element.Input as Input
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Styles
+
+
+-- attributes
+
+
+onEnter : msg -> Attribute msg
+onEnter =
+    onKey 13
+
+
+onKey : Int -> msg -> Element.Attribute msg
+onKey desiredCode msg =
+    let
+        decode code =
+            if code == desiredCode then
+                JD.succeed msg
+            else
+                JD.fail "Not the key"
+
+        isKey =
+            JD.field "which" JD.int
+                |> JD.andThen decode
+    in
+        attribute <|
+            Html.Events.onWithOptions "keyup"
+                { stopPropagation = False
+                , preventDefault = True
+                }
+                isKey
+
 
 
 -- Wrappers
@@ -251,7 +283,11 @@ table headers data =
 
 inputHelper fn attr onChange placeholder value =
     fn
-        (attr ++ [ padding 0, attribute (Attr.disabled (onChange == Nothing)) ])
+        (attr
+            ++ [ padding 0
+               , attribute (Attr.disabled (onChange == Nothing))
+               ]
+        )
         { onChange = onChange
         , text = value
         , label = Input.labelLeft [ padding 0 ] (empty)

@@ -12,6 +12,19 @@ const config_buttonLogInNames = ['login', 'log in'];
 
 //--------------------------------------------------------------------------------
 
+const readInputNames = (input) => {
+    return [input.name, input.getAttribute('autocomplete'), input.id, input.className];
+};
+
+const readButtonNames = (input) => {
+    return [input.innerText, input.name, input.value, input.id, input.className];
+};
+
+const readFormNames = (form) => {
+    return [form.name, form.id, form.className];
+};
+//--------------------------------------------------------------------------------
+
 /*
  * creates a bool with a confidence level.
  * smaller is more confident than high.
@@ -23,27 +36,7 @@ const boolWithConfidence = (bool, confidence) => {
 const getBool = (bWithConfidence) => {
     return bWithConfidence[0];
 };
-const higherConfidance = (a, b) => {
-    if (a[1] < b[1]) {
-        return a[0];
-    } else if (b[1] < a[1]) {
-        return b[0];
-    } else {
-        return null;
-    }
-};
 
-
-
-//--------------------------------------------------------------------------------
-
-const readInputNames = (input) => {
-    return [input.name,input.getAttribute('autocomplete'),input.id, input.className];
-};
-
-const readButtonNames = (input) => {
-    return [input.innerText,input.name,input.value,input.id,input.className];
-};
 
 //--------------------------------------------------------------------------------
 
@@ -87,6 +80,9 @@ const isLogInButton = (button) => {
     return hasGoodName(readButtonNames(button), config_buttonLogInNames);
 };
 
+const isSignUpForm = (form) => {
+    return hasGoodName(readFormNames(form), config_buttonSignUpNames);
+};
 
 //--------------------------------------------------------------------------------
 
@@ -124,15 +120,35 @@ const findForms = (logins, pws) => {
     return groups;
 };
 
+const isSignUpGroup = (group) => {
+    const [isSignUp, submitButtons] = getSubmitButtons(group.form);
+    if (group.mainPw) {
+        const auto = group.mainPw.getAttribute("autocomplete");
+        console.log("auto", auto, "pw", group.mainPw);
+        if (auto === "new-password") {
+            return [true, submitButtons];
+        } else if (auto === "current-password") {
+            return [false, submitButtons];
+        }
+    }
+    if (isSignUp === null) {
+        const isSignUpF = isSignUpForm(group.form);
+        return [isSignUpF && isSignUpF[0], submitButtons];
+    } else {
+        return [isSignUp, submitButtons];
+    }
+};
+
 
 
 const classifyGroups = (groups) => {
     for (let i = 0; i < groups.forms.length; i++) {
-        const [isSignUp, submitButtons] = getSubmitButtons(groups.forms[i]);
-        groups[i].isSignUp = isSignUp;
-        groups[i].submitButtons = submitButtons;
         groups[i].mainLogin = groups[i].logins[0];
         groups[i].mainPw = groups[i].pws[0];
+
+        const [isSignUp, submitButtons] = isSignUpGroup(groups[i]);
+        groups[i].isSignUp = isSignUp;
+        groups[i].submitButtons = submitButtons;
     }
     delete groups.forms;
     return groups;
@@ -167,9 +183,25 @@ const getSubmitButtons = (form) => {
         for (const b of list) {
             const isLogin = isLogInButton(b);
             const isSignUp = isSignUpButton(b);
-            const isReallySignUp = higherConfidance(isLogin, isSignUp);
-            if (null !== isReallySignUp) {
-                return [isReallySignUp, b];
+            // console.log("button", b, "isLogin", isLogin, "isSignUp", isSignUp);
+            if (isSignUp[1] < isLogin[1]) {
+                if (isSignUp[0]) {
+                    return [true, b];
+                } else if (isLogin[0]) { // definitely not a sign up, but is it really a login?
+                    return [false, b];
+                } // no sign up but also no login!
+            } else if (isLogin[1] < isSignUp[1]) {
+                if (isLogin[0]) {
+                    return [false, b];
+                } else if (isSignUp[0]) {
+                    return [true, b];
+                } // no login and no sign up!
+            } else { // same confidence, now they hopefully don't say conflicting things..
+                if (isSignUp[0] && !isLogin[0]) {
+                    return [true, b];
+                } else if (isLogin[0] && !isSignUp[0]) {
+                    return [false, b];
+                } // they conflict, we don't know what to do..
             }
         }
         return null;
@@ -186,7 +218,7 @@ const getSubmitButtons = (form) => {
             }
         }
         if (btns.length === 0) {
-            return null;
+            return [null, []];
         } else {
             return [isSignUps[0], btns];
         }
