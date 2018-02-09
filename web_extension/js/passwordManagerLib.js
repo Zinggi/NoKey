@@ -1,6 +1,9 @@
 /*
  * This library hels when writing password managers.
  * It provides a set of functions to identify and classify input fields.
+ *
+ * This file has been inspired from https://github.com/perfectapi/CKP/blob/develop/keepass.js
+ * All credit to the authers.
  */
 
 
@@ -124,7 +127,7 @@ const isSignUpGroup = (group) => {
     const [isSignUp, submitButtons] = getSubmitButtons(group.form);
     if (group.mainPw) {
         const auto = group.mainPw.getAttribute("autocomplete");
-        console.log("auto", auto, "pw", group.mainPw);
+        // console.log("auto", auto, "pw", group.mainPw);
         if (auto === "new-password") {
             return [true, submitButtons];
         } else if (auto === "current-password") {

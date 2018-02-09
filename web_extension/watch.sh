@@ -10,5 +10,9 @@ $parcel watch background.js --no-hmr --no-cache &
 P2=$!
 $parcel watch popup/main.html --no-hmr --no-cache &
 P3=$!
+$parcel watch content_scripts/fillForm.html --no-hmr --no-cache &
+P4=$!
+$parcel watch content_scripts/newPassword.html --no-hmr --no-cache &
+P5=$!
 
-wait $P0 $P1 $P2 $P3
+wait $P0 $P1 $P2 $P3 $p4 $p5

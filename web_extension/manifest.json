@@ -22,7 +22,9 @@
   },
 
   "web_accessible_resources": [
-      "icons/library.svg"
+      "icons/library.svg",
+      "dist/newPassword.html",
+      "dist/fillForm.html"
   ],
 
   "background": {

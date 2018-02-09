@@ -1,8 +1,4 @@
-// This file has been adapted from https://github.com/perfectapi/CKP/blob/develop/keepass.js
-// All credit to the authers.
 import ActionOutside from 'action-outside';
-import Elm from '../build/apps.js';
-import setup from '../../web/setup.js';
 import pwLib from '../js/passwordManagerLib.js';
 
 
@@ -34,6 +30,7 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
     return (input) => {
         if (typeof input.noPass_injected !== "undefined") return;
         input.noPass_injected = true;
+        // TODO: what if the group changes, after a new dom mutation???
         input.noPass_groupKey = groupKey;
 
         // debug colors
@@ -63,6 +60,7 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
             input.style.backgroundSize = "16px 16px";
             input.style.backgroundPosition = "calc(100% - 4px) 50%";
             input.style.backgroundImage = "url('" + iconPath + "')";
+            // // Might be usefull:
             // input.addEventListener("mouseout", (e) => {
             //   if (e.target !== popup_target) resetIcon(e.target);
             // });
@@ -146,17 +144,7 @@ const closePopup = () => {
 };
 
 const openPopup = (elem, isPw, isSignUp) => {
-    if (!popupLoaded) {
-        console.log("first");
-        popupLoaded = true;
-        let [container, elmNodes] = makeContainer();
-        popupContainer = container;
-        actionOutsidePopup = new ActionOutside(popupContainer, closePopup);
-        document.body.appendChild(popupContainer);
-        startElm(elmNodes);
-    }
-    console.log("always???");
-
+    if (!popupLoaded) return;
 
     actionOutsidePopup.listen(true);
     showContainer(elem, popupContainer, isPw, isSignUp);
@@ -167,90 +155,41 @@ const openPopup = (elem, isPw, isSignUp) => {
 
 const showContainer = (elem, popupContainer, isPw, isSignUp) => {
     popupContainer.style.display = '';
-    // console.log(popupContainer.children);
-    const elementToShow = popupContainer.children[(+isPw)*2 + (+isSignUp)];
-    elementToShow.style.display = '';
-    currentInput = elem;
-    currentGroup = elem.noPass_groupKey;
-};
 
-const startElm = (elmNodes) => {
-    console.log(Elm);
-    const popup = (node) => {
-        const app = Elm.Popup.embed(node);
-        // wire up the ports
-        port.onMessage.addListener((msg) => {
-            if (msg.type == "onNewState") {
-                // console.log("(content) got new state", state);
-                app.ports.onNewState.send(msg.data);
-            }
-        });
-
-        app.ports.getState.subscribe(() => {
-            // console.log("(content) getState");
-            port.postMessage({type: "onStateRequest", data: {}});
-        });
-        app.ports.sendMsgToBackground.subscribe((msg) =>{
-            // console.log("(content) sendMsgToBackground", msg);
-            port.postMessage({type: "onReceiveMsg", data: msg});
-        });
-        return app;
+    const selectElement = () => {
+        if (isSignUp && isPw) {
+            return "newPassword";
+        } else if (!isSignUp) {
+            return "fillForm";
+        }
     };
-    const empty = (node) => {
-        return {};
-    };
-    const fillLogin = (node) => {
-        const app = Elm.FillLogin.embed(node);
-        port.onMessage.addListener((msg) => {
-            if (msg.type == "onNewState") {
-                // console.log("(content) got new state", state);
-                app.ports.onNewState.send(msg.data);
-            }
-        });
-
-        app.ports.getState.subscribe(() => {
-            // console.log("(content, fillLogin) getState");
-            port.postMessage({type: "onStateRequest", data: {}});
-        });
-        app.ports.sendMsgToBackground.subscribe((msg) =>{
-            // console.log("(content) sendMsgToBackground", msg);
-            port.postMessage({type: "onReceiveMsg", data: msg});
-        });
-        return app;
-    };
-    const pw = (node) => {
-        const rands = setup.getRandomInts(9);
-        const flags = {
-            initialSeed: [rands[0], rands.slice(1)]
-        };
-
-        const app = Elm.GeneratePassword.embed(node, flags);
-        app.ports.onAcceptPw.subscribe((pw) => {
-            console.log("On accept: ", pw);
-            closePopup();
-            fillCurrentInput(pw);
-        });
-
-        return app;
-    };
-    for (let i = 0; i < elmNodes.length; i++) {
-        // [sign in: login, sign up: login, sign in: password, sign up: password]
-        const app = [fillLogin, empty, fillLogin, pw][i](elmNodes[i]);
+    const elementToShow = selectElement();
+    for (let child of popupContainer.children) {
+        if (elementToShow === child.myId) {
+            child.style.display = '';
+        } else {
+            child.style.display = 'none';
+        }
     }
 
-    // wire up ports to fill form
-    // fillForm : { login : String, site : String, password : String } -> Cmd msg
-    port.onMessage.addListener((msg) => {
-        if (msg.type === "fillForm") {
-            console.log("fill form with:", msg);
-            fillCurrentForm(msg.data);
-        }
-    });
+    currentInput = elem;
+    // TODO: if group changes, what happens here?
+    currentGroup = elem.noPass_groupKey;
 };
 
 const moveContainer = (bottom, left) => {
     popupContainer.style.top = (bottom+window.scrollY+10)+"px";
     popupContainer.style.left = (left+window.scrollX)+"px";
+};
+
+const adjustPopupSize = (size) => {
+    for (let child of popupContainer.children) {
+        if (size.id === child.myId) {
+            if (size.width === 0 || size.height === 0) continue;
+            child.style.height = size.height + "px";
+            child.style.width = size.width + "px";
+        }
+    }
 };
 
 const makeContainer = () => {
@@ -260,12 +199,34 @@ const makeContainer = () => {
     container.style.zIndex = "2147483647"; // OVER 9000!!!!
     container.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
 
-    const elmNodes = [0,1,2,3].map(() => document.createElement('div'));
-    elmNodes.forEach((node) => {
-        node.style.display = 'none';
-        container.appendChild(node);
+    // we 'hide' the container, so that the iframes can already preload and figure out their sizes.
+    // we can't set display 'none', as then our iframes won't know their size
+    container.style.left = "-5000px";
+    container.style.top = "-5000px";
+
+    const elmNodes = ["fillForm", "newPassword"].map((f) => {
+        const iframe = document.createElement('iframe');
+        iframe.src = browser.extension.getURL("dist/"+f+".html");
+        iframe.frameBorder = 0;
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+
+        container.appendChild(iframe);
+
+        iframe.myId = f;
+
+        return iframe;
+    });
+    // wire up ports to fill form
+    // fillForm : { login : String, site : String, password : String } -> Cmd msg
+    port.onMessage.addListener((msg) => {
+        if (msg.type === "fillForm") {
+            console.log("fill form with:", msg);
+            fillCurrentForm(msg.data);
+        }
     });
 
+    // return iframe;
     return [container, elmNodes];
 };
 
@@ -283,6 +244,37 @@ const onWindowLoad = () => {
             var obs = new MutationObserver(onNodeAdded(accounts));
             obs.observe(document, { childList: true, subtree: true });
             onNodeAdded(accounts)();
+
+            //listen to messages from iframes
+            window.addEventListener("message", (event) => {
+                const isExpected = Array.from(popupContainer.children).some((frame) => {
+                    return frame.contentWindow === event.source;
+                });
+                if (!isExpected) return;
+
+                // reply to msg:
+                //      event.source.postMessage({}, event.origin);
+                const msg = event.data;
+                // console.log("msg from iframe:", msg);
+                if (msg.type === "closePopup") {
+                    closePopup();
+                } else if (msg.type === "fillCurrentInput") {
+                    fillCurrentInput(msg.data);
+                } else if (msg.type === "onSizeChanged") {
+                    adjustPopupSize(msg.data);
+                } else {
+                    console.log("msg type not recognised", msg);
+                }
+
+            }, false);
+            if (!popupLoaded) {
+                // console.log("first");
+                popupLoaded = true;
+                let [container, elmNodes] = makeContainer();
+                popupContainer = container;
+                actionOutsidePopup = new ActionOutside(popupContainer, closePopup);
+                document.body.appendChild(popupContainer);
+            }
         }
     });
 };
@@ -291,10 +283,6 @@ const onWindowLoad = () => {
 // TODO: isolate styles:
 //  iframes:
 //      https://github.com/anderspitman/octopress-blog/blob/dbd21b2a76ea57cf4e967fd44a204c610b35325f/source/_posts/2014-08-04-chrome-extension-content-script-stylesheet-isolation.markdown
-//      https://www.sitepoint.com/chrome-extensions-bridging-the-gap-between-layers/
-//      https://stackoverflow.com/questions/12783217/how-to-really-isolate-stylesheets-in-the-google-chrome-extension#20241247
-//  js lib:
-//      https://github.com/liviavinci/Boundary
 
 
 if (document.readyState === 'complete') {
