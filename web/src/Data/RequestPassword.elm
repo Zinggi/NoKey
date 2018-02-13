@@ -2,6 +2,7 @@ module Data.RequestPassword exposing (State, Status(..), init, getStatus, addSha
 
 import Dict exposing (Dict)
 import SecretSharing exposing (Share)
+import Data.Sync exposing (SyncData)
 import Helper exposing (maybeToList)
 
 
@@ -62,14 +63,19 @@ waitFor key fillForm requiredParts maybeMyShare (State state) =
             state
 
 
-getStatusForSite : String -> State -> Dict String Status
-getStatusForSite site (State state) =
-    Dict.filter (\( siteName, _ ) info -> siteName == site) state
-        |> Dict.foldl
-            (\( siteName, loginName ) info acc ->
-                Dict.insert loginName (mayInfoToStatus (Just info)) acc
+getStatusForSite : String -> SyncData -> State -> Dict String Status
+getStatusForSite site sync (State state) =
+    let
+        accounts =
+            Data.Sync.getAccountsForSite site sync
+    in
+        List.foldl
+            (\loginName acc ->
+                mayInfoToStatus (Dict.get ( site, loginName ) state)
+                    |> \info -> Dict.insert loginName info acc
             )
             Dict.empty
+            accounts
 
 
 addShare : ( String, String ) -> Share -> State -> State

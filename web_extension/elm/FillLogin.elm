@@ -7,9 +7,7 @@ import Elements
 import Styles
 import Background exposing (Model, Msg(..))
 import ExternalStateView
-import Data.Sync
 import Data.RequestPassword exposing (Status(..))
-import Helper exposing (maybeToList)
 
 
 view : Model -> Html Msg
@@ -19,35 +17,27 @@ view model =
             empty
 
         Just site ->
-            case Data.RequestPassword.getStatusForSite site model.sitesState |> Dict.toList of
-                ( _, Done fill pw ) :: _ ->
-                    -- empty
-                    Elements.text "Done"
-
-                ( _, Waiting n m ) :: _ ->
-                    Elements.text <| "Received " ++ toString n ++ "/" ++ toString m ++ " shares"
-
-                ( _, Error error ) :: _ ->
-                    Elements.text ("Couldn't recover password, reason:\n" ++ error)
-
-                _ :: _ ->
-                    -- TODO: what does this mean???
-                    Debug.crash
-                        ("getSavedSite was Nothing, but we are waiting for shares "
-                            ++ "(getSavedSite returned Just ..).\nThis doesn't make any sense, so we crash."
-                        )
-
-                [] ->
-                    -- We aren't waiting on any shares yet
-                    Elements.inputGroup "Choose login"
-                        (chooseAccount site (Data.Sync.getAccountsForSite site model.syncData))
+            List.map (viewStatus site) (Data.RequestPassword.getStatusForSite site model.syncData model.sitesState |> Dict.toList)
+                |> Elements.inputGroup "Choose login"
     )
         |> Element.layout Styles.background
 
 
-chooseAccount : String -> List String -> List (Element Msg)
-chooseAccount site logins =
-    List.map (\login -> Elements.button (Just (RequestPasswordPressed ( site, login ) True)) login) logins
+viewStatus : String -> ( String, Status ) -> Element Msg
+viewStatus site ( login, status ) =
+    case status of
+        Done fill pw ->
+            Elements.button (Just (FillForm { login = login, site = site, password = pw })) ("Fill password for " ++ login)
+
+        Waiting n m ->
+            Elements.text <| "Received " ++ toString n ++ "/" ++ toString m ++ " shares of " ++ login
+
+        Error error ->
+            Elements.text ("Couldn't recover password for " ++ login ++ ", reason:\n" ++ error)
+
+        NotRequested ->
+            -- We aren't waiting on any shares yet
+            Elements.button (Just (RequestPasswordPressed ( site, login ) True)) login
 
 
 main =

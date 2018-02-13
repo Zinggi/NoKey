@@ -178,6 +178,7 @@ type Msg
     | UpdateNotifications Views.Notifications.State
     | SaveEntry Notifications.Id SiteEntry
     | DismissNotification Notifications.Id
+    | FillForm { login : String, site : String, password : String }
     | NoOp
 
 
@@ -441,6 +442,9 @@ update msg model =
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd
+
+        FillForm config ->
+            model |> withCmds [ Ports.fillForm config ]
     )
         |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (encodeModel newModel) ] ))
 
