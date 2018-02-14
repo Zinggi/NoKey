@@ -4,6 +4,7 @@ import Html exposing (Html)
 import Dict
 import Element exposing (..)
 import Elements
+import Loader
 import Styles
 import Background exposing (Model, Msg(..))
 import ExternalStateView
@@ -17,27 +18,54 @@ view model =
             empty
 
         Just site ->
-            List.map (viewStatus site) (Data.RequestPassword.getStatusForSite site model.syncData model.sitesState |> Dict.toList)
+            List.map (viewStatus site) (sortedLogins site model.syncData model.sitesState)
                 |> Elements.inputGroup "Choose login"
     )
         |> Element.layout Styles.background
+
+
+sortedLogins site sync sitesState =
+    -- Well this isn't sorted, but sorting might be confusing...
+    Data.RequestPassword.getStatusForSite site sync sitesState
+        |> Dict.toList
 
 
 viewStatus : String -> ( String, Status ) -> Element Msg
 viewStatus site ( login, status ) =
     case status of
         Done fill pw ->
-            Elements.button (Just (FillForm { login = login, site = site, password = pw })) ("Fill password for " ++ login)
+            labled login
+                [ Elements.button (Just (FillForm { login = login, site = site, password = pw })) "Fill"
+                ]
 
         Waiting n m ->
-            Elements.text <| "Received " ++ toString n ++ "/" ++ toString m ++ " shares of " ++ login
+            labled login
+                [ row [ width fill ]
+                    [ Element.html <| Loader.loaderWithOptions { loaderOptions | color = Styles.black }
+                    , Elements.text <| toString n ++ "/" ++ toString m
+                    ]
+                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed ( site, login ) True)) "Retry")
+                ]
 
         Error error ->
-            Elements.text ("Couldn't recover password for " ++ login ++ ", reason:\n" ++ error)
+            labled login
+                [ el [ width fill ] (Elements.text ("Error:\n" ++ error))
+                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed ( site, login ) True)) "retry")
+                ]
 
         NotRequested ->
             -- We aren't waiting on any shares yet
-            Elements.button (Just (RequestPasswordPressed ( site, login ) True)) login
+            labled login
+                [ el [ alignRight ] (Elements.button (Just (RequestPasswordPressed ( site, login ) True)) "Request")
+                ]
+
+
+loaderOptions =
+    Loader.defaultOptions
+
+
+labled l rest =
+    row [] (el [ width fill ] (Elements.text l) :: rest)
 
 
 main =

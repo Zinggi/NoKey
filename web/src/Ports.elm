@@ -40,7 +40,7 @@ port accountsForSite : List String -> Cmd msg
 
 {-| gets called when we register to a new site
 -}
-port onAddSiteEntry : (SiteEntry -> msg) -> Sub msg
+port onAddSiteEntry : ({ isSignUp : Bool, entry : SiteEntry } -> msg) -> Sub msg
 
 
 {-| Call this whenever the notification count changes

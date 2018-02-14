@@ -29,6 +29,7 @@ const setupElm = (id) => {
 
     const div = document.createElement("div");
     div.style.position = "absolute";
+    div.style.minWidth = "300px";
     document.body.appendChild(div);
 
     return [port, div];

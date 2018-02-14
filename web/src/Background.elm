@@ -174,7 +174,7 @@ type Msg
     | RejectShareRequest Notifications.Id
     | ResetDevice
     | SendOutAccountsFor String
-    | AddSiteEntry SiteEntry
+    | AddSiteEntry { isSignUp : Bool, entry : SiteEntry }
     | UpdateNotifications Views.Notifications.State
     | SaveEntry Notifications.Id SiteEntry
     | DismissNotification Notifications.Id
@@ -424,21 +424,24 @@ update msg model =
             { model | currentSite = Just site }
                 |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
 
-        AddSiteEntry entry ->
-            case Data.Sync.getPasswordHashFor entry.site entry.login model.syncData of
-                Just hash ->
-                    -- TODO: compare hashed password and compare with password hash to see if old or update
-                    -- See problem on notes...
-                    if {- TODO: hash == pwHash entry.password -} False then
-                        -- Ignore, since we already have that password
-                        model |> noCmd
-                    else
-                        -- Update existing entry
-                        model |> updateNotifications (Notifications.newSiteEntry entry False)
+        AddSiteEntry { isSignUp, entry } ->
+            if not isSignUp then
+                model |> noCmd
+            else
+                case Data.Sync.getPasswordHashFor entry.site entry.login model.syncData of
+                    Just hash ->
+                        -- TODO: compare hashed password and compare with password hash to see if old or update
+                        -- See problem on notes...
+                        if {- TODO: hash == pwHash entry.password -} False then
+                            -- Ignore, since we already have that password
+                            model |> noCmd
+                        else
+                            -- Update existing entry
+                            model |> updateNotifications (Notifications.newSiteEntry entry False)
 
-                Nothing ->
-                    model
-                        |> updateNotifications (Notifications.newSiteEntry entry True)
+                    Nothing ->
+                        model
+                            |> updateNotifications (Notifications.newSiteEntry entry True)
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd

@@ -89,7 +89,8 @@ const onNodeAdded = (accounts) => () => {
     console.log("groups:", groups);
 
     const hijackedOnSubmit = (group) => (event) => {
-        const data = getFormData(group);
+        const entry = getFormData(group);
+        const data = { entry: entry, isSignUp: group.isSignUp };
         port.postMessage({ type: "didSubmit", data: data });
     };
 
@@ -195,7 +196,8 @@ const adjustPopupSize = (size) => {
 const makeContainer = () => {
     const container = document.createElement('div');
     container.style.position = "absolute";
-    container.style.background = "white";
+    // container.style.background = "white";
+    container.style.lineHeight = 0;
     container.style.zIndex = "2147483647"; // OVER 9000!!!!
     container.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
 

@@ -50,9 +50,9 @@ import SecretSharing
 endPointUrl : String -> String -> String
 endPointUrl pre path =
     -- TODO: change
-    "localhost"
-        -- {- etz upper -}
-        -- "10.2.117.8"
+    -- "localhost"
+    {- etz upper -}
+    "10.2.120.53"
         -- {- etz lower -}
         -- "10.2.122.231"
         -- {- hg lower -}
@@ -240,6 +240,7 @@ connectPrivateSocket tagger onJoin uuid =
     let
         socket =
             Socket.init socketUrl
+                |> Socket.heartbeatIntervallSeconds 10
 
         channel =
             Channel.init ("private:" ++ uuid)
