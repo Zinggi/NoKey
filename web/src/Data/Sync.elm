@@ -172,6 +172,13 @@ insertSite timestamp reqParts siteName userName shares sync =
             { sync | myShares = myShares }
 
 
+deletePassword : ( String, String ) -> SyncData -> SyncData
+deletePassword key sync =
+    -- TODO: also remove my shares + tell others to delete theirs?
+    -- Or better, link the datastructures to automatically remove them
+    updateShared (\s -> { s | savedSites = ORDict.remove key s.savedSites }) sync
+
+
 {-| mapSavedSites (\siteName userName hasShare -> ..)
 -}
 mapSavedSites : (String -> String -> Int -> Maybe SecretSharing.Share -> a) -> SyncData -> List a

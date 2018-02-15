@@ -175,6 +175,7 @@ type Msg
     | ResetDevice
     | SendOutAccountsFor String
     | AddSiteEntry { isSignUp : Bool, entry : SiteEntry }
+    | DeletePassword ( String, String )
     | UpdateNotifications Views.Notifications.State
     | SaveEntry Notifications.Id SiteEntry
     | DismissNotification Notifications.Id
@@ -226,6 +227,10 @@ update msg model =
         UserNameChanged n ->
             { model | newSiteEntry = (\e -> { e | userName = n }) model.newSiteEntry }
                 |> noCmd
+
+        DeletePassword key ->
+            { model | syncData = Data.Sync.deletePassword key model.syncData }
+                |> syncToOthers
 
         ReceiveMessage msg ->
             model |> withCmds [ withTimestamp (DecodeReceivedMessage msg) ]

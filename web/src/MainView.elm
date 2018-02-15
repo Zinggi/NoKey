@@ -84,18 +84,21 @@ viewSavedSite sitesState siteName userName requiredParts mayShare =
                 [ Elements.text userName
                 , Elements.text (" -> has share: " ++ toString (Nothing /= mayShare))
                 ]
-            , case RequestPassword.getStatus ( siteName, userName ) sitesState of
-                NotRequested ->
-                    Elements.button (Just (RequestPasswordPressed ( siteName, userName ) False)) "Request password"
+            , row []
+                [ case RequestPassword.getStatus ( siteName, userName ) sitesState of
+                    NotRequested ->
+                        Elements.button (Just (RequestPasswordPressed ( siteName, userName ) False)) "Request password"
 
-                Waiting n m ->
-                    Elements.text ("Received " ++ toString n ++ "/" ++ toString m ++ " shares")
+                    Waiting n m ->
+                        Elements.text ("Received " ++ toString n ++ "/" ++ toString m ++ " shares")
 
-                Done _ pw ->
-                    Elements.text ("Password: " ++ pw)
+                    Done _ pw ->
+                        Elements.text ("Password: " ++ pw)
 
-                Error error ->
-                    Elements.text ("Couldn't recover password, reason:\n" ++ error)
+                    Error error ->
+                        Elements.text ("Couldn't recover password, reason:\n" ++ error)
+                , Elements.button (Just (DeletePassword ( siteName, userName ))) "Delete"
+                ]
             ]
         ]
         |> (\elem -> ( siteName ++ userName, elem ))
