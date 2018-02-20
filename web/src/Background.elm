@@ -163,7 +163,7 @@ type Msg
     | GetTokenClicked
     | UpdatePairing Views.Pairing.State
     | TokenSubmitted
-    | PairedWith (Result Http.Error ( String, OtherSharedData, Time ))
+    | PairedWith (Result Http.Error ( String, Time ))
     | JoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
@@ -245,11 +245,11 @@ update msg model =
                                 apiMsg
                     in
                         case apiMsg of
-                            Api.PairedWith syncData ->
+                            Api.PairedWith ->
                                 -- TODO: only accept a PairedWith message if we are expecting one.
                                 -- Otherwise anyone could pair with us, as long as they know our id
                                 { model | pairingDialogue = Views.Pairing.pairingCompleted (Ok id) model.pairingDialogue }
-                                    |> pairedWith timestamp id syncData
+                                    |> pairedWith timestamp id
 
                             other ->
                                 if Data.Sync.isKnownId id model.syncData then
@@ -287,7 +287,7 @@ update msg model =
                                                     _ ->
                                                         newModel |> noCmd
 
-                                        Api.PairedWith _ ->
+                                        Api.PairedWith ->
                                             -- TODO: refactor, split Api messages into Authenticated / Anonymous messages
                                             Debug.crash "This can't happen, the branch is already covered by the surrounding case statement"
                                 else
@@ -312,9 +312,10 @@ update msg model =
                 |> noCmd
 
         GetTokenClicked ->
+            -- TODO: record time, to later check if we were expecting getting paired
             model
                 |> (\m -> { m | pairingDialogue = Views.Pairing.getTockenClicked model.pairingDialogue })
-                |> withCmds [ Api.initPairing ReceiveToken model.uniqueIdentifyier model.syncData ]
+                |> withCmds [ Api.initPairing ReceiveToken model.uniqueIdentifyier ]
 
         UpdatePairing s ->
             { model | pairingDialogue = s }
@@ -323,14 +324,14 @@ update msg model =
         TokenSubmitted ->
             model
                 |> (\m -> { m | pairingDialogue = Views.Pairing.tokenSubmitted m.pairingDialogue })
-                |> withCmds [ Api.pairWith PairedWith model.uniqueIdentifyier model.pairingDialogue.inputToken model.syncData ]
+                |> withCmds [ Api.pairWith PairedWith model.uniqueIdentifyier model.pairingDialogue.inputToken ]
 
         PairedWith res ->
             case res of
-                Ok ( id, syncData, timestamp ) ->
+                Ok ( id, timestamp ) ->
                     model
                         |> (\m -> { m | pairingDialogue = Views.Pairing.pairingCompleted (Ok id) m.pairingDialogue })
-                        |> pairedWith timestamp id syncData
+                        |> pairedWith timestamp id
 
                 Err e ->
                     model
@@ -521,12 +522,12 @@ syncToOthers model =
         ( { model | debounce = debounce }, cmd )
 
 
-pairedWith : Time -> String -> OtherSharedData -> Model -> ( Model, Cmd Msg )
-pairedWith timestamp id syncData model =
-    -- Currently does the same as syncUpdate, but it is only called after we pairedWith someone.
-    -- It might be the right place to add something more in the future
+pairedWith : Time -> String -> Model -> ( Model, Cmd Msg )
+pairedWith timestamp id model =
+    -- TODO: check the timestamp here?
+    -- Finished pairing should be sent until we get an answer or the timer runs out
     model
-        |> syncUpdate timestamp syncData
+        |> Api.finishPairing id timestamp model.syncData
 
 
 syncUpdate : Time -> OtherSharedData -> Model -> ( Model, Cmd Msg )

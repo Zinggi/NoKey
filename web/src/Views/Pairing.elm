@@ -75,7 +75,6 @@ view config doShow diag =
     let
         inp isEnabled rest =
             column []
-                -- TODO: onEnter/onSubmit config.onSubmitToken
                 (row [ spacing (Styles.paddingScale 1), Elements.onEnter config.onSubmitToken ]
                     [ Elements.textInput (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag))) "enter token" diag.inputToken
                     , Elements.button (boolToMaybe isEnabled config.onSubmitToken) "submit"
