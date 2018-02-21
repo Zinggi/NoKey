@@ -4,7 +4,7 @@ import Dict exposing (Dict)
 import Element exposing (..)
 import Elements
 import Styles
-import Background exposing (Msg(..))
+import Model exposing (Msg(..))
 
 
 view : String -> Dict String String -> Element Msg
