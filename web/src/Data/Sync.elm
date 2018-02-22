@@ -41,7 +41,8 @@ type alias OtherSharedData =
 {-| the data we want to share across all known devices
 -}
 type alias SharedData =
-    { knownIds : ORDict String (SingleVersionRegister String)
+    { -- TODO: add device type, e.g. android, browser, extension, ...
+      knownIds : ORDict String (SingleVersionRegister String)
 
     {- Dict (SiteName, UserName) SiteMeta
        TODO: the dict should contain encryptedShares instead of the shares directly
