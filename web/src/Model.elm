@@ -2,14 +2,11 @@ module Model exposing (..)
 
 import Json.Encode as JE exposing (Value)
 import Time exposing (Time)
-import Http
 import Dict exposing (Dict)
 
 
 --
 
-import RemoteData exposing (WebData)
-import Debounce exposing (Debounce)
 import Random.Pcg as Random exposing (Generator, Seed)
 import Random.Pcg.Extended as RandomE
 import SecretSharing
@@ -40,18 +37,12 @@ type Msg
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
     | UserNameChanged String
-      -- | ReceiveMessage JE.Value
-      -- | DecodeReceivedMessage JE.Value Time
-      -- | ReceiveToken (WebData String)
     | PairDeviceClicked
     | GetTokenClicked
     | UpdatePairing Views.Pairing.State
     | TokenSubmitted
-      -- | PairedWith (Result Http.Error ( String, Time ))
-      -- | JoinChannel JE.Value
     | RemoveDevice String
     | SetDeviceName String
-      -- | SyncToOthers Debounce.Msg
     | InsertSite String String (Dict String SecretSharing.Share) Int Time
     | RequestPasswordPressed ( String, String ) Bool
     | GrantShareRequest Notifications.Id ShareRequest
@@ -65,7 +56,7 @@ type Msg
     | DismissNotification Notifications.Id
     | FillForm { login : String, site : String, password : String }
     | ProtocolMsg Protocol.Msg
-    | NoOp
+    | OnStateRequest
 
 
 
@@ -80,7 +71,6 @@ type alias Model =
     , showPairingDialogue : Bool
     , seed : RandomE.Seed
     , sitesState : Data.RequestPassword.State
-    , debounce : Debounce ()
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
     , protocolState : Protocol.State
@@ -123,7 +113,6 @@ init { initialSeed, storedState } =
             , expandSiteEntry = False
             , requirementsState = PW.init (RandomE.initialSeed base ext)
             , seed = RandomE.initialSeed base ext
-            , debounce = Debounce.init
             , uniqueIdentifyier = Maybe.withDefault uuid mayId
             , syncData = Maybe.withDefault (Data.Sync.init indepSeed uuid) maySync
             , pairingDialogue = Views.Pairing.init

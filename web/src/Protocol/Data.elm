@@ -17,7 +17,11 @@ import Data.Sync exposing (SyncData, OtherSharedData)
 type Msg
     = Server ServerMsg
     | Authenticated String Time AuthenticatedMsg
-    | NoReply
+    | Self SelfMsg
+
+
+type SelfMsg
+    = NoReply
     | DecodeError String
     | JoinedChannel Value
     | NewMsg Value

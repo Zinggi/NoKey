@@ -40,8 +40,8 @@ init flags =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     (case msg of
-        NoOp ->
-            -- TODO: do I need this branch???
+        OnStateRequest ->
+            -- Since we send our state out on every update, we don't need to do anything here
             model |> noCmd
 
         AddPassword pw ->
@@ -112,7 +112,7 @@ update msg model =
         RemoveDevice uuid ->
             let
                 ( sync, removeCmd ) =
-                    Api.removeDevice NoOp uuid model.syncData
+                    Api.removeDevice uuid model.syncData
             in
                 { model | syncData = sync }
                     |> Api.syncToOthers
@@ -150,7 +150,7 @@ update msg model =
                                 newModel
                                     |> withCmds
                                         [ -- TODO: this request should be sent multiple times, with a timeout
-                                          Api.requestShare NoOp key model.syncData
+                                          Api.requestShare key model.syncData
                                         ]
 
                 Nothing ->
@@ -160,7 +160,7 @@ update msg model =
         GrantShareRequest id req ->
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Api.grantRequest NoOp req model.syncData ]
+                |> addCmds [ Api.grantRequest req model.syncData ]
 
         RejectShareRequest id ->
             -- TODO: inform other of reject?
@@ -253,7 +253,7 @@ storeState model =
 subs : Model -> Sub Msg
 subs model =
     [ Api.connectPrivateSocket model.uniqueIdentifyier
-    , Ports.onStateRequest (always NoOp)
+    , Ports.onStateRequest (always OnStateRequest)
     , Ports.onReceiveMsg Model.decodeMsg
     , Ports.onRequestAccountsForSite SendOutAccountsFor
     , Ports.onAddSiteEntry AddSiteEntry

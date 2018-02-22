@@ -28,7 +28,7 @@ import Data.RequestPassword
 import SecretSharing
 import Views.Pairing
 import Model exposing (Model, updateNotifications, updateProtocol, protocolMsg)
-import Protocol.Data as Protocol exposing (State, PairingState(..), Msg(..), ServerMsg(..), AuthenticatedMsg(..))
+import Protocol.Data as Protocol exposing (..)
 import Ports
 import Data.Storage
 
@@ -102,10 +102,10 @@ connectPrivateSocket uuid =
         channel =
             Channel.init ("private:" ++ uuid)
                 -- register a handler for messages with a "new_msg" event
-                |> Channel.on "new_msg" (NewMsg >> protocolMsg)
+                |> Channel.on "new_msg" (NewMsg >> Self >> protocolMsg)
                 |> Channel.withDebug
                 |> Channel.withPayload (JE.object [ ( "uuid", JE.string uuid ) ])
-                |> Channel.onJoin (JoinedChannel >> protocolMsg)
+                |> Channel.onJoin (JoinedChannel >> Self >> protocolMsg)
     in
         Phoenix.connect socket [ channel ]
 
@@ -114,68 +114,68 @@ connectPrivateSocket uuid =
 --
 
 
-removeDevice : msg -> String -> SyncData -> ( SyncData, Cmd msg )
-removeDevice msg uuid sync =
+removeDevice : String -> SyncData -> ( SyncData, Cmd Model.Msg )
+removeDevice uuid sync =
     ( Data.Sync.removeDevice uuid sync
-    , informOfRemove msg sync.id uuid
+    , informOfRemove sync.id uuid
     )
 
 
-informOfRemove : msg -> String -> String -> Cmd msg
-informOfRemove msg myId otherId =
-    sendMsgTo msg myId otherId "GotRemoved" []
+informOfRemove : String -> String -> Cmd Model.Msg
+informOfRemove myId otherId =
+    sendMsgTo myId otherId "GotRemoved" []
 
 
-sendMsgTo : msg -> String -> String -> String -> List ( String, Value ) -> Cmd msg
-sendMsgTo msg myId otherId type_ content =
+sendMsgTo : String -> String -> String -> List ( String, Value ) -> Cmd Model.Msg
+sendMsgTo myId otherId type_ content =
     Http.post (apiUrl ("/sendMsgTo/" ++ otherId))
         (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: ( "from", JE.string myId ) :: content)))
         (JD.succeed ())
-        |> Http.send (always msg)
+        |> Http.send (always (protocolMsg (Self NoReply)))
 
 
-sendMsgToAll : msg -> SyncData -> String -> List ( String, Value ) -> Cmd msg
-sendMsgToAll msg sync type_ content =
-    List.map (\id -> sendMsgTo msg sync.id id type_ content)
+sendMsgToAll : SyncData -> String -> List ( String, Value ) -> Cmd Model.Msg
+sendMsgToAll sync type_ content =
+    List.map (\id -> sendMsgTo sync.id id type_ content)
         (Data.Sync.knownOtherIds sync)
         |> Cmd.batch
 
 
-sendMsgToGroup : msg -> String -> List String -> String -> List ( String, Value ) -> Cmd msg
-sendMsgToGroup msg myId otherIds type_ content =
-    List.map (\id -> sendMsgTo msg myId id type_ content) otherIds |> Cmd.batch
+sendMsgToGroup : String -> List String -> String -> List ( String, Value ) -> Cmd Model.Msg
+sendMsgToGroup myId otherIds type_ content =
+    List.map (\id -> sendMsgTo myId id type_ content) otherIds |> Cmd.batch
 
 
-askForNewVersion : msg -> SyncData -> Cmd msg
-askForNewVersion msg sync =
-    sendMsgToAll msg sync "NeedsUpdate" [ ( "version", Data.Sync.encodeVersion sync ) ]
+askForNewVersion : SyncData -> Cmd Model.Msg
+askForNewVersion sync =
+    sendMsgToAll sync "NeedsUpdate" [ ( "version", Data.Sync.encodeVersion sync ) ]
 
 
-askForNewVersionFrom : msg -> List String -> SyncData -> Cmd msg
-askForNewVersionFrom msg otherIds sync =
-    sendMsgToGroup msg sync.id otherIds "NeedsUpdate" [ ( "version", Data.Sync.encodeVersion sync ) ]
+askForNewVersionFrom : List String -> SyncData -> Cmd Model.Msg
+askForNewVersionFrom otherIds sync =
+    sendMsgToGroup sync.id otherIds "NeedsUpdate" [ ( "version", Data.Sync.encodeVersion sync ) ]
 
 
-doSyncToOthers : msg -> SyncData -> ( SyncData, Cmd msg )
-doSyncToOthers msg sync =
+doSyncToOthers : SyncData -> ( SyncData, Cmd Model.Msg )
+doSyncToOthers sync =
     let
         ( ( needMine, needTheirs ), newSync ) =
             Data.Sync.syncWithOthers sync
     in
         ( newSync
-        , Cmd.batch [ syncWith msg needMine sync, askForNewVersionFrom msg needTheirs sync ]
+        , Cmd.batch [ syncWith needMine newSync, askForNewVersionFrom needTheirs newSync ]
         )
 
 
-syncWith : msg -> List String -> SyncData -> Cmd msg
-syncWith msg otherIds sync =
-    sendMsgToGroup msg sync.id otherIds "SyncUpdate" [ ( "syncData", Data.Sync.encode sync ) ]
+syncWith : List String -> SyncData -> Cmd Model.Msg
+syncWith otherIds sync =
+    sendMsgToGroup sync.id otherIds "SyncUpdate" [ ( "syncData", Data.Sync.encode sync ) ]
 
 
 syncToOthersDebouncer : Debounce.Config Model.Msg
 syncToOthersDebouncer =
     { strategy = Debounce.soon (1 * Time.second)
-    , transform = SyncToOthers >> protocolMsg
+    , transform = SyncToOthers >> Self >> protocolMsg
     }
 
 
@@ -204,6 +204,14 @@ update model msg =
     let
         ( state, sync ) =
             ( model.protocolState, model.syncData )
+
+        _ =
+            case msg of
+                Self _ ->
+                    ()
+
+                _ ->
+                    Debug.log ("\tgot msg:\n" ++ toString msg ++ "\n\tin state:\n" ++ toString state.pairingState) ()
     in
         case ( msg, model.protocolState.pairingState ) of
             ( Server (ReceiveToken time maybeToken), Init ) ->
@@ -243,9 +251,9 @@ update model msg =
             ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForFinished t0 token _ ) ->
                 receiveFinishPairing token time otherToken otherId otherSync model
 
-            ( Authenticated _ _ (FinishPairing _ _), _ ) ->
-                Debug.log "got FinishPairing, but we were not expecting this at this time" ( msg, state )
-                    |> always ( model, Cmd.none )
+            ( Authenticated _ _ (FinishPairing _ _), Init ) ->
+                -- This happens when we are already paired, beacause finishPairing is sent multiple times
+                ( model, Cmd.none )
 
             -- Independant of current state
             ( Authenticated otherId time (RequestShare key), _ ) ->
@@ -282,30 +290,31 @@ update model msg =
                         |> withCmds [ cmd ]
 
             ( Authenticated otherId time GotRemoved, _ ) ->
-                { model | syncData = Data.Sync.gotRemoved model.syncData } |> noCmd
+                { model | syncData = Data.Sync.gotRemoved model.syncData }
+                    |> syncToOthers
 
             ( Authenticated otherId time (NeedsUpdate version), _ ) ->
                 { model | syncData = Data.Sync.receiveVersion otherId version model.syncData }
                     |> syncToOthers
 
-            ( JoinedChannel v, _ ) ->
+            ( Self (JoinedChannel v), _ ) ->
                 let
                     _ =
                         Debug.log "(re)join channel" v
                 in
                     model
-                        |> withCmds [ askForNewVersion (protocolMsg NoReply) sync ]
+                        |> withCmds [ askForNewVersion sync ]
 
-            ( NewMsg v, _ ) ->
+            ( Self (NewMsg v), _ ) ->
                 model
                     |> withCmds [ withTimestamp (jsonToMsg v >> protocolMsg) ]
 
-            ( SyncToOthers msg, _ ) ->
+            ( Self (SyncToOthers msg), _ ) ->
                 -- delay the sync update to others, as we might get multiple updates in a short time, so wait until it settled.
                 -- Since we always call this when we got a new state, we also store our state here
                 let
                     ( newSync, cmdToDebounce ) =
-                        doSyncToOthers (protocolMsg NoReply) sync
+                        doSyncToOthers sync
 
                     ( debounce, cmd ) =
                         Debounce.update
@@ -314,24 +323,25 @@ update model msg =
                             msg
                             state.debounce
 
-                    newState =
+                    newModel =
                         { state | debounce = debounce }
+                            |> updateState model
+                            |> (\m -> { m | syncData = newSync })
                 in
-                    newState
-                        |> updateState model
-                        |> withCmds [ cmd, Ports.storeState (Data.Storage.encode model) ]
+                    newModel
+                        |> withCmds [ cmd, Ports.storeState (Data.Storage.encode newModel) ]
 
-            ( DecodeError e, _ ) ->
+            ( Self (DecodeError e), _ ) ->
                 Debug.log "faild to decode msg" e
                     |> always ( model, Cmd.none )
 
-            ( NoReply, _ ) ->
+            ( Self NoReply, _ ) ->
                 ( model, Cmd.none )
 
 
 receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
 receiveFinishPairing token time otherToken otherId otherSync model =
-    -- merge sync, send finish and go back to init
+    -- merge sync, send finish and go back to init. Also save here, as this after this there is no sync update
     -- TODO: also check if within time
     if token == otherToken then
         let
@@ -340,11 +350,14 @@ receiveFinishPairing token time otherToken otherId otherSync model =
 
             state =
                 model.protocolState
+
+            newModel =
+                { state | pairingState = Init }
+                    |> updateState model
+                    |> (\m -> { m | pairingDialogue = Views.Pairing.init, syncData = mergedSync })
         in
-            { state | pairingState = Init }
-                |> updateState model
-                |> (\m -> { m | pairingDialogue = Views.Pairing.init, syncData = mergedSync })
-                |> withCmds [ finishPairing otherId token mergedSync ]
+            newModel
+                |> withCmds [ finishPairing otherId token mergedSync, Ports.storeState (Data.Storage.encode newModel) ]
     else
         ( model, Cmd.none )
 
@@ -395,34 +408,32 @@ pairWith myId time model =
 
 finishPairing : String -> String -> SyncData -> Cmd Model.Msg
 finishPairing otherId token sync =
-    sendMsgTo NoReply sync.id otherId "FinishPairing" [ ( "token", JE.string token ), ( "sync", Data.Sync.encode sync ) ]
-        |> Cmd.map protocolMsg
+    sendMsgTo sync.id otherId "FinishPairing" [ ( "token", JE.string token ), ( "sync", Data.Sync.encode sync ) ]
 
 
 syncToOthers : Model -> ( Model, Cmd Model.Msg )
 syncToOthers model =
     let
         ( debounce, cmd ) =
-            Debounce.push syncToOthersDebouncer () model.debounce
+            Debounce.push syncToOthersDebouncer () model.protocolState.debounce
     in
-        ( { model | debounce = debounce }, cmd )
+        ( updateProtocol (\s -> { s | debounce = debounce }) model, cmd )
 
 
 
 -- Shares
 
 
-requestShare : msg -> ( String, String ) -> SyncData -> Cmd msg
-requestShare msg key sync =
-    sendMsgToAll msg sync "RequestShare" [ ( "shareId", encodeTuple JE.string key ) ]
+requestShare : ( String, String ) -> SyncData -> Cmd Model.Msg
+requestShare key sync =
+    sendMsgToAll sync "RequestShare" [ ( "shareId", encodeTuple JE.string key ) ]
 
 
-grantRequest : msg -> { key : ( String, String ), id : String } -> SyncData -> Cmd msg
-grantRequest msg req sync =
+grantRequest : { key : ( String, String ), id : String } -> SyncData -> Cmd Model.Msg
+grantRequest req sync =
     case Dict.get req.key sync.myShares of
         Just share ->
-            sendMsgTo msg
-                sync.id
+            sendMsgTo sync.id
                 req.id
                 "GrantedShareRequest"
                 [ ( "share", SecretSharing.encodeShare share )
@@ -444,7 +455,7 @@ jsonToMsg msg time =
             m
 
         Err e ->
-            DecodeError e
+            Self (DecodeError e)
 
 
 serverResponseDecoder : Time -> JD.Decoder Msg
