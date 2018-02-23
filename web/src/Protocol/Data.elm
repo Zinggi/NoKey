@@ -26,6 +26,7 @@ type SelfMsg
     | JoinedChannel Value
     | NewMsg Value
     | SyncToOthers Debounce.Msg
+    | Timer Time
 
 
 type ServerMsg

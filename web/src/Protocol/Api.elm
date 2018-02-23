@@ -6,6 +6,7 @@ import Json.Encode as JE exposing (Value)
 import RemoteData exposing (WebData, RemoteData(..))
 import RemoteData.Http
 import Task exposing (Task)
+import Process
 import Time exposing (Time)
 import Dict exposing (Dict)
 
@@ -21,7 +22,7 @@ import Crdt.VClock as VClock exposing (VClock)
 
 --
 
-import Helper exposing (encodeTuple, decodeTuple, mapModel, noCmd, performWithTimestamp, withCmds, attemptWithTimestamp, withTimestamp)
+import Helper exposing (encodeTuple, decodeTuple, mapModel, noCmd, performWithTimestamp, withCmds, attemptWithTimestamp, withTimestamp, andThenUpdate)
 import Data.Sync exposing (SyncData, OtherSharedData)
 import Data.Notifications as Notifications
 import Data.RequestPassword
@@ -213,7 +214,7 @@ update model msg =
                 _ ->
                     Debug.log ("\tgot msg:\n" ++ toString msg ++ "\n\tin state:\n" ++ toString state.pairingState) ()
     in
-        case ( msg, model.protocolState.pairingState ) of
+        (case ( msg, model.protocolState.pairingState ) of
             ( Server (ReceiveToken time maybeToken), Init ) ->
                 (case maybeToken of
                     Success token ->
@@ -227,7 +228,7 @@ update model msg =
                     |> noCmd
 
             ( Server (ReceiveToken _ _), _ ) ->
-                Debug.log "got token, but we were not expecting one" ( msg, state )
+                Debug.crash "got token, but we were not expecting one" ( msg, state )
                     |> always ( model, Cmd.none )
 
             ( Server (PairedWith res), WaitForPaired t0 token ) ->
@@ -242,14 +243,14 @@ update model msg =
                     |> mapModel (\m -> { m | pairingDialogue = Views.Pairing.pairingCompleted res m.pairingDialogue })
 
             ( Server (PairedWith _), _ ) ->
-                Debug.log "got PairedWith, but we were not expecting this at this time" ( msg, state )
+                Debug.crash "got PairedWith, but we were not expecting it now" ( msg, state )
                     |> always ( model, Cmd.none )
 
             ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForPaired t0 token ) ->
-                receiveFinishPairing token time otherToken otherId otherSync model
+                receiveFinishPairing token t0 time otherToken otherId otherSync model
 
             ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForFinished t0 token _ ) ->
-                receiveFinishPairing token time otherToken otherId otherSync model
+                receiveFinishPairing token t0 time otherToken otherId otherSync model
 
             ( Authenticated _ _ (FinishPairing _ _), Init ) ->
                 -- This happens when we are already paired, beacause finishPairing is sent multiple times
@@ -332,34 +333,79 @@ update model msg =
                         |> withCmds [ cmd, Ports.storeState (Data.Storage.encode newModel) ]
 
             ( Self (DecodeError e), _ ) ->
-                Debug.log "faild to decode msg" e
+                Debug.crash "faild to decode msg" e
                     |> always ( model, Cmd.none )
+
+            ( Self (Timer time), Init ) ->
+                -- Ignore timer in init state
+                ( model, Cmd.none )
+
+            ( Self (Timer time), WaitForFinished t0 _ _ ) ->
+                checkTimer t0 time model
+
+            ( Self (Timer time), WaitForPaired t0 _ ) ->
+                checkTimer t0 time model
 
             ( Self NoReply, _ ) ->
                 ( model, Cmd.none )
+        )
+            |> andThenUpdate
+                (\m ->
+                    if m.protocolState.pairingState /= Init then
+                        ( m, startTimer (5 * Time.second) )
+                    else
+                        ( m, Cmd.none )
+                )
 
 
-receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
-receiveFinishPairing token time otherToken otherId otherSync model =
+startTimer : Time -> Cmd Model.Msg
+startTimer time =
+    Process.sleep time
+        |> Task.andThen
+            (\_ ->
+                Time.now
+            )
+        |> Task.perform (\t -> protocolMsg (Self (Timer t)))
+
+
+checkTimer : Time -> Time -> Model -> ( Model, Cmd Model.Msg )
+checkTimer t0 time model =
+    if time - t0 > 60 * Time.second then
+        ( backToInit model, Cmd.none )
+    else
+        ( model, Cmd.none )
+
+
+receiveFinishPairing : String -> Time -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
+receiveFinishPairing token t0 time otherToken otherId otherSync model =
     -- merge sync, send finish and go back to init. Also save here, as this after this there is no sync update
-    -- TODO: also check if within time
-    if token == otherToken then
+    if token == otherToken && time - t0 > 60 * Time.second then
         let
             mergedSync =
                 Data.Sync.merge time otherSync model.syncData
 
-            state =
-                model.protocolState
-
             newModel =
-                { state | pairingState = Init }
-                    |> updateState model
-                    |> (\m -> { m | pairingDialogue = Views.Pairing.init, syncData = mergedSync })
+                backToInit model
+                    |> (\m -> { m | syncData = mergedSync })
         in
             newModel
                 |> withCmds [ finishPairing otherId token mergedSync, Ports.storeState (Data.Storage.encode newModel) ]
     else
         ( model, Cmd.none )
+
+
+backToInit : Model -> Model
+backToInit model =
+    let
+        state =
+            model.protocolState
+
+        newModel =
+            { state | pairingState = Init }
+                |> updateState model
+                |> (\m -> { m | pairingDialogue = Views.Pairing.init })
+    in
+        newModel
 
 
 {-| The pairing works as follows:
