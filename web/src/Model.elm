@@ -41,6 +41,7 @@ type Msg
     | GetTokenClicked
     | UpdatePairing Views.Pairing.State
     | TokenSubmitted
+    | DoTokenSubmitted Time
     | RemoveDevice String
     | SetDeviceName String
     | InsertSite String String (Dict String SecretSharing.Share) Int Time
@@ -166,6 +167,11 @@ updateProtocol f model =
 protocolMsg : Protocol.Msg -> Msg
 protocolMsg =
     ProtocolMsg
+
+
+updatePairingDialogue : (Views.Pairing.State -> Views.Pairing.State) -> Model -> Model
+updatePairingDialogue f model =
+    { model | pairingDialogue = f model.pairingDialogue }
 
 
 

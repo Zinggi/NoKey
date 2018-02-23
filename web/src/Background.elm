@@ -17,7 +17,7 @@ import Data.Storage
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
-import Model exposing (Model, Msg(..), Flags, updateNotifications)
+import Model exposing (..)
 
 
 -- Init
@@ -29,8 +29,7 @@ init flags =
         newModel =
             Model.init flags
     in
-        -- TODO: ask other devices for updates, e.g. only send our version (unless we know we had an offline change)
-        newModel |> withCmds [ storeState newModel ]
+        newModel |> withCmds [ storeState newModel, Api.askForNewVersion newModel.syncData ]
 
 
 
@@ -95,19 +94,22 @@ update msg model =
                 |> noCmd
 
         GetTokenClicked ->
-            -- TODO: record time, to later check if we were expecting getting paired
             model
-                |> (\m -> { m | pairingDialogue = Views.Pairing.getTockenClicked model.pairingDialogue })
+                |> updatePairingDialogue Views.Pairing.getTockenClicked
                 |> Api.initPairing model.uniqueIdentifyier
 
         UpdatePairing s ->
             { model | pairingDialogue = s }
                 |> noCmd
 
+        DoTokenSubmitted time ->
+            model
+                |> updatePairingDialogue Views.Pairing.tokenSubmitted
+                |> Api.pairWith model.uniqueIdentifyier time
+
         TokenSubmitted ->
             model
-                |> (\m -> { m | pairingDialogue = Views.Pairing.tokenSubmitted m.pairingDialogue })
-                |> Api.pairWith model.uniqueIdentifyier (0 {- TODO: should be time submitted -})
+                |> withCmds [ withTimestamp DoTokenSubmitted ]
 
         RemoveDevice uuid ->
             let
@@ -121,7 +123,6 @@ update msg model =
         SetDeviceName newName ->
             let
                 newSync =
-                    -- do not sync immediately to reduce #of messages.
                     Data.Sync.renameDevice newName model.syncData
             in
                 { model | syncData = newSync }
@@ -148,10 +149,7 @@ update msg model =
 
                             _ ->
                                 newModel
-                                    |> withCmds
-                                        [ -- TODO: this request should be sent multiple times, with a timeout
-                                          Api.requestShare key model.syncData
-                                        ]
+                                    |> withCmds [ Api.requestShare key model.syncData ]
 
                 Nothing ->
                     -- TODO: should we really crash here?

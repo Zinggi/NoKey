@@ -88,36 +88,36 @@ view config doShow diag =
                 [ Elements.button (Just config.onGetTokenClicked) "Get code"
                 , case ( diag.token, diag.tokenSubmitStatus ) of
                     ( _, Submitted ) ->
-                        inp True [ Elements.text "wait for response.." ]
+                        inp True [ Elements.p "Wait for token.." ]
 
                     ( _, Answer (Ok a) ) ->
-                        inp True [ Elements.text ("Successfully paired with: " ++ a) ]
+                        inp True [ Elements.p ("Wait on confirmation from: " ++ a) ]
 
                     ( _, Answer (Err e) ) ->
-                        inp True [ Elements.text ("Error: " ++ toString e) ]
+                        inp True [ Elements.p ("Error: " ++ toString e) ]
 
                     ( NotAsked, _ ) ->
                         inp True []
 
                     ( Loading, _ ) ->
-                        inp False [ Elements.text "wait for token..." ]
+                        inp False [ Elements.p "Wait for token.." ]
 
                     ( Failure e, _ ) ->
                         case e of
                             NetworkError ->
-                                inp True [ Elements.text "Either you or the pairing server are offline. Sorry about that :(" ]
+                                inp True [ Elements.p "Either you or the pairing server are offline. Sorry about that :(" ]
 
                             _ ->
-                                inp True [ Elements.text ("Something went wrong: " ++ toString e) ]
+                                inp True [ Elements.p ("Something went wrong: " ++ toString e) ]
 
                     ( Success t, _ ) ->
                         inp True
-                            [ column [] [ Elements.text "Scan the QR code or type the words shown below." ]
+                            [ column [] [ Elements.p "Scan the QR code or type the words shown below." ]
                             , column []
                                 [ QRCode.encode t
                                     |> Result.map (QRCode.toSvg >> html)
                                     |> Result.withDefault
-                                        (Elements.text "Error while encoding to QRCode.")
+                                        (Elements.p "Error while encoding to QRCode.")
                                 ]
                             , column [] [ Elements.text t ]
                             ]

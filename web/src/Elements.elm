@@ -130,6 +130,11 @@ text txt =
     el [ Font.size (Styles.scaled 1), alignLeft ] (Element.text txt)
 
 
+p : String -> Element msg
+p txt =
+    paragraph [] [ text txt ]
+
+
 italicText : String -> Element msg
 italicText txt =
     el [ Font.size (Styles.scaled 1), alignLeft, Font.italic ] (Element.text txt)

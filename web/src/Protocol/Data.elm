@@ -46,6 +46,7 @@ type AuthenticatedMsg
 type alias State =
     { pairingState : PairingState
     , debounce : Debounce ()
+    , timer : Timer
     }
 
 

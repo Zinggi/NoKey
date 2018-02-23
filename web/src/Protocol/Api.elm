@@ -22,7 +22,7 @@ import Crdt.VClock as VClock exposing (VClock)
 
 --
 
-import Helper exposing (encodeTuple, decodeTuple, mapModel, noCmd, performWithTimestamp, withCmds, attemptWithTimestamp, withTimestamp, andThenUpdate)
+import Helper exposing (..)
 import Data.Sync exposing (SyncData, OtherSharedData)
 import Data.Notifications as Notifications
 import Data.RequestPassword
@@ -247,10 +247,10 @@ update model msg =
                     |> always ( model, Cmd.none )
 
             ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForPaired t0 token ) ->
-                receiveFinishPairing token t0 time otherToken otherId otherSync model
+                receiveFinishPairing token time otherToken otherId otherSync model
 
             ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForFinished t0 token _ ) ->
-                receiveFinishPairing token t0 time otherToken otherId otherSync model
+                receiveFinishPairing token time otherToken otherId otherSync model
 
             ( Authenticated _ _ (FinishPairing _ _), Init ) ->
                 -- This happens when we are already paired, beacause finishPairing is sent multiple times
@@ -340,8 +340,9 @@ update model msg =
                 -- Ignore timer in init state
                 ( model, Cmd.none )
 
-            ( Self (Timer time), WaitForFinished t0 _ _ ) ->
+            ( Self (Timer time), WaitForFinished t0 token otherId ) ->
                 checkTimer t0 time model
+                    |> addCmds [ finishPairing otherId token sync ]
 
             ( Self (Timer time), WaitForPaired t0 _ ) ->
                 checkTimer t0 time model
@@ -376,10 +377,10 @@ checkTimer t0 time model =
         ( model, Cmd.none )
 
 
-receiveFinishPairing : String -> Time -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
-receiveFinishPairing token t0 time otherToken otherId otherSync model =
+receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
+receiveFinishPairing token time otherToken otherId otherSync model =
     -- merge sync, send finish and go back to init. Also save here, as this after this there is no sync update
-    if token == otherToken && time - t0 > 60 * Time.second then
+    if token == otherToken then
         let
             mergedSync =
                 Data.Sync.merge time otherSync model.syncData
@@ -409,12 +410,11 @@ backToInit model =
 
 
 {-| The pairing works as follows:
-TODO: add time of start, at finish, check if <60s
-We start the process with initPairing. This send our Id to the server, which replies with a random token.
+We start the process with initPairing. This sends our Id to the server, which replies with a random token.
 We enter the token on another client and send it to the server. (pairWith)
 The server sends both devices the id of the other device back. (PairedWith)
 On receiving PairedWith, they send (FinishPairing token sync) to each other.
-On receiving (FinishPairing token sync), check if the token matches, if yes paired and end with a syncUpdate
+On receiving (FinishPairing token sync), check if the token matches, if yes pair.
 -}
 initPairing : String -> Model -> ( Model, Cmd Model.Msg )
 initPairing uuid model =
@@ -447,8 +447,7 @@ pairWith myId time model =
                 (JD.field "otherId" JD.string)
                 |> Http.toTask
                 |> Task.attempt PairedWith
-                |> Cmd.map Server
-                |> Cmd.map protocolMsg
+                |> Cmd.map (protocolMsg << Server)
             ]
 
 
@@ -470,6 +469,8 @@ syncToOthers model =
 -- Shares
 
 
+{-| TODO!: this request should be sent multiple times, with a timeout
+-}
 requestShare : ( String, String ) -> SyncData -> Cmd Model.Msg
 requestShare key sync =
     sendMsgToAll sync "RequestShare" [ ( "shareId", encodeTuple JE.string key ) ]
