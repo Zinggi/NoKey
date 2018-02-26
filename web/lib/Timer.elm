@@ -1,4 +1,4 @@
-module Timer exposing (Timer)
+module Timer exposing (Timer, init, Msg, Config, startTimer, update)
 
 import Time exposing (Time)
 import Dict exposing (Dict)
@@ -6,12 +6,12 @@ import Task
 import Process
 
 
--- TODO: test, document and WAS IT WORTH IT?
+-- TODO: document
 
 
-type Timer
+type Timer id
     = Timer
-        { timers : Dict String ( Maybe Time, Time )
+        { timers : Dict String ( id, Maybe Time, Time )
         , isActive : Bool
         }
 
@@ -20,22 +20,22 @@ type Msg
     = Tick Time
 
 
-type alias Config msg =
-    { onInterval : Time -> String -> msg
-    , onFinish : Time -> String -> msg
+type alias Config id msg =
+    { onInterval : id -> Time -> msg
+    , onFinish : id -> Time -> msg
     , toMsg : Msg -> msg
     , frequency : Time
     }
 
 
-init : Timer
+init : Timer id
 init =
     Timer { timers = Dict.empty, isActive = False }
 
 
-startTimer : Config msg -> String -> Time -> Timer -> ( Timer, Cmd msg )
+startTimer : Config id msg -> id -> Time -> Timer id -> ( Timer id, Cmd msg )
 startTimer config id totalTime (Timer timer) =
-    ( Timer { timers = Dict.insert id ( Nothing, totalTime ) timer.timers, isActive = True }
+    ( Timer { timers = Dict.insert (toString id) ( id, Nothing, totalTime ) timer.timers, isActive = True }
     , if timer.isActive then
         Cmd.none
       else
@@ -43,21 +43,21 @@ startTimer config id totalTime (Timer timer) =
     )
 
 
-update : Config msg -> Msg -> Timer -> ( Timer, Cmd msg )
+update : Config id msg -> Msg -> Timer id -> ( Timer id, Cmd msg )
 update config (Tick currentTime) (Timer timer) =
     let
         ( msgs, newTimers ) =
             Dict.foldl
-                (\id ( mayStart, total ) ( msgs, t ) ->
+                (\strId ( id, mayStart, total ) ( msgs, t ) ->
                     case mayStart of
                         Just start ->
                             if currentTime - start < total then
-                                ( config.onInterval currentTime id :: msgs, t )
+                                ( config.onInterval id currentTime :: msgs, t )
                             else
-                                ( config.onFinish currentTime id :: msgs, Dict.remove id t )
+                                ( config.onFinish id currentTime :: msgs, Dict.remove strId t )
 
                         Nothing ->
-                            ( msgs, Dict.insert id ( Just currentTime, total ) t )
+                            ( msgs, Dict.insert strId ( id, Just currentTime, total ) t )
                 )
                 ( [], timer.timers )
                 timer.timers
@@ -77,6 +77,6 @@ update config (Tick currentTime) (Timer timer) =
                 |> Task.perform (config.toMsg << Tick)
     in
         if needsUpdate then
-            ( Timer { timer | timers = newTimers }, Cmd.batch cmds )
+            ( Timer { timer | timers = newTimers }, Cmd.batch (nextTick :: cmds) )
         else
-            ( Timer { timer | timers = newTimers, isActive = False }, Cmd.batch (nextTick :: cmds) )
+            ( Timer { timer | timers = newTimers, isActive = False }, Cmd.batch cmds )

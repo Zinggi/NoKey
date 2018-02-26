@@ -149,7 +149,7 @@ update msg model =
 
                             _ ->
                                 newModel
-                                    |> withCmds [ Api.requestShare key model.syncData ]
+                                    |> Api.requestShare key
 
                 Nothing ->
                     -- TODO: should we really crash here?

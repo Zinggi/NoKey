@@ -6,7 +6,6 @@ import Json.Encode as JE exposing (Value)
 import RemoteData exposing (WebData, RemoteData(..))
 import RemoteData.Http
 import Task exposing (Task)
-import Process
 import Time exposing (Time)
 import Dict exposing (Dict)
 
@@ -18,6 +17,7 @@ import Phoenix.Socket as Socket
 import Phoenix.Channel as Channel
 import Debounce exposing (Debounce)
 import Crdt.VClock as VClock exposing (VClock)
+import Timer
 
 
 --
@@ -258,8 +258,13 @@ update model msg =
 
             -- Independant of current state
             ( Authenticated otherId time (RequestShare key), _ ) ->
-                model
-                    |> updateNotifications (Notifications.newShareRequest otherId key)
+                let
+                    ( nId, notifications ) =
+                        Notifications.newShareRequestWithId otherId key model.notifications
+                in
+                    model
+                        |> updateNotifications (always notifications)
+                        |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
 
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
                 let
@@ -275,7 +280,8 @@ update model msg =
                     case Data.RequestPassword.getStatus key newSitesState of
                         Data.RequestPassword.Done True pw ->
                             -- if done and fillForm is set, call port to fill the form
-                            newModel |> withCmds [ Ports.fillForm { login = login, site = site, password = pw } ]
+                            newModel
+                                |> withCmds [ Ports.fillForm { login = login, site = site, password = pw } ]
 
                         _ ->
                             newModel |> noCmd
@@ -336,45 +342,49 @@ update model msg =
                 Debug.crash "faild to decode msg" e
                     |> always ( model, Cmd.none )
 
-            ( Self (Timer time), Init ) ->
-                -- Ignore timer in init state
-                ( model, Cmd.none )
+            ( Self (Timer m), _ ) ->
+                let
+                    ( newTimer, cmd ) =
+                        Timer.update timerConfig m state.timer
+                in
+                    model
+                        |> updateProtocol (\p -> { p | timer = newTimer })
+                        |> withCmds [ cmd ]
 
-            ( Self (Timer time), WaitForFinished t0 token otherId ) ->
-                checkTimer t0 time model
-                    |> addCmds [ finishPairing otherId token sync ]
+            ( Self (OnInterval id time), _ ) ->
+                case ( id, state.pairingState ) of
+                    ( Pairing, WaitForFinished _ token otherId ) ->
+                        model |> withCmds [ finishPairing otherId token sync ]
 
-            ( Self (Timer time), WaitForPaired t0 _ ) ->
-                checkTimer t0 time model
+                    ( Pairing, _ ) ->
+                        model |> noCmd
+
+                    ( CollectShares, _ ) ->
+                        ( model
+                        , Data.RequestPassword.getWaiting model.sitesState
+                            |> List.map (\key -> doRequestShare key model.syncData)
+                            |> Cmd.batch
+                        )
+
+                    ( ShareRequest _, _ ) ->
+                        model |> noCmd
+
+            ( Self (OnFinishTimer id time), _ ) ->
+                case id of
+                    Pairing ->
+                        backToInit model
+                            |> noCmd
+
+                    CollectShares ->
+                        { model | sitesState = Data.RequestPassword.removeWaiting model.sitesState }
+                            |> noCmd
+
+                    ShareRequest nId ->
+                        { model | notifications = Notifications.remove nId model.notifications } |> noCmd
 
             ( Self NoReply, _ ) ->
                 ( model, Cmd.none )
         )
-            |> andThenUpdate
-                (\m ->
-                    if m.protocolState.pairingState /= Init then
-                        ( m, startTimer (5 * Time.second) )
-                    else
-                        ( m, Cmd.none )
-                )
-
-
-startTimer : Time -> Cmd Model.Msg
-startTimer time =
-    Process.sleep time
-        |> Task.andThen
-            (\_ ->
-                Time.now
-            )
-        |> Task.perform (\t -> protocolMsg (Self (Timer t)))
-
-
-checkTimer : Time -> Time -> Model -> ( Model, Cmd Model.Msg )
-checkTimer t0 time model =
-    if time - t0 > 60 * Time.second then
-        ( backToInit model, Cmd.none )
-    else
-        ( model, Cmd.none )
 
 
 receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
@@ -429,6 +439,25 @@ initPairing uuid model =
         |> Cmd.map Server
         |> Cmd.map protocolMsg
     )
+        |> andThenUpdate (startTimer Pairing (60 * Time.second))
+
+
+timerConfig : Timer.Config TimerId Model.Msg
+timerConfig =
+    { onInterval = (\a b -> protocolMsg (Self (OnInterval a b)))
+    , onFinish = (\a b -> protocolMsg (Self (OnFinishTimer a b)))
+    , toMsg = protocolMsg << Self << Timer
+    , frequency = 5 * Time.second
+    }
+
+
+startTimer : TimerId -> Time -> Model -> ( Model, Cmd Model.Msg )
+startTimer id timeout model =
+    let
+        ( newT, cmd ) =
+            Timer.startTimer timerConfig id timeout model.protocolState.timer
+    in
+        ( model |> updateProtocol (\p -> { p | timer = newT }), cmd )
 
 
 pairWith : String -> Time -> Model -> ( Model, Cmd Model.Msg )
@@ -449,6 +478,7 @@ pairWith myId time model =
                 |> Task.attempt PairedWith
                 |> Cmd.map (protocolMsg << Server)
             ]
+        |> andThenUpdate (startTimer Pairing (60 * Time.second))
 
 
 finishPairing : String -> String -> SyncData -> Cmd Model.Msg
@@ -469,10 +499,15 @@ syncToOthers model =
 -- Shares
 
 
-{-| TODO!: this request should be sent multiple times, with a timeout
--}
-requestShare : ( String, String ) -> SyncData -> Cmd Model.Msg
-requestShare key sync =
+requestShare : ( String, String ) -> Model -> ( Model, Cmd Model.Msg )
+requestShare key model =
+    model
+        |> startTimer CollectShares (60 * Time.second)
+        |> addCmds [ doRequestShare key model.syncData ]
+
+
+doRequestShare : ( String, String ) -> SyncData -> Cmd Model.Msg
+doRequestShare key sync =
     sendMsgToAll sync "RequestShare" [ ( "shareId", encodeTuple JE.string key ) ]
 
 

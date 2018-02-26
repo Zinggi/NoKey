@@ -7,11 +7,13 @@ import Debounce exposing (Debounce)
 import RemoteData exposing (WebData, RemoteData(..))
 import SecretSharing
 import Crdt.VClock as VClock exposing (VClock)
+import Timer exposing (Timer)
 
 
 --
 
 import Data.Sync exposing (SyncData, OtherSharedData)
+import Data.Notifications
 
 
 type Msg
@@ -20,13 +22,21 @@ type Msg
     | Self SelfMsg
 
 
+type TimerId
+    = Pairing
+    | CollectShares
+    | ShareRequest Data.Notifications.Id
+
+
 type SelfMsg
     = NoReply
     | DecodeError String
     | JoinedChannel Value
     | NewMsg Value
     | SyncToOthers Debounce.Msg
-    | Timer Time
+    | Timer Timer.Msg
+    | OnInterval TimerId Time
+    | OnFinishTimer TimerId Time
 
 
 type ServerMsg
@@ -45,9 +55,15 @@ type AuthenticatedMsg
 
 type alias State =
     { pairingState : PairingState
+    , collectShares : CollectSharesState
     , debounce : Debounce ()
-    , timer : Timer
+    , timer : Timer TimerId
     }
+
+
+type CollectSharesState
+    = Start
+    | WaitForShares
 
 
 type PairingState
@@ -60,5 +76,7 @@ type PairingState
 init : State
 init =
     { pairingState = Init
+    , collectShares = Start
     , debounce = Debounce.init
+    , timer = Timer.init
     }

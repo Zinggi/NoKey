@@ -1,4 +1,4 @@
-module Data.RequestPassword exposing (State, Status(..), init, getStatus, addShare, waitFor, getStatusForSite)
+module Data.RequestPassword exposing (State, Status(..), init, getStatus, addShare, waitFor, getStatusForSite, getWaiting, removeWaiting)
 
 import Dict exposing (Dict)
 import SecretSharing exposing (Share)
@@ -60,6 +60,27 @@ waitFor key fillForm requiredParts maybeMyShare (State state) =
                 , password = Nothing
                 }
             )
+            state
+
+
+getWaiting : State -> List ( String, String )
+getWaiting (State state) =
+    Dict.filter
+        (\_ info -> isWaiting info)
+        state
+        |> Dict.keys
+
+
+isWaiting : Info -> Bool
+isWaiting info =
+    info.password == Nothing
+
+
+removeWaiting : State -> State
+removeWaiting (State state) =
+    State <|
+        Dict.filter
+            (\_ info -> not (isWaiting info))
             state
 
 
