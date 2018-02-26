@@ -29,23 +29,23 @@ init =
 view : Config msg -> Notifications -> Int -> State -> Element msg
 view config ns maxSecurityLevel state =
     case Notifications.first ns of
-        Just ( id, n ) ->
-            viewEntry config id maxSecurityLevel n state
+        Just n ->
+            viewEntry config maxSecurityLevel n state
 
         Nothing ->
             empty
 
 
-viewEntry : Config msg -> Id -> Int -> Notification -> State -> Element msg
-viewEntry config id maxSecurityLevel n state =
-    case n of
+viewEntry : Config msg -> Int -> Notification -> State -> Element msg
+viewEntry config maxSecurityLevel n state =
+    case n.data of
         ShareRequestT req ->
             column []
                 [ column [] [ Elements.h4 req.id ]
                 , Elements.text (" wants to view password for: " ++ toString req.key)
                 , column []
-                    [ Elements.button (Just (config.onRejectRequest id)) "Reject"
-                    , Elements.button (Just (config.onGrantRequest id req)) "Grant"
+                    [ Elements.button (Just (config.onRejectRequest n.id)) "Reject"
+                    , Elements.button (Just (config.onGrantRequest n.id req)) "Grant"
                     ]
                 ]
 
@@ -63,7 +63,7 @@ viewEntry config id maxSecurityLevel n state =
                     , Elements.withLabel "Security Level" <| Elements.clampedNumberInput config.toMsg ( 2, 2, maxSecurityLevel ) state
                     ]
                 , Elements.buttonRow []
-                    [ Elements.button (Just (config.onSaveEntry id { entry | securityLevel = min maxSecurityLevel state })) "Save"
-                    , Elements.button (Just (config.onDismiss id)) "Forget"
+                    [ Elements.button (Just (config.onSaveEntry n.id { entry | securityLevel = min maxSecurityLevel state })) "Save"
+                    , Elements.button (Just (config.onDismiss n.id)) "Forget"
                     ]
                 ]

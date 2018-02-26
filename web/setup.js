@@ -95,7 +95,7 @@ const setup = (startFn, onStart) => {
 
 
         app.ports.storeState.subscribe((state) => {
-            console.log("store state: ", state);
+            // console.log("store state: ", state);
             storeState(state);
         });
 

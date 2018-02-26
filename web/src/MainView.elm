@@ -21,7 +21,7 @@ import Views.Pairing
 import Views.Notifications
 import Views.PasswordGenerator
 import Views.Devices
-import Background exposing (Model, Msg(..))
+import Model exposing (Model, Msg(..))
 
 
 view : Model -> Html Msg

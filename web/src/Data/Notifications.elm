@@ -1,9 +1,29 @@
-module Data.Notifications exposing (Notification(..), Notifications, Id, ShareRequest, SiteEntry, newSiteEntry, first, init, remove, newShareRequest, count, map)
+module Data.Notifications
+    exposing
+        ( Notification
+        , Notifications
+        , NotificationT(..)
+        , Id
+        , ShareRequest
+        , SiteEntry
+        , newSiteEntry
+        , first
+        , init
+        , remove
+        , newShareRequest
+        , newShareRequestWithId
+        , count
+        , map
+        )
 
 import Dict exposing (Dict)
 
 
-type Notification
+type alias Notification =
+    { id : Id, data : NotificationT }
+
+
+type NotificationT
     = ShareRequestT ShareRequest
       -- TODO: This notification has to persist,
       -- e.g. we never want to lose a password just because we closed the browser
@@ -68,24 +88,36 @@ newSiteEntry entry isNew ns =
         ns
 
 
-insert : Notification -> Notifications -> Notifications
+insert : NotificationT -> Notifications -> Notifications
 insert n ns =
-    { ns | data = Dict.insert ns.maxKey n ns.data, maxKey = ns.maxKey + 1 }
+    { ns | data = Dict.insert ns.maxKey { data = n, id = ns.maxKey } ns.data, maxKey = ns.maxKey + 1 }
 
 
-member : Notification -> Notifications -> Bool
+insertWithId : NotificationT -> Notifications -> ( Id, Notifications )
+insertWithId n ns =
+    ( ns.maxKey, insert n ns )
+
+
+member : NotificationT -> Notifications -> Bool
 member n ns =
-    Dict.filter (\id n_ -> n_ == n) ns.data
+    Dict.filter (\id n_ -> n_.data == n) ns.data
         |> Dict.size
         |> (\x -> x > 0)
 
 
-replaceIfElseInsert : (Notification -> Bool) -> Notification -> Notifications -> Notifications
+get : NotificationT -> Notifications -> Maybe Notification
+get n ns =
+    Dict.filter (\id n_ -> n_.data == n) ns.data
+        |> Dict.values
+        |> List.head
+
+
+replaceIfElseInsert : (NotificationT -> Bool) -> NotificationT -> Notifications -> Notifications
 replaceIfElseInsert f n ns =
     let
         reducer id n_ ( acc, didReplace ) =
-            if f n_ then
-                ( Dict.insert id n acc, True )
+            if f n_.data then
+                ( Dict.insert id { n_ | data = n } acc, True )
             else
                 ( Dict.insert id n_ acc, didReplace )
 
@@ -98,7 +130,7 @@ replaceIfElseInsert f n ns =
             insert n ns
 
 
-insertNoDuplicate : Notification -> Notifications -> Notifications
+insertNoDuplicate : NotificationT -> Notifications -> Notifications
 insertNoDuplicate n ns =
     if member n ns then
         ns
@@ -106,14 +138,24 @@ insertNoDuplicate n ns =
         insert n ns
 
 
+insertNoDuplicateWithId : NotificationT -> Notifications -> ( Int, Notifications )
+insertNoDuplicateWithId n ns =
+    case get n ns of
+        Just n_ ->
+            ( n_.id, ns )
+
+        Nothing ->
+            insertWithId n ns
+
+
 count : Notifications -> Int
 count ns =
     Dict.size ns.data
 
 
-first : Notifications -> Maybe ( Id, Notification )
+first : Notifications -> Maybe Notification
 first ns =
-    Dict.toList ns.data |> List.head
+    Dict.values ns.data |> List.head
 
 
 remove : Id -> Notifications -> Notifications
@@ -124,6 +166,11 @@ remove id ns =
 newShareRequest : String -> ( String, String ) -> Notifications -> Notifications
 newShareRequest id key ns =
     insertNoDuplicate (ShareRequestT { id = id, key = key }) ns
+
+
+newShareRequestWithId : String -> ( String, String ) -> Notifications -> ( Id, Notifications )
+newShareRequestWithId id key ns =
+    insertNoDuplicateWithId (ShareRequestT { id = id, key = key }) ns
 
 
 map : (Id -> Notification -> b) -> Notifications -> List b

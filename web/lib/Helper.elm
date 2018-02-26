@@ -9,7 +9,7 @@ import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import Uuid
 import Time exposing (Time)
-import Task
+import Task exposing (Task)
 
 
 -- Update
@@ -48,6 +48,36 @@ andThenUpdate fn ( m, cmd1 ) =
             fn m
     in
         ( newM, Cmd.batch [ cmd1, cmd2 ] )
+
+
+
+-- Task
+
+
+performWithTimestamp : (Time -> v -> msg) -> Task Never v -> Cmd msg
+performWithTimestamp toMsg task =
+    Time.now
+        |> Task.andThen (\time -> Task.map (toMsg time) task)
+        |> Task.perform identity
+
+
+attemptWithTimestamp : (Time -> Result x a -> msg) -> Task x a -> Cmd msg
+attemptWithTimestamp toMsg task =
+    Time.now
+        |> Task.andThen
+            (\time ->
+                Task.map (\a -> ( time, a )) task
+                    |> Task.mapError (\x -> ( time, x ))
+            )
+        |> Task.attempt
+            (\res ->
+                case res of
+                    Ok ( t, a ) ->
+                        toMsg t (Ok a)
+
+                    Err ( t, x ) ->
+                        toMsg t (Err x)
+            )
 
 
 
