@@ -32,7 +32,9 @@ view model =
     in
         row
             [ alignTop ]
-            [ column [ attribute (Attr.style [ ( "maxWidth", "800px" ) ]) ]
+            -- TODO: use width (fillBetween { min = Just 150, max = Just 800 })
+            -- once https://github.com/mdgriffith/stylish-elephants/issues/54 is resolved
+            [ column [ centerX, htmlAttribute (Attr.style [ ( "maxWidth", "800px" ) ]) ]
                 (if Notifications.count model.notifications > 0 then
                     [ Views.Notifications.view notificationsConfig model.notifications numberOfKnownDevices model.notificationsView ]
                  else

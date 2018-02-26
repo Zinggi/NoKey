@@ -6,15 +6,14 @@ import Element.Font as Font
 import Element.Background as Background
 import Element.Border as Border
 import Html.Attributes as Attr
-import Scale
 
 
 scaled =
-    Scale.modular 14 1.414 >> round
+    modular 14 1.414 >> round
 
 
 paddingScale =
-    Scale.modular 6 1.414 >> round
+    modular 6 1.414 >> round
 
 
 
@@ -60,7 +59,7 @@ textColor =
 borderStyle =
     [ Border.width 1
     , Border.color thinLineColor
-    , Border.mouseOverColor black
+    , mouseOver [ Border.color black ]
     , Border.rounded 4
     ]
 

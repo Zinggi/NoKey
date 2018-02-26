@@ -32,7 +32,7 @@ onKey desiredCode msg =
             JD.field "which" JD.int
                 |> JD.andThen decode
     in
-        attribute <|
+        htmlAttribute <|
             Html.Events.onWithOptions "keyup"
                 { stopPropagation = False
                 , preventDefault = True
@@ -109,14 +109,16 @@ checkBox onChange isDisabled label checked =
                                 Styles.white
                             )
                                 |> Background.color
-                          , inFront checked (el (paddingXY (Styles.paddingScale -6) (Styles.paddingScale 2) :: box) (text "✔"))
                           ]
+                        , if checked then
+                            [ inFront (el (paddingXY (Styles.paddingScale -6) (Styles.paddingScale 2) :: box) (text "✔")) ]
+                          else
+                            []
                         ]
                     )
                     empty
         , checked = checked
         , label = Input.labelRight [] (text label)
-        , notice = Nothing
         }
 
 
@@ -204,7 +206,6 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
                         labelClosed
                     )
                 )
-        , notice = Nothing
         }
 
 
@@ -219,22 +220,21 @@ clampedNumberInput onChange ( min, default, max ) n =
 
         inp length t =
             Input.text
-                [ attribute (Attr.type_ t)
-                , attribute (Attr.min (toString min))
-                , attribute (Attr.max (toString max))
-                , attribute (Attr.style [ ( "background", "none" ), ( "border", "none" ) ])
+                [ htmlAttribute (Attr.type_ t)
+                , htmlAttribute (Attr.min (toString min))
+                , htmlAttribute (Attr.max (toString max))
+                , htmlAttribute (Attr.style [ ( "background", "none" ), ( "border", "none" ) ])
                 , alignLeft
                 , width (px (Styles.scaled length))
                 , height (px (Styles.scaled 2))
                 , padding 0
                 , Font.size (Styles.scaled 1)
-                , attribute (Attr.disabled (min == max))
+                , htmlAttribute (Attr.disabled (min == max))
                 ]
                 { onChange = Just toNumber
                 , text = toString m
                 , label = Input.labelLeft [] (empty)
                 , placeholder = Nothing
-                , notice = Nothing
                 }
     in
         row [ alignLeft ] [ inp 8 "range", inp 4 "number" ]
@@ -266,8 +266,8 @@ textInput onChange placeholder value =
 passwordEntry : Maybe (String -> msg) -> String -> String -> Element msg
 passwordEntry onChange label value =
     row []
-        [ el [ width (fillPortion 1), attribute (Attr.type_ "password"), attribute (Attr.name "password") ] (text label)
-        , inputHelper Input.currentPassword [ width (fillPortion 3) ] onChange "********" value
+        [ el [ width (fillPortion 1), htmlAttribute (Attr.type_ "password"), htmlAttribute (Attr.name "password") ] (text label)
+        , password [ width (fillPortion 3) ] onChange value
         ]
 
 
@@ -286,11 +286,29 @@ table headers data =
         }
 
 
+password attr onChange value =
+    Input.currentPassword
+        (attr
+            ++ [ padding 0
+               , htmlAttribute (Attr.disabled (onChange == Nothing))
+               ]
+        )
+        { onChange = onChange
+        , text = value
+        , label = Input.labelLeft [ padding 0 ] (empty)
+        , placeholder =
+            Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text "********")
+        , show =
+            -- TODO: add button to show
+            False
+        }
+
+
 inputHelper fn attr onChange placeholder value =
     fn
         (attr
             ++ [ padding 0
-               , attribute (Attr.disabled (onChange == Nothing))
+               , htmlAttribute (Attr.disabled (onChange == Nothing))
                ]
         )
         { onChange = onChange
@@ -301,5 +319,4 @@ inputHelper fn attr onChange placeholder value =
                 Nothing
             else
                 Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
-        , notice = Nothing
         }
