@@ -6,7 +6,8 @@ import Element exposing (..)
 import Elements
 import Loader
 import Styles
-import Background exposing (Model, Msg(..))
+import Background
+import Model exposing (Model, Msg(..))
 import ExternalStateView
 import Data.RequestPassword exposing (Status(..))
 
@@ -72,6 +73,6 @@ main =
     ExternalStateView.program
         { view = view
         , subs = Background.subs
-        , decodeModel = Background.decodeModel
-        , encodeMsg = Background.encodeMsg
+        , decodeModel = Model.decode
+        , encodeMsg = Model.encodeMsg
         }

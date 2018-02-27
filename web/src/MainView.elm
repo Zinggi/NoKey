@@ -118,8 +118,6 @@ newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
             column []
                 ([ Elements.inputWithLabel (Just UserNameChanged) "Login name" "" entry.userName
                  , Elements.text "Security Level: "
-
-                 -- TODO: limit max by number of available devices.
                  , Elements.clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
                  , Views.PasswordGenerator.view AddPassword NewPasswordRequirements requirementsState
                  ]

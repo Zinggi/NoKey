@@ -1,6 +1,7 @@
 module MainBackground exposing (main)
 
-import Background exposing (Flags, Model, Msg)
+import Background
+import Model exposing (Model, Msg, Flags)
 
 
 main : Program Flags Model Msg
