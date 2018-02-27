@@ -103,7 +103,7 @@ const findForms = (logins, pws) => {
         for (const elem of list) {
             const form = elem.form;
             if (!form) {
-                console.log("not in a form:", elem);
+                // console.log("not in a form:", elem);
                 continue;
             }
             const ind = groups.forms.indexOf(form);

@@ -75,7 +75,7 @@ const getRandomInts = (n) => {
 
 const setup = (startFn, onStart) => {
     getState((state) => {
-        console.log("stored state: ", state);
+        // console.log("stored state: ", state);
 
         // 1 + 8 32bit ints give us a generator of period (2^32)^9bits, which corresponds to (2^8)^36bit,
         // e.g. more than enough for 32 character passwords.

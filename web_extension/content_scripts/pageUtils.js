@@ -47,7 +47,7 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
             //     input.style.background = "pink";
             // }
         } else {
-            console.log("we don't know if this is a sign up or login page!", input);
+            // console.log("we don't know if this is a sign up or login page!", input);
             return;
         }
 
@@ -66,7 +66,7 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
             // });
             // input.addEventListener("mousemove", onIconHover);
             input.addEventListener("click", (event) => {
-                console.log("on icon click", event);
+                // console.log("on icon click", event);
                 openPopup(event.target, isPw, isSignUp);
             });
         }
@@ -83,10 +83,10 @@ const getFormData = (group) => {
 };
 
 const onNodeAdded = (accounts) => () => {
-    console.log("onNodeAdded");
+    // console.log("onNodeAdded");
 
     groups = pwLib.classifyForms();
-    console.log("groups:", groups);
+    // console.log("groups:", groups);
 
     const hijackedOnSubmit = (group) => (event) => {
         const entry = getFormData(group);
@@ -102,7 +102,7 @@ const onNodeAdded = (accounts) => () => {
         if (typeof group.form.noPass_injected !== "undefined") continue;
         group.form.noPass_injected = true;
 
-        console.log("group", group);
+        // console.log("group", group);
 
         group.logins.forEach(injectIcon(false, group.isSignUp, accounts, key));
         group.pws.forEach(injectIcon(true, group.isSignUp, accounts, key));
@@ -223,7 +223,7 @@ const makeContainer = () => {
     // fillForm : { login : String, site : String, password : String } -> Cmd msg
     port.onMessage.addListener((msg) => {
         if (msg.type === "fillForm") {
-            console.log("fill form with:", msg);
+            // console.log("fill form with:", msg);
             fillCurrentForm(msg.data);
         }
     });
@@ -242,7 +242,7 @@ const onWindowLoad = () => {
     port.onMessage.addListener((msg) => {
         if (msg.type == "onGetAccountsForSite") {
             const accounts = msg.data;
-            console.log("known accounts:", accounts);
+            // console.log("known accounts:", accounts);
             var obs = new MutationObserver(onNodeAdded(accounts));
             obs.observe(document, { childList: true, subtree: true });
             onNodeAdded(accounts)();
@@ -265,7 +265,7 @@ const onWindowLoad = () => {
                 } else if (msg.type === "onSizeChanged") {
                     adjustPopupSize(msg.data);
                 } else {
-                    console.log("msg type not recognised", msg);
+                    console.error("msg type not recognised", msg);
                 }
 
             }, false);

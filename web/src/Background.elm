@@ -54,10 +54,12 @@ update msg model =
         SaveEntry id entry ->
             saveEntry entry model
                 |> andThenUpdate (updateNotifications (Notifications.remove id))
+                |> addCmds [ Ports.closePopup () ]
 
         DismissNotification id ->
             model
                 |> updateNotifications (Notifications.remove id)
+                |> addCmds [ Ports.closePopup () ]
 
         InsertSite siteName userName share requiredParts timestamp ->
             { model | syncData = Data.Sync.insertSite timestamp requiredParts siteName userName share model.syncData }

@@ -13,7 +13,7 @@ const main = () => {
 
     const app = Elm.GeneratePassword.embed(div, flags);
     app.ports.onAcceptPw.subscribe((pw) => {
-        console.log("On accept: ", pw);
+        // console.log("On accept: ", pw);
         window.parent.postMessage({ type: "closePopup" }, "*");
         window.parent.postMessage({ type: "fillCurrentInput", data: pw }, "*");
     });

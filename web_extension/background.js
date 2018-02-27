@@ -1,7 +1,7 @@
 import { setup } from '../web/setup.js';
 import Elm from './build/apps.js';
 
-console.log("(background) start background.js");
+// console.log("(background) start background.js");
 
 const sendMsgToAll = (msg, ports) => {
     for (let key in ports) {
@@ -34,7 +34,7 @@ setup(Elm.MainBackground.worker, (app) => {
             } else if (msg.type === "getAccountsForSite") {
                 app.ports.onRequestAccountsForSite.send(msg.data);
             } else if (msg.type === "didSubmit") {
-                console.log("didSubmit", msg.data);
+                // console.log("didSubmit", msg.data);
                 app.ports.onAddSiteEntry.send(msg.data);
             }
         });
@@ -54,18 +54,34 @@ setup(Elm.MainBackground.worker, (app) => {
 
     // fillForm : { login : String, site : String, password : String } -> Cmd msg
     app.ports.fillForm.subscribe((msg) => {
-        console.log("fill form:", msg);
+        // console.log("fill form:", msg);
         sendMsgToAll({ type: "fillForm", data: msg }, ports);
     });
 
+    // close all popups
+    app.ports.closePopup.subscribe((msg) => {
+        sendMsgToAll({ type: "closePopup" }, ports);
+    });
 
     app.ports.notificationCount.subscribe((count) => {
-        console.log("notificationCount: ", count);
+        // console.log("notificationCount: ", count);
         browser.browserAction.setBadgeBackgroundColor({color: "red"});
         if (count > 0) {
             browser.browserAction.setBadgeText({text: ""+count});
             // this is the tooltip
             browser.browserAction.setTitle({title: "NoKey: User interaction required"});
+            const popupUrl = browser.extension.getURL("dist/main.html");
+            browser.windows.create({
+                url: popupUrl,
+                width: 600,
+                height: 300,
+                type: 'popup', // TODO: test difference between:"normal" "popup" ("panel": deprecated on chrome) ("detached_panel" doesn't exist on chrome)
+                allowScriptsToClose: true // TODO: make window close on esc and save and forget button: window.close
+            }).then((win) => {
+                // console.log(win);
+            }, (err) => {
+                console.error("creating window failed!", err);
+            });
 
         } else {
             browser.browserAction.setBadgeText({text: ""});

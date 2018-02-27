@@ -53,5 +53,10 @@ port notificationCount : Int -> Cmd msg
 port fillForm : { login : String, site : String, password : String } -> Cmd msg
 
 
+{-| indicate to the popup that it should close itself
+-}
+port closePopup : () -> Cmd msg
+
+
 
 -- port onStateChange : (Value -> msg) -> Sub msg
