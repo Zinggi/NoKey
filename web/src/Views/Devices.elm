@@ -10,7 +10,10 @@ import Model exposing (Msg(..))
 view : String -> Dict String String -> Element Msg
 view myId knownIds =
     Elements.miniPage "Devices"
-        (Elements.textInput (Just SetDeviceName) ("Name your device.. " ++ "(" ++ String.left 4 myId ++ ")") (Dict.get myId knownIds |> Maybe.withDefault "")
+        (row []
+            [ Elements.hashIcon myId
+            , Elements.textInput (Just SetDeviceName) ("Name your device.. " ++ "(" ++ String.left 4 myId ++ ")") (Dict.get myId knownIds |> Maybe.withDefault "")
+            ]
             :: devicesMap (viewDeviceEntry myId) knownIds
         )
 
@@ -32,7 +35,8 @@ viewDeviceEntry myId uuid name =
         empty
     else
         row []
-            [ el [ width (fillPortion 5) ]
+            [ Elements.hashIcon uuid
+            , el [ width (fillPortion 5) ]
                 (paragraph [ alignLeft, spacing (Styles.scaled 1) ]
                     (if name == "" then
                         [ Elements.italicText "Unnamed ", Elements.text ("(" ++ String.left 4 uuid ++ ")") ]

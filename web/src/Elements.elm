@@ -9,6 +9,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Styles
+import HashIcon
 
 
 -- attributes
@@ -84,6 +85,11 @@ withLabel label ele =
 
 
 -- Elements
+
+
+hashIcon : String -> Element msg
+hashIcon =
+    html << HashIcon.iconFromStringWithBrands 48 2.5
 
 
 checkBox : (Bool -> msg) -> Bool -> String -> Bool -> Element msg

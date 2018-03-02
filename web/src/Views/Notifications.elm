@@ -42,7 +42,11 @@ viewEntry config maxSecurityLevel n state =
         ShareRequestT req ->
             column []
                 [ column [] [ Elements.h4 req.id ]
-                , Elements.text (" wants to view password for: " ++ toString req.key)
+                , -- TODO: create a view for this, e.g. Id -> Icon + name/partOfId
+                  row []
+                    [ Elements.hashIcon req.id
+                    , Elements.text (" wants to view password for: " ++ toString req.key)
+                    ]
                 , column []
                     [ Elements.button (Just (config.onRejectRequest n.id)) "Reject"
                     , Elements.button (Just (config.onGrantRequest n.id req)) "Grant"

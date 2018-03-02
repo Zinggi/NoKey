@@ -11,6 +11,7 @@
     "native-modules": true,
     "dependencies": {
         "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
+        "Zinggi/elm-hash-icon": "2.0.1 <= v < 3.0.0",
         "Zinggi/elm-random-pcg-extended": "2.0.0 <= v < 3.0.0",
         "danyx23/elm-uuid": "2.1.1 <= v < 3.0.0",
         "elm-community/json-extra": "2.6.0 <= v < 3.0.0",
