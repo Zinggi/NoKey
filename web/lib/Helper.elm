@@ -1,6 +1,7 @@
 module Helper exposing (..)
 
 import Dict exposing (Dict)
+import Dict.Extra as Dict
 import Set exposing (Set)
 import Random.Pcg.Extended as Random exposing (Generator)
 import Random.Pcg as RandomP
@@ -174,6 +175,35 @@ indexedMap f s =
 -- List
 
 
+{-| Given a list of strings, find the first non equal characters, in groups of 4.
+findNonEqualBeginning ["aaaabbbbcccc", "aaaaccccdddd", "eeeeddddffff"] ->
+["aaaabbbb", "aaaacccc", "eeeedddd"]
+findNonEqualBeginning ["abcd", "aced"] -> ["abcd", "aced"]
+-}
+findNonEqualBeginning : List String -> List String
+findNonEqualBeginning ids =
+    case ids of
+        [] ->
+            []
+
+        [ id ] ->
+            [ "" ]
+
+        first :: rest ->
+            findNonEqualBeginningHelper (List.length ids) (roundUpToMultiple 4 (String.length first)) ids
+
+
+findNonEqualBeginningHelper total n ids =
+    let
+        groups =
+            Dict.groupBy (String.left n) ids
+    in
+        if Dict.size groups >= total then
+            findNonEqualBeginningHelper total (n - 4) ids
+        else
+            List.map (String.left (n + 4)) ids
+
+
 maybeToList : Maybe a -> List a
 maybeToList mayA =
     case mayA of
@@ -202,6 +232,27 @@ mergeLists a b =
 
         ( aas, [] ) ->
             aas
+
+
+
+-- Int
+
+
+roundUpToMultiple : Int -> Int -> Int
+roundUpToMultiple multiple num =
+    if multiple == 0 then
+        num
+    else
+        let
+            remainder =
+                abs num % multiple
+        in
+            if remainder == 0 then
+                num
+            else if remainder < 0 then
+                -(abs num - remainder)
+            else
+                num + multiple - remainder
 
 
 

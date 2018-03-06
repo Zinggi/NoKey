@@ -7,20 +7,12 @@ import Styles
 import Model exposing (Msg(..))
 
 
-view : String -> Dict String String -> Element Msg
+view : String -> Dict String ( String, String ) -> Element Msg
 view myId knownIds =
     Elements.miniPage "Devices"
-        (row []
-            [ Elements.hashIcon myId
-            , Elements.textInput (Just SetDeviceName) ("Name your device.. " ++ "(" ++ String.left 4 myId ++ ")") (Dict.get myId knownIds |> Maybe.withDefault "")
-            ]
+        (Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             :: devicesMap (viewDeviceEntry myId) knownIds
         )
-
-
-
--- Elements.table [ ( "name", .name ), ( "uuid", .uuid ) ]
---     (devicesMap (viewDeviceEntry myId) knownIds)
 
 
 {-| TODO: fix input lag on input fields. Workaround:
@@ -29,30 +21,21 @@ view myId knownIds =
     https://ellie-app.com/3fPSxX6VHK7a1/0
 
 -}
-viewDeviceEntry : String -> String -> String -> Element Msg
-viewDeviceEntry myId uuid name =
+viewDeviceEntry : String -> String -> ( String, String ) -> Element Msg
+viewDeviceEntry myId uuid ( name, idPart ) =
     if myId == uuid then
         empty
     else
         row []
-            [ Elements.hashIcon uuid
-            , el [ width (fillPortion 5) ]
-                (paragraph [ alignLeft, spacing (Styles.scaled 1) ]
-                    (if name == "" then
-                        [ Elements.italicText "Unnamed ", Elements.text ("(" ++ String.left 4 uuid ++ ")") ]
-                     else
-                        [ Elements.text name ]
-                    )
-                )
-            , el [ width fill ]
-                -- TODO: add nice icons, e.g. trash-2 from:
-                -- http://package.elm-lang.org/packages/1602/elm-feather/2.2.0
-                -- https://feathericons.com/
-                (Elements.button (Just (RemoveDevice uuid)) "Remove!")
+            [ Elements.avatar uuid ( name, idPart ) [ width fill ]
+            , -- TODO: add nice icons, e.g. trash-2 from:
+              -- http://package.elm-lang.org/packages/1602/elm-feather/2.2.0
+              -- https://feathericons.com/
+              (Elements.button (Just (RemoveDevice uuid)) "Remove!")
             ]
 
 
-devicesMap : (String -> String -> b) -> Dict String String -> List b
+devicesMap : (String -> ( String, String ) -> b) -> Dict String ( String, String ) -> List b
 devicesMap f known_ids =
     Dict.foldl
         (\uuid name acc ->

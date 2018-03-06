@@ -1,6 +1,7 @@
 module Data.Sync exposing (..)
 
 import Dict exposing (Dict)
+import Dict.Extra as Dict
 import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
@@ -107,9 +108,34 @@ savedSites sync =
     ORDict.getWith TimestampedVersionRegister.get sync.shared.savedSites
 
 
-knownDevices : SyncData -> Dict String String
+
+-- knownDevices : SyncData -> Dict String String
+-- knownDevices sync =
+--     ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
+
+
+{-| returns Dict Id (Name, IdPart)
+the IdPart is used to distinguish devices with the same name
+-}
+knownDevices : SyncData -> Dict String ( String, String )
 knownDevices sync =
     ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
+        |> Dict.toList
+        |> Dict.groupBy Tuple.second
+        -- Now we have a Dict Name (List (Id, Name))
+        |> Dict.map
+            (\name idsToName ->
+                List.map Tuple.first idsToName
+                    |> (\ids -> List.map2 (,) ids (Helper.findNonEqualBeginning ids))
+            )
+        -- Now we have a Dict Name (List (Id, NecessairyBeginningsOfId))
+        |> Dict.foldl
+            (\name idsToIdPart acc ->
+                Dict.fromList idsToIdPart
+                    |> Dict.map (\id idPart -> ( name, idPart ))
+                    |> Dict.union acc
+            )
+            Dict.empty
 
 
 knownIds : SyncData -> List String
@@ -127,9 +153,9 @@ removeDevice uuid sync =
     updateShared (\s -> { s | knownIds = ORDict.remove uuid s.knownIds }) sync
 
 
-getName : SyncData -> String
+getName : SyncData -> ( String, String )
 getName sync =
-    knownDevices sync |> Dict.get sync.id |> Maybe.withDefault ""
+    knownDevices sync |> Dict.get sync.id |> Maybe.withDefault ( "", "" )
 
 
 gotRemoved : SyncData -> SyncData

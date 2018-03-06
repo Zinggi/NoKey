@@ -215,6 +215,38 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
         }
 
 
+avatar : String -> ( String, String ) -> List (Attribute msg) -> Element msg
+avatar id ( name, idPart ) attrs =
+    row (spacing (Styles.scaled 1) :: attrs)
+        [ hashIcon id
+        , paragraph [ alignLeft, width fill, spacing (Styles.scaled -2) ]
+            (helperMayName name :: helperMayIdPart idPart :: [])
+        ]
+
+
+helperMayName name =
+    if name == "" then
+        italicText "Unnamed"
+    else
+        text name
+
+
+helperMayIdPart idPart =
+    if idPart /= "" then
+        italicText ("(" ++ idPart ++ ")")
+    else
+        empty
+
+
+myAvatar : (String -> msg) -> String -> ( String, String ) -> List (Attribute msg) -> Element msg
+myAvatar onSetDeviceName id ( name, idPart ) attrs =
+    row (spacing (Styles.scaled 1) :: attrs)
+        [ hashIcon id
+        , textInput (Just onSetDeviceName) "Name your device.." name
+        , helperMayIdPart idPart
+        ]
+
+
 clampedNumberInput : (Int -> msg) -> ( Int, Int, Int ) -> Int -> Element msg
 clampedNumberInput onChange ( min, default, max ) n =
     let
