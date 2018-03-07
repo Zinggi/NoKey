@@ -17,6 +17,7 @@ module Data.Notifications
         )
 
 import Dict exposing (Dict)
+import Data.Sync exposing (GroupId)
 
 
 type alias Notification =
@@ -50,7 +51,7 @@ type alias Notifications =
 
 type alias ShareRequest =
     { id : String
-    , key : ( String, String )
+    , key : GroupId
     }
 
 
@@ -163,12 +164,12 @@ remove id ns =
     { ns | data = Dict.remove id ns.data }
 
 
-newShareRequest : String -> ( String, String ) -> Notifications -> Notifications
+newShareRequest : String -> GroupId -> Notifications -> Notifications
 newShareRequest id key ns =
     insertNoDuplicate (ShareRequestT { id = id, key = key }) ns
 
 
-newShareRequestWithId : String -> ( String, String ) -> Notifications -> ( Id, Notifications )
+newShareRequestWithId : String -> GroupId -> Notifications -> ( Id, Notifications )
 newShareRequestWithId id key ns =
     insertNoDuplicateWithId (ShareRequestT { id = id, key = key }) ns
 

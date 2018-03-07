@@ -12,7 +12,7 @@ import Timer exposing (Timer)
 
 --
 
-import Data.Sync exposing (SyncData, OtherSharedData)
+import Data.Sync exposing (SyncData, OtherSharedData, GroupId)
 import Data.Notifications
 
 
@@ -47,8 +47,8 @@ type ServerMsg
 type AuthenticatedMsg
     = FinishPairing String Data.Sync.OtherSharedData
     | SyncUpdate OtherSharedData
-    | RequestShare ( String, String )
-    | GrantedShareRequest ( String, String ) SecretSharing.Share
+    | RequestShare GroupId
+    | GrantedShareRequest GroupId SecretSharing.Share
     | GotRemoved
     | NeedsUpdate VClock
 

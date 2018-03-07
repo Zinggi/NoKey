@@ -28,9 +28,20 @@ type alias SyncData =
     -- private data
     , id : String
     , synchedWith : Dict String VClock
-    , myShares : Dict ( String, String ) SecretSharing.Share
+    , myShares : Dict GroupId SecretSharing.Share
+    , passwordStash : Dict AccountId ( GroupId, Password )
     , seed : Seed
     }
+
+
+type alias Password =
+    String
+
+
+{-| (SecurityLevel, CreatorId)
+-}
+type alias GroupId =
+    ( Int, String )
 
 
 {-| the data we receive on a sync update
@@ -45,22 +56,55 @@ type alias SharedData =
     { -- TODO: add device type, e.g. android, browser, extension, ...
       knownIds : ORDict String (SingleVersionRegister String)
 
-    {- Dict (SiteName, UserName) SiteMeta
-       TODO: the dict should contain encryptedShares instead of the shares directly
-    -}
-    , savedSites : ORDict ( String, String ) (TimestampedVersionRegister SiteMeta)
+    -- These shares will be taken out one by one by the device whose id matches the id
+    -- in the second dict
+    -- TODO: here we should store encrypted shares with e.g. RSA
+    , sharesToDistribute : ORDict GroupId (ORDict String (TimestampedVersionRegister SecretSharing.Share))
+
+    -- here we store all passwords, encrypted with the group password
+    , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
     , version : VClock
     }
 
 
-type alias SiteMeta =
-    { sharesForOthers : Dict String SecretSharing.Share
-    , requiredParts : Int
+encryptedPasswords : SyncData -> Dict AccountId ( GroupId, EncryptedPassword )
+encryptedPasswords sync =
+    ORDict.getWith TimestampedVersionRegister.get sync.shared.passwords
 
-    -- TODO: add a hash of the password, so that we can tell when loging in to a site,
-    -- wheater we have a new password or the old one.
-    -- => problem: hash contains info about password! more on notes...
-    }
+
+accounts : SyncData -> Dict AccountId GroupId
+accounts sync =
+    encryptedPasswords sync
+        |> Dict.map (\key ( groupId, _ ) -> groupId)
+
+
+getShare : GroupId -> SyncData -> Maybe SecretSharing.Share
+getShare groupId sync =
+    Dict.get groupId sync.myShares
+
+
+type alias AccountId =
+    -- siteName, userName
+    ( String, String )
+
+
+type EncryptedPassword
+    = -- TODO: encrypted with http://package.elm-lang.org/packages/billstclair/elm-crypto-string/latest
+      EncryptedPassword String
+
+
+type alias GroupPassword =
+    String
+
+
+encryptPassword : GroupPassword -> Password -> EncryptedPassword
+encryptPassword groupPw pw =
+    Debug.crash "TODO"
+
+
+decryptPassword : GroupPassword -> EncryptedPassword -> Password
+decryptPassword groupPw encryptedPw =
+    Debug.crash "TODO"
 
 
 init : Seed -> String -> SyncData
@@ -70,23 +114,30 @@ init seed uuid =
     , id = uuid
     , seed = seed
     , myShares = Dict.empty
+    , passwordStash = Dict.empty
     }
 
 
 initShared : Seed -> String -> SharedData
 initShared seed uuid =
     { knownIds = ORDict.init seed |> ORDict.insert uuid (SingleVersionRegister.init "")
-    , savedSites = ORDict.init seed
+    , sharesToDistribute = ORDict.init seed
+    , passwords = ORDict.init seed
     , version = VClock.init
     }
 
 
-getAccountsForSite : String -> SyncData -> List String
+getAccountsForSite : String -> SyncData -> List ( String, GroupId )
 getAccountsForSite site sync =
-    savedSites sync
-        |> Dict.filter (\( siteName, userName ) value -> site == siteName)
-        |> Dict.keys
-        |> List.map (\( siteName, userName ) -> userName)
+    accounts sync
+        |> Dict.filterMap
+            (\( siteName, userName ) groupId ->
+                if site == siteName then
+                    Just ( userName, groupId )
+                else
+                    Nothing
+            )
+        |> Dict.values
 
 
 updateShared : (SharedData -> SharedData) -> SyncData -> SyncData
@@ -101,17 +152,6 @@ updateShared f sync =
 isKnownId : String -> SyncData -> Bool
 isKnownId id sync =
     ORDict.get sync.shared.knownIds |> Dict.member id
-
-
-savedSites : SyncData -> Dict ( String, String ) SiteMeta
-savedSites sync =
-    ORDict.getWith TimestampedVersionRegister.get sync.shared.savedSites
-
-
-
--- knownDevices : SyncData -> Dict String String
--- knownDevices sync =
---     ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
 
 
 {-| returns Dict Id (Name, IdPart)
@@ -171,82 +211,91 @@ renameDevice newName sync =
     updateShared (\s -> { s | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) s.knownIds }) sync
 
 
-insertSite : Time -> Int -> String -> String -> Dict String SecretSharing.Share -> SyncData -> SyncData
-insertSite timestamp reqParts siteName userName shares sync =
+insertToStash : AccountId -> GroupId -> Password -> SyncData -> SyncData
+insertToStash accountId groupId pw sync =
+    { sync | passwordStash = Dict.insert accountId ( groupId, pw ) sync.passwordStash }
+
+
+{-| TODO: Insert a site. To call this we need to know the group password or
+on first invocation generate a new groupId + password
+-}
+insertSite : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
+insertSite timestamp groupPw accountId groupId pw sync =
     let
-        ( myShares, sharesForOthers ) =
-            case Dict.get sync.id shares of
-                Just share ->
-                    ( Dict.insert ( siteName, userName ) share sync.myShares, Dict.remove sync.id shares )
+        encPw =
+            encryptPassword groupPw pw
 
-                Nothing ->
-                    Debug.log "This should never happen, but there is a save default, so we don't crash" <|
-                        ( sync.myShares, shares )
-
-        updateEntry fn =
-            fn sync.id timestamp { sharesForOthers = sharesForOthers, requiredParts = reqParts }
+        updateFn fn =
+            fn sync.id timestamp ( groupId, encPw )
     in
-        updateShared
-            (\s ->
-                { s
-                    | savedSites =
-                        ORDict.updateOrInsert ( siteName, userName )
-                            (updateEntry TimestampedVersionRegister.set)
-                            (updateEntry TimestampedVersionRegister.init)
-                            s.savedSites
-                }
-            )
-            { sync | myShares = myShares }
+        sync
+            |> updateShared
+                (\s ->
+                    { s
+                        | passwords =
+                            ORDict.updateOrInsert accountId
+                                (updateFn TimestampedVersionRegister.set)
+                                (updateFn TimestampedVersionRegister.init)
+                                s.passwords
+                    }
+                )
 
 
-deletePassword : ( String, String ) -> SyncData -> SyncData
+
+-- ORDict.updateOrInsert ( siteName, userName )
+--     (updateEntry TimestampedVersionRegister.set)
+--     (updateEntry TimestampedVersionRegister.init)
+--     s.savedSites
+
+
+deletePassword : AccountId -> SyncData -> SyncData
 deletePassword key sync =
     -- TODO: also remove my shares + tell others to delete theirs?
     -- Or better, link the datastructures to automatically remove them
-    updateShared (\s -> { s | savedSites = ORDict.remove key s.savedSites }) sync
+    -- TODO: should this even be allowed without unlocking the group??
+    updateShared (\s -> { s | passwords = ORDict.remove key s.passwords }) sync
 
 
-{-| mapSavedSites (\siteName userName hasShare -> ..)
--}
-mapSavedSites : (String -> String -> Int -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
-mapSavedSites f sync =
-    (savedSites sync)
+mapAccounts : (AccountId -> GroupId -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
+mapAccounts f sync =
+    (accounts sync)
         |> Dict.foldl
-            (\( siteName, userName ) value acc ->
-                f siteName userName value.requiredParts (Dict.get ( siteName, userName ) sync.myShares) :: acc
+            (\accountId groupId acc ->
+                f accountId groupId (Dict.get groupId sync.myShares) :: acc
             )
             []
 
 
-getSavedSite : ( String, String ) -> SyncData -> Maybe ( Int, Maybe SecretSharing.Share )
-getSavedSite key sync =
-    (savedSites sync)
-        |> Dict.get key
-        |> Maybe.map (\v -> ( v.requiredParts, Dict.get key sync.myShares ))
-
-
-getPasswordHashFor : String -> String -> SyncData -> Maybe String
-getPasswordHashFor siteName userName sync =
-    savedSites sync
-        |> Dict.get ( siteName, userName )
-        |> Maybe.map ({- TODO: should retrieve password hash, see above, there are some problems with this approach -} always "TODO")
+hasPasswordFor : AccountId -> SyncData -> Bool
+hasPasswordFor key sync =
+    encryptedPasswords sync
+        |> Dict.member key
 
 
 merge : Time -> OtherSharedData -> SyncData -> SyncData
 merge timestamp other my =
     let
-        newSavedSites =
-            ORDict.merge TimestampedVersionRegister.merge
-                other.shared.savedSites
-                my.shared.savedSites
+        newSharesToDistribute =
+            ORDict.merge (ORDict.merge TimestampedVersionRegister.merge)
+                other.shared.sharesToDistribute
+                my.shared.sharesToDistribute
+
+        newPasswords =
+            ORDict.merge TimestampedVersionRegister.merge other.shared.passwords my.shared.passwords
 
         ( myShares, sharesForOthers ) =
-            getMyShares my.id my.myShares (ORDict.getWith TimestampedVersionRegister.get newSavedSites)
+            getMyShares my.id
+                my.myShares
+                (ORDict.getWith (ORDict.getWith TimestampedVersionRegister.get) newSharesToDistribute)
     in
         { my
             | shared =
                 { knownIds = ORDict.merge SingleVersionRegister.merge other.shared.knownIds my.shared.knownIds
-                , savedSites = ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp) sharesForOthers newSavedSites
+                , passwords = newPasswords
+                , sharesToDistribute =
+                    ORDict.updateWithDict (ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp))
+                        sharesForOthers
+                        newSharesToDistribute
                 , version = VClock.merge other.shared.version my.shared.version
                 }
             , myShares = myShares
@@ -259,25 +308,27 @@ receiveVersion from version sync =
     { sync | synchedWith = Dict.insert from version sync.synchedWith }
 
 
+{-| take out my shares if there are any
+-}
 getMyShares :
     String
-    -> Dict ( String, String ) SecretSharing.Share
-    -> Dict ( String, String ) SiteMeta
-    -> ( Dict ( String, String ) SecretSharing.Share, Dict ( String, String ) SiteMeta )
-getMyShares id myOldShares savedSites =
+    -> Dict GroupId SecretSharing.Share
+    -> Dict GroupId (Dict String SecretSharing.Share)
+    -> ( Dict GroupId SecretSharing.Share, Dict GroupId (Dict String SecretSharing.Share) )
+getMyShares id myOldShares sharesToDistribute =
     Dict.foldl
-        (\( siteName, userName ) meta ( myShares, other ) ->
-            case Dict.get id meta.sharesForOthers of
+        (\( siteName, userName ) sharesForOthers ( myShares, other ) ->
+            case Dict.get id sharesForOthers of
                 Just share ->
                     ( Dict.insert ( siteName, userName ) share myShares
-                    , Dict.insert ( siteName, userName ) { meta | sharesForOthers = Dict.remove id meta.sharesForOthers } other
+                    , Dict.insert ( siteName, userName ) (Dict.remove id sharesForOthers) other
                     )
 
                 Nothing ->
                     ( myShares, other )
         )
-        ( myOldShares, savedSites )
-        savedSites
+        ( myOldShares, sharesToDistribute )
+        sharesToDistribute
 
 
 syncWithOthers : SyncData -> ( ( List String, List String ), SyncData )
@@ -307,100 +358,156 @@ syncWithOthers sync =
         )
 
 
-decoder : String -> Decoder OtherSharedData
-decoder id =
-    JD.map3
-        (\knownIds savedSites version ->
-            { id = id
-            , shared =
-                { knownIds = knownIds
-                , savedSites = savedSites
-                , version = version
-                }
+otherSharedDecoder : String -> Decoder OtherSharedData
+otherSharedDecoder id =
+    JD.field "dataVersion" JD.int
+        |> JD.andThen
+            (\v ->
+                case v of
+                    1 ->
+                        decoderV1 id
+
+                    _ ->
+                        JD.fail ("cannot decode version " ++ toString v)
+            )
+
+
+sharedDecoder : Decoder SharedData
+sharedDecoder =
+    JD.map4
+        (\knownIds passwords sharesToDistribute version ->
+            { knownIds = knownIds
+            , passwords = passwords
+            , sharesToDistribute = sharesToDistribute
+            , version = version
             }
         )
         (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder JD.string))
-        (JD.field "savedSites" <|
-            ORDict.decoder2 (decodeTuple JD.string)
-                (TimestampedVersionRegister.decoder siteMetaDecoder)
+        (JD.field "passwords" <|
+            ORDict.decoder2 accountIdDecoder
+                (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
+        )
+        (JD.field "sharesToDistribute" <|
+            ORDict.decoder2 groupIdDecoder
+                (ORDict.decoder (TimestampedVersionRegister.decoder SecretSharing.shareDecoder))
         )
         (JD.field "version" VClock.decoder)
+
+
+decoderV1 : String -> Decoder OtherSharedData
+decoderV1 id =
+    JD.field "shared" sharedDecoder
+        |> JD.map (\shared -> { id = id, shared = shared })
+
+
+encryptedPasswordDecoder : Decoder EncryptedPassword
+encryptedPasswordDecoder =
+    JD.map EncryptedPassword JD.string
+
+
+groupIdDecoder : Decoder GroupId
+groupIdDecoder =
+    decodeTuple2 JD.int JD.string
+
+
+accountIdDecoder : Decoder AccountId
+accountIdDecoder =
+    decodeTuple JD.string
 
 
 completeDecoder : Decoder SyncData
 completeDecoder =
-    JD.map7
-        (\id knownIds savedSites myShares synchedWith version seed ->
+    JD.field "dataVersion" JD.int
+        |> JD.andThen
+            (\v ->
+                case v of
+                    1 ->
+                        completeDecoderV1
+
+                    _ ->
+                        JD.fail ("cannot decode version " ++ toString v)
+            )
+
+
+completeDecoderV1 : Decoder SyncData
+completeDecoderV1 =
+    JD.map6
+        (\id shared myShares synchedWith passwordStash seed ->
             { id = id
-            , shared =
-                { knownIds = knownIds
-                , savedSites = savedSites
-                , version = version
-                }
+            , shared = shared
             , myShares = myShares
             , synchedWith = synchedWith
+            , passwordStash = passwordStash
             , seed = seed
             }
         )
         (JD.field "id" JD.string)
-        (JD.field "knownIds" <| ORDict.completeDecoder (SingleVersionRegister.decoder JD.string))
-        (JD.field "savedSites" <|
-            ORDict.completeDecoder2 (decodeTuple JD.string)
-                (TimestampedVersionRegister.decoder siteMetaDecoder)
-        )
-        (JD.field "myShares" <| JD.dict2 (decodeTuple JD.string) SecretSharing.shareDecoder)
+        (JD.field "shared" sharedDecoder)
+        (JD.field "myShares" <| JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
         (JD.field "synchedWith" <| JD.dict VClock.decoder)
-        (JD.field "version" VClock.decoder)
+        (JD.field "passwordStash" <| JD.dict2 accountIdDecoder (decodeTuple2 groupIdDecoder JD.string))
         (JD.field "seed" Random.fromJson)
 
 
-siteMetaDecoder : Decoder SiteMeta
-siteMetaDecoder =
-    JD.map2 SiteMeta
-        (JD.field "sharesForOthers" <| JD.dict SecretSharing.shareDecoder)
-        (JD.field "requiredParts" JD.int)
+
+-- (JD.field "passwords" <|
+--     ORDict.decoder2 accountIdDecoder
+--         (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
+-- )
+-- (JD.field "sharesToDistribute" <| ORDict.decoder2 groupIdDecoder (ORDict.decoder SecretSharing.shareDecoder))
 
 
-encode : SyncData -> Value
-encode s =
+encodeShared : SharedData -> Value
+encodeShared shared =
     JE.object
-        [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) s.shared.knownIds )
-        , ( "savedSites"
-          , ORDict.encode2
-                (\t -> encodeTuple JE.string t |> JE.encode 0)
-                (TimestampedVersionRegister.encode encodeSiteMeta)
-                s.shared.savedSites
+        [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) shared.knownIds )
+        , ( "passwords"
+          , ORDict.encode2 encodeAccountId
+                (TimestampedVersionRegister.encode (encodeTuple2 encodeGroupId encodeEncryptedPassword))
+                shared.passwords
           )
-        , ( "version", VClock.encode s.shared.version )
+        , ( "sharesToDistribute"
+          , ORDict.encode2 encodeGroupId
+                (ORDict.encode (TimestampedVersionRegister.encode SecretSharing.encodeShare))
+                shared.sharesToDistribute
+          )
+        , ( "version", VClock.encode shared.version )
+
+        -- TODO: change if data format changes
+        , ( "dataVersion", JE.int 1 )
         ]
+
+
+encodeEncryptedPassword : EncryptedPassword -> Value
+encodeEncryptedPassword (EncryptedPassword pw) =
+    JE.string pw
+
+
+encodeAccountId : AccountId -> Value
+encodeAccountId id =
+    encodeTuple JE.string id
+
+
+encodeGroupId : GroupId -> Value
+encodeGroupId id =
+    encodeTuple2 JE.int JE.string id
 
 
 encodeComplete : SyncData -> Value
 encodeComplete s =
     JE.object
-        [ ( "knownIds", ORDict.encodeComplete identity (SingleVersionRegister.encode JE.string) s.shared.knownIds )
-        , ( "id", JE.string s.id )
-        , ( "savedSites"
-          , ORDict.encodeComplete
-                (\t -> encodeTuple JE.string t |> JE.encode 0)
-                (TimestampedVersionRegister.encode encodeSiteMeta)
-                s.shared.savedSites
-          )
-        , ( "myShares", JE.dict (\t -> encodeTuple JE.string t |> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
+        [ ( "id", JE.string s.id )
+        , ( "shared", encodeShared s.shared )
+        , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
         , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
-        , ( "version", encodeVersion s )
+        , ( "passwordStash", JE.dict (encodeAccountId >> JE.encode 0) (encodeTuple2 encodeGroupId JE.string) s.passwordStash )
         , ( "seed", Random.toJson s.seed )
+
+        -- TODO: change if data format changes
+        , ( "dataVersion", JE.int 1 )
         ]
 
 
 encodeVersion : SyncData -> Value
 encodeVersion sync =
     VClock.encode sync.shared.version
-
-
-encodeSiteMeta : SiteMeta -> Value
-encodeSiteMeta meta =
-    JE.object
-        [ ( "sharesForOthers", JE.dict identity SecretSharing.encodeShare meta.sharesForOthers )
-        , ( "requiredParts", JE.int meta.requiredParts )
-        ]

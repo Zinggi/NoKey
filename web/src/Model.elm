@@ -17,9 +17,9 @@ import PortUtils
 
 import Helper exposing (..)
 import Data.PasswordMeta exposing (PasswordMetaData)
-import Data.RequestPassword
+import Data.RequestGroupPassword
 import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest, SiteEntry)
-import Data.Sync exposing (SyncData, OtherSharedData)
+import Data.Sync exposing (SyncData, OtherSharedData, GroupId, AccountId)
 import Data.Storage
 import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
@@ -45,7 +45,7 @@ type Msg
     | RemoveDevice String
     | SetDeviceName String
     | InsertSite String String (Dict String SecretSharing.Share) Int Time
-    | RequestPasswordPressed ( String, String ) Bool
+    | RequestPasswordPressed GroupId (Maybe AccountId)
     | GrantShareRequest Notifications.Id ShareRequest
     | RejectShareRequest Notifications.Id
     | ResetDevice
@@ -71,7 +71,7 @@ type alias Model =
     , pairingDialogue : Views.Pairing.State
     , showPairingDialogue : Bool
     , seed : RandomE.Seed
-    , sitesState : Data.RequestPassword.State
+    , groupPasswordRequestsState : Data.RequestGroupPassword.State
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
     , protocolState : Protocol.State
@@ -120,7 +120,7 @@ init { initialSeed, storedState } =
             , showPairingDialogue = True
             , notifications = Notifications.init
             , notificationsView = Views.Notifications.init
-            , sitesState = Data.RequestPassword.init
+            , groupPasswordRequestsState = Data.RequestGroupPassword.init
             , protocolState = Protocol.init
             , currentSite = Nothing
             }

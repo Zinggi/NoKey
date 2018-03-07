@@ -86,13 +86,13 @@ completeDecoder2 keyDecoder =
 {-| This encoder won't encode the seed. Other clients don't need to know our internal seed.
 -}
 encode : ORSet String -> Value
-encode =
-    encodeCustom identity
+encode set =
+    JE.dict identity (encodeTuple (encodeSet JE.int)) set.data
 
 
-encodeCustom : (comparable -> String) -> ORSet comparable -> Value
+encodeCustom : (comparable -> Value) -> ORSet comparable -> Value
 encodeCustom keyTrans set =
-    JE.dict keyTrans (encodeTuple (encodeSet JE.int)) set.data
+    JE.dict (\s -> keyTrans s |> JE.encode 0) (encodeTuple (encodeSet JE.int)) set.data
 
 
 {-| Encode with the seed

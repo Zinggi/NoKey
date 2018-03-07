@@ -10,7 +10,7 @@ import SecretSharing
 import Helper exposing (..)
 import Ports
 import Data.PasswordMeta exposing (PasswordMetaData)
-import Data.RequestPassword
+import Data.RequestGroupPassword
 import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest, SiteEntry)
 import Data.Sync exposing (SyncData, OtherSharedData)
 import Data.Storage
@@ -62,8 +62,10 @@ update msg model =
                 |> addCmds [ Ports.closePopup () ]
 
         InsertSite siteName userName share requiredParts timestamp ->
-            { model | syncData = Data.Sync.insertSite timestamp requiredParts siteName userName share model.syncData }
-                |> Api.syncToOthers
+            {- TODO: if we already have the group password, insert, else insert to stash -}
+            -- { model | syncData = Data.Sync.insertSite timestamp requiredParts siteName userName share model.syncData }
+            --     |> Api.syncToOthers
+            Debug.crash "TODO"
 
         SiteNameChanged s ->
             { model
@@ -129,33 +131,37 @@ update msg model =
             in
                 { model | syncData = newSync }
                     |> Api.syncToOthers
-                    |> addCmds [ Ports.setTitle ("NoPass (" ++ newName ++ ")") ]
+                    |> addCmds
+                        [ Ports.setTitle
+                            (if newName == "" then
+                                "NoKey"
+                             else
+                                "NoKey (" ++ newName ++ ")"
+                            )
+                        ]
 
         RequestPasswordPressed key fillForm ->
-            case Data.Sync.getSavedSite key model.syncData of
-                Just ( requiredParts, maybeMyShare ) ->
-                    let
-                        newSitesState =
-                            Data.RequestPassword.waitFor key fillForm requiredParts maybeMyShare model.sitesState
+            let
+                maybeMyShare =
+                    Data.Sync.getShare key model.syncData
 
-                        newModel =
-                            { model | sitesState = newSitesState }
+                newSitesState =
+                    Data.RequestGroupPassword.waitFor key fillForm maybeMyShare model.groupPasswordRequestsState
 
-                        ( site, login ) =
-                            key
-                    in
-                        case Data.RequestPassword.getStatus key newSitesState of
-                            Data.RequestPassword.Done True pw ->
-                                newModel
-                                    |> withCmds [ Ports.fillForm { password = pw, site = site, login = login } ]
+                newModel =
+                    { model | groupPasswordRequestsState = newSitesState }
 
-                            _ ->
-                                newModel
-                                    |> Api.requestShare key
+                ( site, login ) =
+                    key
+            in
+                case Data.RequestGroupPassword.getStatus key newSitesState of
+                    Data.RequestGroupPassword.Done (Just ( site, login )) pw ->
+                        newModel
+                            |> withCmds [ Ports.fillForm { password = pw, site = site, login = login } ]
 
-                Nothing ->
-                    -- TODO: should we really crash here?
-                    Debug.crash "You somehow managed to press on RequestPassword for a site that we haven't saved!"
+                    _ ->
+                        newModel
+                            |> Api.requestShare key
 
         GrantShareRequest id req ->
             model
@@ -176,23 +182,13 @@ update msg model =
                 |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
 
         AddSiteEntry { isSignUp, entry } ->
-            if not isSignUp then
+            -- TODO: type can be either SignUp | LogIn | UpdateCredentials
+            -- LogIn can be ignored if we have already an entry for it
+            if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
             else
-                case Data.Sync.getPasswordHashFor entry.site entry.login model.syncData of
-                    Just hash ->
-                        -- TODO: compare hashed password and compare with password hash to see if old or update
-                        -- See problem on notes...
-                        if {- TODO: hash == pwHash entry.password -} False then
-                            -- Ignore, since we already have that password
-                            model |> noCmd
-                        else
-                            -- Update existing entry
-                            model |> updateNotifications (Notifications.newSiteEntry entry False)
-
-                    Nothing ->
-                        model
-                            |> updateNotifications (Notifications.newSiteEntry entry True)
+                -- add new password entry
+                model |> updateNotifications (Notifications.newSiteEntry entry True)
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd

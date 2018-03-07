@@ -2,6 +2,7 @@ port module Ports exposing (..)
 
 import Json.Encode exposing (Value)
 import Data.Notifications exposing (SiteEntry)
+import Data.Sync exposing (GroupId)
 
 
 port setTitle : String -> Cmd msg
@@ -34,8 +35,9 @@ port onRequestAccountsForSite : (String -> msg) -> Sub msg
 
 
 {-| This sends out the accounts that we have saved for a site, as an answer to onRequestAccountsForSite
+TODO: change JS caller
 -}
-port accountsForSite : List String -> Cmd msg
+port accountsForSite : List ( String, GroupId ) -> Cmd msg
 
 
 {-| gets called when we register to a new site

@@ -7,7 +7,6 @@ import RemoteData exposing (WebData, RemoteData(..))
 import RemoteData.Http
 import Task exposing (Task)
 import Time exposing (Time)
-import Dict exposing (Dict)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -23,9 +22,9 @@ import Timer
 --
 
 import Helper exposing (..)
-import Data.Sync exposing (SyncData, OtherSharedData)
+import Data.Sync exposing (SyncData, OtherSharedData, GroupId)
 import Data.Notifications as Notifications
-import Data.RequestPassword
+import Data.RequestGroupPassword
 import SecretSharing
 import Views.Pairing
 import Model exposing (Model, updateNotifications, updateProtocol, protocolMsg)
@@ -170,7 +169,8 @@ doSyncToOthers sync =
 
 syncWith : List String -> SyncData -> Cmd Model.Msg
 syncWith otherIds sync =
-    sendMsgToGroup sync.id otherIds "SyncUpdate" [ ( "syncData", Data.Sync.encode sync ) ]
+    -- TODO: encode is now encodeShared
+    sendMsgToGroup sync.id otherIds "SyncUpdate" [ ( "syncData", Data.Sync.encodeShared sync.shared ) ]
 
 
 syncToOthersDebouncer : Debounce.Config Model.Msg
@@ -269,16 +269,16 @@ update model msg =
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
                 let
                     newSitesState =
-                        Data.RequestPassword.addShare key share model.sitesState
+                        Data.RequestGroupPassword.addShare key share model.groupPasswordRequestsState
 
                     newModel =
-                        { model | sitesState = newSitesState }
+                        { model | groupPasswordRequestsState = newSitesState }
 
                     ( site, login ) =
                         key
                 in
-                    case Data.RequestPassword.getStatus key newSitesState of
-                        Data.RequestPassword.Done True pw ->
+                    case Data.RequestGroupPassword.getStatus key newSitesState of
+                        Data.RequestGroupPassword.Done (Just ( site, login )) pw ->
                             -- if done and fillForm is set, call port to fill the form
                             newModel
                                 |> withCmds [ Ports.fillForm { login = login, site = site, password = pw } ]
@@ -361,7 +361,7 @@ update model msg =
 
                     ( CollectShares, _ ) ->
                         ( model
-                        , Data.RequestPassword.getWaiting model.sitesState
+                        , Data.RequestGroupPassword.getWaiting model.groupPasswordRequestsState
                             |> List.map (\key -> doRequestShare key model.syncData)
                             |> Cmd.batch
                         )
@@ -376,7 +376,7 @@ update model msg =
                             |> noCmd
 
                     CollectShares ->
-                        { model | sitesState = Data.RequestPassword.removeWaiting model.sitesState }
+                        { model | groupPasswordRequestsState = Data.RequestGroupPassword.removeWaiting model.groupPasswordRequestsState }
                             |> noCmd
 
                     ShareRequest nId ->
@@ -483,7 +483,7 @@ pairWith myId time model =
 
 finishPairing : String -> String -> SyncData -> Cmd Model.Msg
 finishPairing otherId token sync =
-    sendMsgTo sync.id otherId "FinishPairing" [ ( "token", JE.string token ), ( "sync", Data.Sync.encode sync ) ]
+    sendMsgTo sync.id otherId "FinishPairing" [ ( "token", JE.string token ), ( "sync", Data.Sync.encodeShared sync.shared ) ]
 
 
 syncToOthers : Model -> ( Model, Cmd Model.Msg )
@@ -499,27 +499,27 @@ syncToOthers model =
 -- Shares
 
 
-requestShare : ( String, String ) -> Model -> ( Model, Cmd Model.Msg )
+requestShare : GroupId -> Model -> ( Model, Cmd Model.Msg )
 requestShare key model =
     model
         |> startTimer CollectShares (60 * Time.second)
         |> addCmds [ doRequestShare key model.syncData ]
 
 
-doRequestShare : ( String, String ) -> SyncData -> Cmd Model.Msg
+doRequestShare : GroupId -> SyncData -> Cmd Model.Msg
 doRequestShare key sync =
-    sendMsgToAll sync "RequestShare" [ ( "shareId", encodeTuple JE.string key ) ]
+    sendMsgToAll sync "RequestShare" [ ( "shareId", Data.Sync.encodeGroupId key ) ]
 
 
-grantRequest : { key : ( String, String ), id : String } -> SyncData -> Cmd Model.Msg
+grantRequest : { key : GroupId, id : String } -> SyncData -> Cmd Model.Msg
 grantRequest req sync =
-    case Dict.get req.key sync.myShares of
+    case Data.Sync.getShare req.key sync of
         Just share ->
             sendMsgTo sync.id
                 req.id
                 "GrantedShareRequest"
                 [ ( "share", SecretSharing.encodeShare share )
-                , ( "shareId", encodeTuple JE.string req.key )
+                , ( "shareId", Data.Sync.encodeGroupId req.key )
                 ]
 
         Nothing ->
@@ -555,7 +555,7 @@ serverResponseDecoder time =
 
                     -- TODO: these messages should be authenticated with an HMAC
                     "SyncUpdate" ->
-                        JD.map SyncUpdate (JD.field "syncData" (Data.Sync.decoder id))
+                        JD.map SyncUpdate (JD.field "syncData" (Data.Sync.otherSharedDecoder id))
                             |> JD.map (Authenticated id time)
 
                     "GotRemoved" ->
@@ -563,12 +563,12 @@ serverResponseDecoder time =
                             |> JD.map (Authenticated id time)
 
                     "RequestShare" ->
-                        JD.map RequestShare (JD.field "shareId" (decodeTuple JD.string))
+                        JD.map RequestShare (JD.field "shareId" Data.Sync.groupIdDecoder)
                             |> JD.map (Authenticated id time)
 
                     "GrantedShareRequest" ->
                         JD.map2 GrantedShareRequest
-                            (JD.field "shareId" (decodeTuple JD.string))
+                            (JD.field "shareId" Data.Sync.groupIdDecoder)
                             (JD.field "share" SecretSharing.shareDecoder)
                             |> JD.map (Authenticated id time)
 
@@ -579,7 +579,7 @@ serverResponseDecoder time =
                     "FinishPairing" ->
                         JD.map2 FinishPairing
                             (JD.field "token" JD.string)
-                            (JD.field "sync" (Data.Sync.decoder id))
+                            (JD.field "sync" (Data.Sync.otherSharedDecoder id))
                             |> JD.map (Authenticated id time)
 
                     other ->

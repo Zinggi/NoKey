@@ -93,9 +93,9 @@ encode encodeValue dict =
     JE.object [ ( "keys", ORSet.encode dict.keys ), ( "store", JE.object (Dict.toList (Dict.map (always encodeValue) dict.store)) ) ]
 
 
-encode2 : (comparable -> String) -> (value -> Value) -> ORDict comparable value -> Value
+encode2 : (comparable -> Value) -> (value -> Value) -> ORDict comparable value -> Value
 encode2 encodeKey encodeValue dict =
-    JE.object [ ( "keys", ORSet.encodeCustom encodeKey dict.keys ), ( "store", JE.dict encodeKey encodeValue dict.store ) ]
+    JE.object [ ( "keys", ORSet.encodeCustom encodeKey dict.keys ), ( "store", JE.dict (encodeKey >> JE.encode 0) encodeValue dict.store ) ]
 
 
 encodeComplete : (comparable -> String) -> (value -> Value) -> ORDict comparable value -> Value

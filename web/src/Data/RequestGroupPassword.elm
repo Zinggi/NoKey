@@ -1,23 +1,23 @@
-module Data.RequestPassword exposing (State, Status(..), init, getStatus, addShare, waitFor, getStatusForSite, getWaiting, removeWaiting)
+module Data.RequestGroupPassword exposing (State, Status(..), init, getStatus, addShare, waitFor, getStatusForSite, getWaiting, removeWaiting)
 
 import Dict exposing (Dict)
 import SecretSharing exposing (Share)
-import Data.Sync exposing (SyncData)
+import Data.Sync exposing (SyncData, GroupId, AccountId, GroupPassword)
 import Helper exposing (maybeToList)
 
 
 type State
-    = State (Dict ( String, String ) Info)
+    = State (Dict GroupId Info)
 
 
 type alias Info =
-    { requiredParts : Int, fillForm : Bool, shares : List Share, password : Maybe (Result String String) }
+    { fillForm : Maybe AccountId, shares : List Share, password : Maybe (Result String String) }
 
 
 type Status
     = NotRequested
     | Waiting Int Int
-    | Done Bool String
+    | Done (Maybe AccountId) GroupPassword
     | Error String
 
 
@@ -26,13 +26,13 @@ init =
     State Dict.empty
 
 
-getStatus : ( String, String ) -> State -> Status
+getStatus : GroupId -> State -> Status
 getStatus key (State state) =
-    mayInfoToStatus (Dict.get key state)
+    mayInfoToStatus key (Dict.get key state)
 
 
-mayInfoToStatus : Maybe Info -> Status
-mayInfoToStatus mayInfo =
+mayInfoToStatus : GroupId -> Maybe Info -> Status
+mayInfoToStatus ( level, _ ) mayInfo =
     case mayInfo of
         Nothing ->
             NotRequested
@@ -46,24 +46,23 @@ mayInfoToStatus mayInfo =
                     Error r
 
                 Nothing ->
-                    Waiting (List.length info.shares) info.requiredParts
+                    Waiting (List.length info.shares) level
 
 
-waitFor : ( String, String ) -> Bool -> Int -> Maybe Share -> State -> State
-waitFor key fillForm requiredParts maybeMyShare (State state) =
+waitFor : GroupId -> Maybe AccountId -> Maybe Share -> State -> State
+waitFor key fillForm maybeMyShare (State state) =
     State <|
         Dict.insert key
-            (tryGetPassword
+            (tryGetPassword key
                 { fillForm = fillForm
                 , shares = maybeToList maybeMyShare
-                , requiredParts = requiredParts
                 , password = Nothing
                 }
             )
             state
 
 
-getWaiting : State -> List ( String, String )
+getWaiting : State -> List GroupId
 getWaiting (State state) =
     Dict.filter
         (\_ info -> isWaiting info)
@@ -91,31 +90,31 @@ getStatusForSite site sync (State state) =
             Data.Sync.getAccountsForSite site sync
     in
         List.foldl
-            (\loginName acc ->
-                mayInfoToStatus (Dict.get ( site, loginName ) state)
+            (\( loginName, groupId ) acc ->
+                mayInfoToStatus groupId (Dict.get groupId state)
                     |> \info -> Dict.insert loginName info acc
             )
             Dict.empty
             accounts
 
 
-addShare : ( String, String ) -> Share -> State -> State
+addShare : GroupId -> Share -> State -> State
 addShare key share (State state) =
     (State <|
         Dict.update key
-            (Maybe.map (\info -> tryGetPassword { info | shares = share :: info.shares }))
+            (Maybe.map (\info -> tryGetPassword key { info | shares = share :: info.shares }))
             state
     )
 
 
-tryGetPassword : Info -> Info
-tryGetPassword info =
+tryGetPassword : GroupId -> Info -> Info
+tryGetPassword ( level, _ ) info =
     case info.password of
         Just pw ->
             info
 
         Nothing ->
-            if (List.length info.shares) >= info.requiredParts then
+            if (List.length info.shares) >= level then
                 -- expensive operation
                 { info | password = Just <| SecretSharing.joinToString info.shares }
             else

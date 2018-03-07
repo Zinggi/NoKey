@@ -13,8 +13,8 @@ import SecretSharing
 
 import Styles
 import Elements
-import Data.Sync exposing (SyncData)
-import Data.RequestPassword as RequestPassword exposing (Status(..))
+import Data.Sync exposing (SyncData, AccountId, GroupId)
+import Data.RequestGroupPassword as RequestPassword exposing (Status(..))
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
 import Views.Pairing
@@ -47,7 +47,7 @@ view model =
                       else
                         text "pair a device to save your first password"
                     , Elements.line
-                    , lazy (\( a, b ) -> viewSavedSites a b) ( model.sitesState, model.syncData )
+                    , lazy (\( a, b ) -> viewSavedSites a b) ( model.groupPasswordRequestsState, model.syncData )
                     , Elements.line
                     , Elements.button (Just ResetDevice) "Reset Device"
                     ]
@@ -71,14 +71,16 @@ pairingConfig =
     { onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
 
 
+{-| TODO: this should be like in the UI scetch "Passwords"
+-}
 viewSavedSites : RequestPassword.State -> SyncData -> Element Msg
 viewSavedSites sitesState sync =
-    Data.Sync.mapSavedSites (viewSavedSite sitesState) sync
+    Data.Sync.mapAccounts (viewSavedSite sitesState) sync
         |> Element.Keyed.column []
 
 
-viewSavedSite : RequestPassword.State -> String -> String -> Int -> Maybe SecretSharing.Share -> ( String, Element Msg )
-viewSavedSite sitesState siteName userName requiredParts mayShare =
+viewSavedSite : RequestPassword.State -> AccountId -> GroupId -> Maybe SecretSharing.Share -> ( String, Element Msg )
+viewSavedSite sitesState (( siteName, userName ) as accountId) groupId mayShare =
     column []
         [ column []
             [ Elements.h3 siteName
@@ -87,9 +89,9 @@ viewSavedSite sitesState siteName userName requiredParts mayShare =
                 , Elements.text (" -> has share: " ++ toString (Nothing /= mayShare))
                 ]
             , row []
-                [ case RequestPassword.getStatus ( siteName, userName ) sitesState of
+                [ case NotRequested {- TODO: was: RequestPassword.getStatusFor accountId sitesState -} of
                     NotRequested ->
-                        Elements.button (Just (RequestPasswordPressed ( siteName, userName ) False)) "Request password"
+                        Elements.button (Just (RequestPasswordPressed groupId Nothing)) "Request password"
 
                     Waiting n m ->
                         Elements.text ("Received " ++ toString n ++ "/" ++ toString m ++ " shares")
