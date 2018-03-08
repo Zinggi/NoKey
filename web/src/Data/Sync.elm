@@ -2,12 +2,16 @@ module Data.Sync exposing (..)
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
+import Set
 import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
 import Random.Pcg as Random exposing (Seed)
+import Random.Pcg.Extended as RandomE
+import Random as RandomC
 import Time exposing (Time)
+import Crypto.Strings as AES
 
 
 --
@@ -18,6 +22,8 @@ import Crdt.ORDict as ORDict exposing (ORDict)
 import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersionRegister)
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.VClock as VClock exposing (VClock)
+import Data.RequestGroupPassword as Request exposing (Status)
+import Data exposing (..)
 
 
 {-| This represents the data that is shared + all the metadata we need to sync this to others + our own private shares
@@ -30,18 +36,20 @@ type alias SyncData =
     , synchedWith : Dict String VClock
     , myShares : Dict GroupId SecretSharing.Share
     , passwordStash : Dict AccountId ( GroupId, Password )
+    , groupPasswordStash : Dict GroupId GroupPassword
     , seed : Seed
+
+    -- ephemeral
+    , groupPasswordRequestsState : Request.State
     }
 
 
-type alias Password =
-    String
-
-
-{-| (SecurityLevel, CreatorId)
--}
-type alias GroupId =
-    ( Int, String )
+clearStashes : GroupId -> SyncData -> SyncData
+clearStashes groupId sync =
+    { sync
+        | groupPasswordStash = Dict.remove groupId sync.groupPasswordStash
+        , passwordStash = Dict.filter (\accountId ( grId, _ ) -> grId /= groupId) sync.passwordStash
+    }
 
 
 {-| the data we receive on a sync update
@@ -59,7 +67,7 @@ type alias SharedData =
     -- These shares will be taken out one by one by the device whose id matches the id
     -- in the second dict
     -- TODO: here we should store encrypted shares with e.g. RSA
-    , sharesToDistribute : ORDict GroupId (ORDict String (TimestampedVersionRegister SecretSharing.Share))
+    , sharesToDistribute : ORDict GroupId (TimestampedVersionRegister (Dict String SecretSharing.Share))
 
     -- here we store all passwords, encrypted with the group password
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
@@ -78,33 +86,27 @@ accounts sync =
         |> Dict.map (\key ( groupId, _ ) -> groupId)
 
 
+groups : SyncData -> List GroupId
+groups sync =
+    accounts sync
+        |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
+        |> Set.toList
+
+
 getShare : GroupId -> SyncData -> Maybe SecretSharing.Share
 getShare groupId sync =
     Dict.get groupId sync.myShares
 
 
-type alias AccountId =
-    -- siteName, userName
-    ( String, String )
+encryptPassword : Time -> GroupPassword -> Password -> Result String EncryptedPassword
+encryptPassword time groupPw pw =
+    AES.encrypt (RandomC.initialSeed (round time)) groupPw pw
+        |> Result.map (\( encPw, seedC ) -> EncryptedPassword encPw)
 
 
-type EncryptedPassword
-    = -- TODO: encrypted with http://package.elm-lang.org/packages/billstclair/elm-crypto-string/latest
-      EncryptedPassword String
-
-
-type alias GroupPassword =
-    String
-
-
-encryptPassword : GroupPassword -> Password -> EncryptedPassword
-encryptPassword groupPw pw =
-    Debug.crash "TODO"
-
-
-decryptPassword : GroupPassword -> EncryptedPassword -> Password
-decryptPassword groupPw encryptedPw =
-    Debug.crash "TODO"
+decryptPassword : GroupPassword -> EncryptedPassword -> Result String Password
+decryptPassword groupPw (EncryptedPassword encryptedPw) =
+    AES.decrypt groupPw encryptedPw
 
 
 init : Seed -> String -> SyncData
@@ -115,6 +117,8 @@ init seed uuid =
     , seed = seed
     , myShares = Dict.empty
     , passwordStash = Dict.empty
+    , groupPasswordStash = Dict.empty
+    , groupPasswordRequestsState = Request.init
     }
 
 
@@ -147,6 +151,14 @@ updateShared f sync =
             f sync.shared
                 |> (\s -> { s | version = VClock.increment sync.id s.version })
     }
+
+
+incrementIf : Bool -> SyncData -> SyncData
+incrementIf b sync =
+    if b then
+        updateShared identity sync
+    else
+        sync
 
 
 isKnownId : String -> SyncData -> Bool
@@ -211,41 +223,112 @@ renameDevice newName sync =
     updateShared (\s -> { s | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) s.knownIds }) sync
 
 
-insertToStash : AccountId -> GroupId -> Password -> SyncData -> SyncData
-insertToStash accountId groupId pw sync =
-    { sync | passwordStash = Dict.insert accountId ( groupId, pw ) sync.passwordStash }
-
-
 {-| TODO: Insert a site. To call this we need to know the group password or
 on first invocation generate a new groupId + password
 -}
-insertSite : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
-insertSite timestamp groupPw accountId groupId pw sync =
+insertSite : Time -> RandomE.Seed -> AccountId -> GroupId -> Password -> SyncData -> ( SyncData, RandomE.Seed )
+insertSite time seed accountId groupId pw sync =
+    case Request.getGroupPassword groupId sync.groupPasswordRequestsState of
+        -- if have group password then
+        Just groupPw ->
+            -- insert into passwords
+            ( insertToStorage time groupPw accountId groupId pw sync, seed )
+
+        Nothing ->
+            let
+                -- add password to stash
+                newSync =
+                    insertToStash accountId groupId pw sync
+
+                ( level, _ ) =
+                    groupId
+            in
+                -- if groupId exists then
+                if List.member groupId (groups sync) then
+                    -- request shares
+                    Debug.crash "TODO"
+                else
+                    let
+                        -- generate group password
+                        ( groupPw, seed2 ) =
+                            RandomE.step Helper.groupPwGenerator seed
+
+                        -- generate shares
+                        ( genShares, seed3 ) =
+                            SecretSharing.splitString
+                                ( level
+                                , knownIds sync |> List.length
+                                )
+                                groupPw
+                                seed2
+
+                        shares =
+                            List.map2 (,) (knownIds sync) genShares
+                                |> Dict.fromList
+
+                        -- take out our share
+                        ( myShares, sharesForOthers ) =
+                            case Dict.get sync.id shares of
+                                Just share ->
+                                    ( Dict.insert groupId share sync.myShares, Dict.remove sync.id shares )
+
+                                Nothing ->
+                                    Debug.log "This should never happen, but there is a save default, so we don't crash" <|
+                                        ( sync.myShares, shares )
+
+                        newSync2 =
+                            { newSync | myShares = myShares }
+                                |> updateShared
+                                    (\s ->
+                                        { s
+                                            | sharesToDistribute =
+                                                ORDict.updateOrInsert groupId
+                                                    (TimestampedVersionRegister.set sync.id time sharesForOthers)
+                                                    (TimestampedVersionRegister.init sync.id time sharesForOthers)
+                                                    s.sharesToDistribute
+                                        }
+                                    )
+
+                        -- add groupPw to stash
+                        newSync3 =
+                            { newSync2 | groupPasswordStash = Dict.insert groupId groupPw newSync2.groupPasswordStash }
+                    in
+                        -- TODO: start distributing shares
+                        -- This should happen automatically, right??
+                        ( newSync3, seed3 )
+
+
+insertToStorage : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
+insertToStorage timestamp groupPw accountId groupId pw sync =
     let
-        encPw =
-            encryptPassword groupPw pw
-
-        updateFn fn =
-            fn sync.id timestamp ( groupId, encPw )
+        updateFn p fn =
+            fn sync.id timestamp ( groupId, p )
     in
-        sync
-            |> updateShared
-                (\s ->
-                    { s
-                        | passwords =
-                            ORDict.updateOrInsert accountId
-                                (updateFn TimestampedVersionRegister.set)
-                                (updateFn TimestampedVersionRegister.init)
-                                s.passwords
-                    }
-                )
+        case encryptPassword timestamp groupPw pw of
+            Ok encPw ->
+                sync
+                    |> updateShared
+                        (\s ->
+                            { s
+                                | passwords =
+                                    ORDict.updateOrInsert accountId
+                                        (updateFn encPw TimestampedVersionRegister.set)
+                                        (updateFn encPw TimestampedVersionRegister.init)
+                                        s.passwords
+                            }
+                        )
+
+            Err str ->
+                -- TODO: probably just ignore error, don't crash!
+                Debug.crash
+                    ("Encrypting a password failed? But why???\n(groupPw, accountId, groupId, pw):\n"
+                        ++ toString ( groupPw, accountId, groupId, pw )
+                    )
 
 
-
--- ORDict.updateOrInsert ( siteName, userName )
---     (updateEntry TimestampedVersionRegister.set)
---     (updateEntry TimestampedVersionRegister.init)
---     s.savedSites
+insertToStash : AccountId -> GroupId -> Password -> SyncData -> SyncData
+insertToStash accountId groupId pw sync =
+    { sync | passwordStash = Dict.insert accountId ( groupId, pw ) sync.passwordStash }
 
 
 deletePassword : AccountId -> SyncData -> SyncData
@@ -256,14 +339,89 @@ deletePassword key sync =
     updateShared (\s -> { s | passwords = ORDict.remove key s.passwords }) sync
 
 
-mapAccounts : (AccountId -> GroupId -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
+getStatusForSite : String -> SyncData -> Dict String Status
+getStatusForSite site sync =
+    let
+        accounts =
+            getAccountsForSite site sync
+    in
+        List.foldl
+            (\( loginName, groupId ) acc ->
+                Request.getStatus groupId sync.groupPasswordRequestsState
+                    |> \info -> Dict.insert loginName info acc
+            )
+            Dict.empty
+            accounts
+
+
+mapAccounts : (Status -> AccountId -> GroupId -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
 mapAccounts f sync =
     (accounts sync)
         |> Dict.foldl
             (\accountId groupId acc ->
-                f accountId groupId (Dict.get groupId sync.myShares) :: acc
+                f (Request.getStatus groupId sync.groupPasswordRequestsState)
+                    accountId
+                    groupId
+                    (Dict.get groupId sync.myShares)
+                    :: acc
             )
             []
+
+
+addShare : GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe FillFormData )
+addShare key share sync =
+    -- TODO: anything else to do here?
+    -- Yes: check if some of the tasks inside the stash can be completed
+    -- TODO: test if this works
+    let
+        ( newReqState, mayForm ) =
+            Request.addShare key share sync.groupPasswordRequestsState
+
+        newSync =
+            { sync | groupPasswordRequestsState = newReqState }
+    in
+        case Request.getGroupPassword key newReqState of
+            Just pw ->
+                -- remove pw from stash(es)
+                ( clearStashes key newSync, mayForm )
+
+            Nothing ->
+                ( newSync, mayForm )
+
+
+requestPasswordPressed : GroupId -> Maybe AccountId -> SyncData -> ( SyncData, Maybe FillFormData )
+requestPasswordPressed groupId mayAccount sync =
+    let
+        maybeMyShare =
+            getShare groupId sync
+
+        newReqState =
+            Request.waitFor groupId mayAccount maybeMyShare sync.groupPasswordRequestsState
+
+        newSync =
+            { sync | groupPasswordRequestsState = newReqState }
+    in
+        case Request.getStatus groupId newReqState of
+            Request.Done (Just ( site, login )) pw ->
+                ( newSync, Just { password = pw, site = site, login = login } )
+
+            _ ->
+                ( newSync, Nothing )
+
+
+updateGroupPasswordRequest : (Request.State -> Request.State) -> SyncData -> SyncData
+updateGroupPasswordRequest f sync =
+    { sync | groupPasswordRequestsState = f sync.groupPasswordRequestsState }
+
+
+currentGroupId : Int -> SyncData -> String
+currentGroupId level sync =
+    -- TODO: remove in faviour of giving the user a choice
+    groups sync
+        |> List.filter (\( l, g ) -> l == level)
+        |> List.map Tuple.second
+        |> List.head
+        |> Maybe.withDefault sync.id
 
 
 hasPasswordFor : AccountId -> SyncData -> Bool
@@ -276,24 +434,24 @@ merge : Time -> OtherSharedData -> SyncData -> SyncData
 merge timestamp other my =
     let
         newSharesToDistribute =
-            ORDict.merge (ORDict.merge TimestampedVersionRegister.merge)
+            ORDict.merge TimestampedVersionRegister.merge
                 other.shared.sharesToDistribute
                 my.shared.sharesToDistribute
 
         newPasswords =
             ORDict.merge TimestampedVersionRegister.merge other.shared.passwords my.shared.passwords
 
-        ( myShares, sharesForOthers ) =
+        ( myShares, sharesForOthers, didTakeShare ) =
             getMyShares my.id
                 my.myShares
-                (ORDict.getWith (ORDict.getWith TimestampedVersionRegister.get) newSharesToDistribute)
+                (ORDict.getWith TimestampedVersionRegister.get newSharesToDistribute)
     in
         { my
             | shared =
                 { knownIds = ORDict.merge SingleVersionRegister.merge other.shared.knownIds my.shared.knownIds
                 , passwords = newPasswords
                 , sharesToDistribute =
-                    ORDict.updateWithDict (ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp))
+                    ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp)
                         sharesForOthers
                         newSharesToDistribute
                 , version = VClock.merge other.shared.version my.shared.version
@@ -301,6 +459,7 @@ merge timestamp other my =
             , myShares = myShares
         }
             |> receiveVersion other.id other.shared.version
+            |> incrementIf didTakeShare
 
 
 receiveVersion : String -> VClock -> SyncData -> SyncData
@@ -314,20 +473,21 @@ getMyShares :
     String
     -> Dict GroupId SecretSharing.Share
     -> Dict GroupId (Dict String SecretSharing.Share)
-    -> ( Dict GroupId SecretSharing.Share, Dict GroupId (Dict String SecretSharing.Share) )
+    -> ( Dict GroupId SecretSharing.Share, Dict GroupId (Dict String SecretSharing.Share), Bool )
 getMyShares id myOldShares sharesToDistribute =
     Dict.foldl
-        (\( siteName, userName ) sharesForOthers ( myShares, other ) ->
+        (\( siteName, userName ) sharesForOthers ( myShares, other, didTakeShare ) ->
             case Dict.get id sharesForOthers of
                 Just share ->
                     ( Dict.insert ( siteName, userName ) share myShares
                     , Dict.insert ( siteName, userName ) (Dict.remove id sharesForOthers) other
+                    , True
                     )
 
                 Nothing ->
-                    ( myShares, other )
+                    ( myShares, other, didTakeShare )
         )
-        ( myOldShares, sharesToDistribute )
+        ( myOldShares, sharesToDistribute, False )
         sharesToDistribute
 
 
@@ -360,20 +520,26 @@ syncWithOthers sync =
 
 otherSharedDecoder : String -> Decoder OtherSharedData
 otherSharedDecoder id =
+    sharedDecoder
+        |> JD.map (\shared -> { id = id, shared = shared })
+
+
+sharedDecoder : Decoder SharedData
+sharedDecoder =
     JD.field "dataVersion" JD.int
         |> JD.andThen
             (\v ->
                 case v of
                     1 ->
-                        decoderV1 id
+                        JD.field "data" sharedDecoderV1
 
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
             )
 
 
-sharedDecoder : Decoder SharedData
-sharedDecoder =
+sharedDecoderV1 : Decoder SharedData
+sharedDecoderV1 =
     JD.map4
         (\knownIds passwords sharesToDistribute version ->
             { knownIds = knownIds
@@ -389,15 +555,9 @@ sharedDecoder =
         )
         (JD.field "sharesToDistribute" <|
             ORDict.decoder2 groupIdDecoder
-                (ORDict.decoder (TimestampedVersionRegister.decoder SecretSharing.shareDecoder))
+                (TimestampedVersionRegister.decoder (JD.dict SecretSharing.shareDecoder))
         )
         (JD.field "version" VClock.decoder)
-
-
-decoderV1 : String -> Decoder OtherSharedData
-decoderV1 id =
-    JD.field "shared" sharedDecoder
-        |> JD.map (\shared -> { id = id, shared = shared })
 
 
 encryptedPasswordDecoder : Decoder EncryptedPassword
@@ -431,13 +591,15 @@ completeDecoder =
 
 completeDecoderV1 : Decoder SyncData
 completeDecoderV1 =
-    JD.map6
-        (\id shared myShares synchedWith passwordStash seed ->
+    JD.map7
+        (\id shared myShares synchedWith passwordStash groupPasswordStash seed ->
             { id = id
             , shared = shared
             , myShares = myShares
             , synchedWith = synchedWith
             , passwordStash = passwordStash
+            , groupPasswordStash = groupPasswordStash
+            , groupPasswordRequestsState = Request.init
             , seed = seed
             }
         )
@@ -446,32 +608,29 @@ completeDecoderV1 =
         (JD.field "myShares" <| JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
         (JD.field "synchedWith" <| JD.dict VClock.decoder)
         (JD.field "passwordStash" <| JD.dict2 accountIdDecoder (decodeTuple2 groupIdDecoder JD.string))
+        (JD.field "groupPasswordStash" <| JD.dict2 groupIdDecoder JD.string)
         (JD.field "seed" Random.fromJson)
-
-
-
--- (JD.field "passwords" <|
---     ORDict.decoder2 accountIdDecoder
---         (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
--- )
--- (JD.field "sharesToDistribute" <| ORDict.decoder2 groupIdDecoder (ORDict.decoder SecretSharing.shareDecoder))
 
 
 encodeShared : SharedData -> Value
 encodeShared shared =
     JE.object
-        [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) shared.knownIds )
-        , ( "passwords"
-          , ORDict.encode2 encodeAccountId
-                (TimestampedVersionRegister.encode (encodeTuple2 encodeGroupId encodeEncryptedPassword))
-                shared.passwords
+        [ ( "data"
+          , JE.object
+                [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) shared.knownIds )
+                , ( "passwords"
+                  , ORDict.encode2 encodeAccountId
+                        (TimestampedVersionRegister.encode (encodeTuple2 encodeGroupId encodeEncryptedPassword))
+                        shared.passwords
+                  )
+                , ( "sharesToDistribute"
+                  , ORDict.encode2 encodeGroupId
+                        (TimestampedVersionRegister.encode (JE.dict identity SecretSharing.encodeShare))
+                        shared.sharesToDistribute
+                  )
+                , ( "version", VClock.encode shared.version )
+                ]
           )
-        , ( "sharesToDistribute"
-          , ORDict.encode2 encodeGroupId
-                (ORDict.encode (TimestampedVersionRegister.encode SecretSharing.encodeShare))
-                shared.sharesToDistribute
-          )
-        , ( "version", VClock.encode shared.version )
 
         -- TODO: change if data format changes
         , ( "dataVersion", JE.int 1 )
@@ -501,6 +660,7 @@ encodeComplete s =
         , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
         , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
         , ( "passwordStash", JE.dict (encodeAccountId >> JE.encode 0) (encodeTuple2 encodeGroupId JE.string) s.passwordStash )
+        , ( "groupPasswordStash", JE.dict (encodeGroupId >> JE.encode 0) JE.string s.groupPasswordStash )
         , ( "seed", Random.toJson s.seed )
 
         -- TODO: change if data format changes

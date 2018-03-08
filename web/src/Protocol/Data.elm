@@ -12,7 +12,8 @@ import Timer exposing (Timer)
 
 --
 
-import Data.Sync exposing (SyncData, OtherSharedData, GroupId)
+import Data.Sync exposing (SyncData, OtherSharedData)
+import Data exposing (GroupId)
 import Data.Notifications
 
 

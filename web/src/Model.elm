@@ -17,9 +17,9 @@ import PortUtils
 
 import Helper exposing (..)
 import Data.PasswordMeta exposing (PasswordMetaData)
-import Data.RequestGroupPassword
 import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest, SiteEntry)
-import Data.Sync exposing (SyncData, OtherSharedData, GroupId, AccountId)
+import Data.Sync exposing (SyncData, OtherSharedData)
+import Data exposing (GroupId, AccountId, Password)
 import Data.Storage
 import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
@@ -32,7 +32,7 @@ import Ports
 
 
 type Msg
-    = AddPassword String
+    = AddPassword String String
     | SiteNameChanged String
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
@@ -44,7 +44,7 @@ type Msg
     | DoTokenSubmitted Time
     | RemoveDevice String
     | SetDeviceName String
-    | InsertSite String String (Dict String SecretSharing.Share) Int Time
+    | InsertSite AccountId GroupId Password Time
     | RequestPasswordPressed GroupId (Maybe AccountId)
     | GrantShareRequest Notifications.Id ShareRequest
     | RejectShareRequest Notifications.Id
@@ -53,7 +53,7 @@ type Msg
     | AddSiteEntry { isSignUp : Bool, entry : SiteEntry }
     | DeletePassword ( String, String )
     | UpdateNotifications Views.Notifications.State
-    | SaveEntry Notifications.Id SiteEntry
+    | SaveEntry Notifications.Id String SiteEntry
     | DismissNotification Notifications.Id
     | FillForm { login : String, site : String, password : String }
     | ProtocolMsg Protocol.Msg
@@ -71,7 +71,6 @@ type alias Model =
     , pairingDialogue : Views.Pairing.State
     , showPairingDialogue : Bool
     , seed : RandomE.Seed
-    , groupPasswordRequestsState : Data.RequestGroupPassword.State
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
     , protocolState : Protocol.State
@@ -120,7 +119,6 @@ init { initialSeed, storedState } =
             , showPairingDialogue = True
             , notifications = Notifications.init
             , notificationsView = Views.Notifications.init
-            , groupPasswordRequestsState = Data.RequestGroupPassword.init
             , protocolState = Protocol.init
             , currentSite = Nothing
             }

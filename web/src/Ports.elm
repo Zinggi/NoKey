@@ -2,7 +2,7 @@ port module Ports exposing (..)
 
 import Json.Encode exposing (Value)
 import Data.Notifications exposing (SiteEntry)
-import Data.Sync exposing (GroupId)
+import Data exposing (GroupId)
 
 
 port setTitle : String -> Cmd msg

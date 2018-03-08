@@ -43,16 +43,16 @@ update msg model =
             -- Since we send our state out on every update, we don't need to do anything here
             model |> noCmd
 
-        AddPassword pw ->
+        AddPassword groupId pw ->
             let
-                { userName, siteName } =
+                { userName, siteName, securityLevel } =
                     model.newSiteEntry
             in
-                saveEntry { login = userName, site = siteName, password = pw, securityLevel = model.newSiteEntry.securityLevel } model
+                saveEntry groupId { login = userName, site = siteName, password = pw, securityLevel = securityLevel } model
                     |> mapModel updateSeed
 
-        SaveEntry id entry ->
-            saveEntry entry model
+        SaveEntry id groupId entry ->
+            saveEntry groupId entry model
                 |> andThenUpdate (updateNotifications (Notifications.remove id))
                 |> addCmds [ Ports.closePopup () ]
 
@@ -61,11 +61,13 @@ update msg model =
                 |> updateNotifications (Notifications.remove id)
                 |> addCmds [ Ports.closePopup () ]
 
-        InsertSite siteName userName share requiredParts timestamp ->
-            {- TODO: if we already have the group password, insert, else insert to stash -}
-            -- { model | syncData = Data.Sync.insertSite timestamp requiredParts siteName userName share model.syncData }
-            --     |> Api.syncToOthers
-            Debug.crash "TODO"
+        InsertSite accountId groupId password timestamp ->
+            let
+                ( newSync, newSeed ) =
+                    Data.Sync.insertSite timestamp model.seed accountId groupId password model.syncData
+            in
+                { model | syncData = newSync, seed = newSeed }
+                    |> Api.syncToOthers
 
         SiteNameChanged s ->
             { model
@@ -140,26 +142,20 @@ update msg model =
                             )
                         ]
 
-        RequestPasswordPressed key fillForm ->
+        RequestPasswordPressed key mayFill ->
             let
-                maybeMyShare =
-                    Data.Sync.getShare key model.syncData
-
-                newSitesState =
-                    Data.RequestGroupPassword.waitFor key fillForm maybeMyShare model.groupPasswordRequestsState
+                ( newSync, mayForm ) =
+                    Data.Sync.requestPasswordPressed key mayFill model.syncData
 
                 newModel =
-                    { model | groupPasswordRequestsState = newSitesState }
-
-                ( site, login ) =
-                    key
+                    { model | syncData = newSync }
             in
-                case Data.RequestGroupPassword.getStatus key newSitesState of
-                    Data.RequestGroupPassword.Done (Just ( site, login )) pw ->
+                case mayForm of
+                    Just formData ->
                         newModel
-                            |> withCmds [ Ports.fillForm { password = pw, site = site, login = login } ]
+                            |> withCmds [ Ports.fillForm formData ]
 
-                    _ ->
+                    Nothing ->
                         newModel
                             |> Api.requestShare key
 
@@ -199,32 +195,13 @@ update msg model =
         |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ] ))
 
 
-saveEntry : SiteEntry -> Model -> ( Model, Cmd Msg )
-saveEntry entry model =
-    let
-        ( shares, seed2 ) =
-            SecretSharing.splitString
-                ( entry.securityLevel
-                , Data.Sync.knownIds model.syncData |> List.length
-                )
-                entry.password
-                model.seed
-
-        share =
-            List.map2
-                (\id share ->
-                    ( id, share )
-                )
-                (Data.Sync.knownIds model.syncData)
-                shares
-                |> Dict.fromList
-    in
-        { model
-            | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry
-            , expandSiteEntry = False
-            , seed = seed2
-        }
-            |> withCmds [ withTimestamp (InsertSite entry.site entry.login share entry.securityLevel) ]
+saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )
+saveEntry groupId entry model =
+    { model
+        | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry
+        , expandSiteEntry = False
+    }
+        |> withCmds [ withTimestamp (InsertSite ( entry.site, entry.login ) ( entry.securityLevel, groupId ) entry.password) ]
 
 
 updateSeed : Model -> Model

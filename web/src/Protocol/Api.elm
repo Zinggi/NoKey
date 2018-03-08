@@ -22,7 +22,8 @@ import Timer
 --
 
 import Helper exposing (..)
-import Data.Sync exposing (SyncData, OtherSharedData, GroupId)
+import Data.Sync exposing (SyncData, OtherSharedData)
+import Data exposing (GroupId)
 import Data.Notifications as Notifications
 import Data.RequestGroupPassword
 import SecretSharing
@@ -169,7 +170,6 @@ doSyncToOthers sync =
 
 syncWith : List String -> SyncData -> Cmd Model.Msg
 syncWith otherIds sync =
-    -- TODO: encode is now encodeShared
     sendMsgToGroup sync.id otherIds "SyncUpdate" [ ( "syncData", Data.Sync.encodeShared sync.shared ) ]
 
 
@@ -268,22 +268,19 @@ update model msg =
 
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
                 let
-                    newSitesState =
-                        Data.RequestGroupPassword.addShare key share model.groupPasswordRequestsState
+                    ( newSync, mayForm ) =
+                        Data.Sync.addShare key share model.syncData
 
                     newModel =
-                        { model | groupPasswordRequestsState = newSitesState }
-
-                    ( site, login ) =
-                        key
+                        { model | syncData = newSync }
                 in
-                    case Data.RequestGroupPassword.getStatus key newSitesState of
-                        Data.RequestGroupPassword.Done (Just ( site, login )) pw ->
+                    case mayForm of
+                        Just formData ->
                             -- if done and fillForm is set, call port to fill the form
                             newModel
-                                |> withCmds [ Ports.fillForm { login = login, site = site, password = pw } ]
+                                |> withCmds [ Ports.fillForm formData ]
 
-                        _ ->
+                        Nothing ->
                             newModel |> noCmd
 
             ( Authenticated otherId time (SyncUpdate otherSync), _ ) ->
@@ -339,7 +336,7 @@ update model msg =
                         |> withCmds [ cmd, Ports.storeState (Data.Storage.encode newModel) ]
 
             ( Self (DecodeError e), _ ) ->
-                Debug.crash "faild to decode msg" e
+                Debug.crash ("faild to decode msg" ++ e)
                     |> always ( model, Cmd.none )
 
             ( Self (Timer m), _ ) ->
@@ -361,7 +358,7 @@ update model msg =
 
                     ( CollectShares, _ ) ->
                         ( model
-                        , Data.RequestGroupPassword.getWaiting model.groupPasswordRequestsState
+                        , Data.RequestGroupPassword.getWaiting model.syncData.groupPasswordRequestsState
                             |> List.map (\key -> doRequestShare key model.syncData)
                             |> Cmd.batch
                         )
@@ -376,7 +373,7 @@ update model msg =
                             |> noCmd
 
                     CollectShares ->
-                        { model | groupPasswordRequestsState = Data.RequestGroupPassword.removeWaiting model.groupPasswordRequestsState }
+                        { model | syncData = Data.Sync.updateGroupPasswordRequest Data.RequestGroupPassword.removeWaiting model.syncData }
                             |> noCmd
 
                     ShareRequest nId ->

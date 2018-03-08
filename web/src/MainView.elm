@@ -13,7 +13,8 @@ import SecretSharing
 
 import Styles
 import Elements
-import Data.Sync exposing (SyncData, AccountId, GroupId)
+import Data.Sync exposing (SyncData)
+import Data exposing (AccountId, GroupId)
 import Data.RequestGroupPassword as RequestPassword exposing (Status(..))
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
@@ -36,18 +37,23 @@ view model =
             -- once https://github.com/mdgriffith/stylish-elephants/issues/54 is resolved
             [ column [ centerX, htmlAttribute (Attr.style [ ( "maxWidth", "800px" ) ]) ]
                 (if Notifications.count model.notifications > 0 then
-                    [ Views.Notifications.view notificationsConfig model.notifications numberOfKnownDevices model.notificationsView ]
+                    [ Views.Notifications.view notificationsConfig model.syncData model.notifications numberOfKnownDevices model.notificationsView ]
                  else
                     [ Views.Devices.view model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
                     , Elements.line
                     , Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
                     , Elements.line
                     , if numberOfKnownDevices >= 2 then
-                        newSiteForm model.requirementsState model.expandSiteEntry model.newSiteEntry numberOfKnownDevices model.seed
+                        newSiteForm model.requirementsState
+                            model.expandSiteEntry
+                            model.newSiteEntry
+                            (Data.Sync.currentGroupId model.newSiteEntry.securityLevel model.syncData)
+                            numberOfKnownDevices
+                            model.seed
                       else
                         text "pair a device to save your first password"
                     , Elements.line
-                    , lazy (\( a, b ) -> viewSavedSites a b) ( model.groupPasswordRequestsState, model.syncData )
+                    , lazy viewSavedSites model.syncData
                     , Elements.line
                     , Elements.button (Just ResetDevice) "Reset Device"
                     ]
@@ -73,14 +79,14 @@ pairingConfig =
 
 {-| TODO: this should be like in the UI scetch "Passwords"
 -}
-viewSavedSites : RequestPassword.State -> SyncData -> Element Msg
-viewSavedSites sitesState sync =
-    Data.Sync.mapAccounts (viewSavedSite sitesState) sync
+viewSavedSites : SyncData -> Element Msg
+viewSavedSites sync =
+    Data.Sync.mapAccounts viewSavedSite sync
         |> Element.Keyed.column []
 
 
-viewSavedSite : RequestPassword.State -> AccountId -> GroupId -> Maybe SecretSharing.Share -> ( String, Element Msg )
-viewSavedSite sitesState (( siteName, userName ) as accountId) groupId mayShare =
+viewSavedSite : RequestPassword.Status -> AccountId -> GroupId -> Maybe SecretSharing.Share -> ( String, Element Msg )
+viewSavedSite status (( siteName, userName ) as accountId) groupId mayShare =
     column []
         [ column []
             [ Elements.h3 siteName
@@ -89,7 +95,7 @@ viewSavedSite sitesState (( siteName, userName ) as accountId) groupId mayShare 
                 , Elements.text (" -> has share: " ++ toString (Nothing /= mayShare))
                 ]
             , row []
-                [ case NotRequested {- TODO: was: RequestPassword.getStatusFor accountId sitesState -} of
+                [ case status of
                     NotRequested ->
                         Elements.button (Just (RequestPasswordPressed groupId Nothing)) "Request password"
 
@@ -108,8 +114,8 @@ viewSavedSite sitesState (( siteName, userName ) as accountId) groupId mayShare 
         |> (\elem -> ( siteName ++ userName, elem ))
 
 
-newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> Int -> Seed -> Element Msg
-newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
+newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> String -> Int -> Seed -> Element Msg
+newSiteForm requirementsState expandSiteEntry entry currentGroupId maxSecurityLevel seed =
     column []
         [ column []
             [ Elements.inputWithLabel (Just SiteNameChanged) "New Site: " "example.com" entry.siteName
@@ -121,7 +127,7 @@ newSiteForm requirementsState expandSiteEntry entry maxSecurityLevel seed =
                 ([ Elements.inputWithLabel (Just UserNameChanged) "Login name" "" entry.userName
                  , Elements.text "Security Level: "
                  , Elements.clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
-                 , Views.PasswordGenerator.view AddPassword NewPasswordRequirements requirementsState
+                 , Views.PasswordGenerator.view (AddPassword currentGroupId) NewPasswordRequirements requirementsState
                  ]
                 )
           )

@@ -1,8 +1,8 @@
-module Data.RequestGroupPassword exposing (State, Status(..), init, getStatus, addShare, waitFor, getStatusForSite, getWaiting, removeWaiting)
+module Data.RequestGroupPassword exposing (State, Status(..), init, getStatus, addShare, waitFor, getWaiting, removeWaiting, getGroupPassword)
 
 import Dict exposing (Dict)
 import SecretSharing exposing (Share)
-import Data.Sync exposing (SyncData, GroupId, AccountId, GroupPassword)
+import Data exposing (GroupId, AccountId, GroupPassword, FillFormData)
 import Helper exposing (maybeToList)
 
 
@@ -23,7 +23,18 @@ type Status
 
 init : State
 init =
+    -- TODO: generate necessairy group passwords here
     State Dict.empty
+
+
+getGroupPassword : GroupId -> State -> Maybe GroupPassword
+getGroupPassword groupId state =
+    case getStatus groupId state of
+        Done _ pw ->
+            Just pw
+
+        _ ->
+            Nothing
 
 
 getStatus : GroupId -> State -> Status
@@ -83,28 +94,22 @@ removeWaiting (State state) =
             state
 
 
-getStatusForSite : String -> SyncData -> State -> Dict String Status
-getStatusForSite site sync (State state) =
-    let
-        accounts =
-            Data.Sync.getAccountsForSite site sync
-    in
-        List.foldl
-            (\( loginName, groupId ) acc ->
-                mayInfoToStatus groupId (Dict.get groupId state)
-                    |> \info -> Dict.insert loginName info acc
-            )
-            Dict.empty
-            accounts
-
-
-addShare : GroupId -> Share -> State -> State
+addShare : GroupId -> Share -> State -> ( State, Maybe FillFormData )
 addShare key share (State state) =
-    (State <|
-        Dict.update key
-            (Maybe.map (\info -> tryGetPassword key { info | shares = share :: info.shares }))
-            state
-    )
+    let
+        newState =
+            (State <|
+                Dict.update key
+                    (Maybe.map (\info -> tryGetPassword key { info | shares = share :: info.shares }))
+                    state
+            )
+    in
+        case getStatus key newState of
+            Done (Just ( site, login )) pw ->
+                ( newState, Just { login = login, site = site, password = pw } )
+
+            _ ->
+                ( newState, Nothing )
 
 
 tryGetPassword : GroupId -> Info -> Info

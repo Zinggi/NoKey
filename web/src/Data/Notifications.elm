@@ -17,7 +17,7 @@ module Data.Notifications
         )
 
 import Dict exposing (Dict)
-import Data.Sync exposing (GroupId)
+import Data exposing (GroupId)
 
 
 type alias Notification =

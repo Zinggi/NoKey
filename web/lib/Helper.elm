@@ -3,8 +3,11 @@ module Helper exposing (..)
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Set exposing (Set)
-import Random.Pcg.Extended as Random exposing (Generator)
+import Char
+import Random.Pcg.Extended as RandomE exposing (Generator)
 import Random.Pcg as RandomP
+import Random.Pcg.Interop as RandomP
+import Random
 import BigInt exposing (BigInt)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -309,9 +312,32 @@ encodeSet valueEncoder set =
 -- Random
 
 
+pcgToCore : RandomP.Seed -> Random.Seed
+pcgToCore seedP =
+    Random.initialSeed (RandomP.step (RandomP.int RandomP.minInt RandomP.maxInt) seedP |> Tuple.first)
+
+
+coreToPcg : Random.Seed -> RandomP.Seed
+coreToPcg seedC =
+    RandomP.initialSeed (Random.step (Random.int Random.minInt Random.maxInt) seedC |> Tuple.first)
+
+
 randomUUID : RandomP.Generator String
 randomUUID =
     RandomP.map Uuid.toString Uuid.uuidGenerator
+
+
+groupPwGenerator : Generator String
+groupPwGenerator =
+    -- 0 - 1114111 is all unicode
+    -- 0 - 127 is all ascii
+    -- TODO: how to maximize characters? and how big to make it?
+    RandomE.map String.fromList (RandomE.list 16 (charGenerator 0 1114111))
+
+
+charGenerator : Int -> Int -> Generator Char
+charGenerator start end =
+    RandomE.map Char.fromCode (RandomE.int start end)
 
 
 flatten : List (Generator a) -> Generator (List a)
@@ -319,14 +345,14 @@ flatten gens =
     case gens of
         g :: gs ->
             g
-                |> Random.andThen
+                |> RandomE.andThen
                     (\a ->
                         flatten gs
-                            |> Random.map (\aS -> a :: aS)
+                            |> RandomE.map (\aS -> a :: aS)
                     )
 
         [] ->
-            Random.constant []
+            RandomE.constant []
 
 
 {-| Sample a subset of length n of the given list.
@@ -334,18 +360,18 @@ flatten gens =
 sampleSubset : Int -> List a -> Generator (List a)
 sampleSubset n set =
     if n <= 0 then
-        Random.constant []
+        RandomE.constant []
     else
-        Random.sample set
-            |> Random.andThen
+        RandomE.sample set
+            |> RandomE.andThen
                 (\maybeElem ->
                     case maybeElem of
                         Nothing ->
-                            Random.constant []
+                            RandomE.constant []
 
                         Just e ->
                             sampleSubset (n - 1) (List.filter (\a -> a /= e) set)
-                                |> Random.map (\l -> e :: l)
+                                |> RandomE.map (\l -> e :: l)
                 )
 
 
@@ -356,10 +382,10 @@ bigIntMax m =
             BigInt.toString m |> String.length
     in
         bigIntDigits l
-            |> Random.andThen
+            |> RandomE.andThen
                 (\n ->
                     if BigInt.lt n m then
-                        Random.constant n
+                        RandomE.constant n
                     else
                         -- if it doesn meet requirements, try again
                         -- this should terminate in max ~10 rounds, e.g. if m = 11111
@@ -370,8 +396,8 @@ bigIntMax m =
 
 bigIntDigits : Int -> Generator BigInt
 bigIntDigits n =
-    Random.list n (Random.int 0 9)
-        |> Random.map
+    RandomE.list n (RandomE.int 0 9)
+        |> RandomE.map
             (List.map toString
                 >> String.join ""
                 >> BigInt.fromString
