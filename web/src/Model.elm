@@ -51,7 +51,8 @@ type Msg
     | ResetDevice
     | SendOutAccountsFor String
     | AddSiteEntry { isSignUp : Bool, entry : SiteEntry }
-    | DeletePassword ( String, String )
+    | DeletePassword AccountId
+    | TogglePassword AccountId
     | UpdateNotifications Views.Notifications.State
     | SaveEntry Notifications.Id String SiteEntry
     | DismissNotification Notifications.Id

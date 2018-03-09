@@ -269,7 +269,7 @@ update model msg =
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
                 let
                     ( newSync, mayForm ) =
-                        Data.Sync.addShare key share model.syncData
+                        Data.Sync.addShare time key share model.syncData
 
                     newModel =
                         { model | syncData = newSync }
@@ -279,9 +279,10 @@ update model msg =
                             -- if done and fillForm is set, call port to fill the form
                             newModel
                                 |> withCmds [ Ports.fillForm formData ]
+                                |> andThenUpdate syncToOthers
 
                         Nothing ->
-                            newModel |> noCmd
+                            newModel |> syncToOthers
 
             ( Authenticated otherId time (SyncUpdate otherSync), _ ) ->
                 let

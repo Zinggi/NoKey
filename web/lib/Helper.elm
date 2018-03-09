@@ -54,6 +54,14 @@ andThenUpdate fn ( m, cmd1 ) =
         ( newM, Cmd.batch [ cmd1, cmd2 ] )
 
 
+andThenUpdateIf : Bool -> (model -> ( model, Cmd msg )) -> ( model, Cmd msg ) -> ( model, Cmd msg )
+andThenUpdateIf shouldUpdate =
+    if shouldUpdate then
+        andThenUpdate
+    else
+        (\_ m -> m)
+
+
 
 -- Task
 
@@ -331,8 +339,10 @@ groupPwGenerator : Generator String
 groupPwGenerator =
     -- 0 - 1114111 is all unicode
     -- 0 - 127 is all ascii
+    -- 0 - 255 extended ascii
     -- TODO: how to maximize characters? and how big to make it?
-    RandomE.map String.fromList (RandomE.list 16 (charGenerator 0 1114111))
+    -- Right now definitely too small!!
+    RandomE.map String.fromList (RandomE.list 16 (charGenerator 0 255))
 
 
 charGenerator : Int -> Int -> Generator Char

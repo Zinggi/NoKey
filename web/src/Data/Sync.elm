@@ -11,18 +11,18 @@ import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Random as RandomC
 import Time exposing (Time)
-import Crypto.Strings as AES
 
 
 --
 
 import Helper exposing (decodeTuple, decodeTuple2, encodeTuple, encodeTuple2, encodeSet, decodeSet)
 import SecretSharing
+import AES
 import Crdt.ORDict as ORDict exposing (ORDict)
 import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersionRegister)
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.VClock as VClock exposing (VClock)
-import Data.RequestGroupPassword as Request exposing (Status)
+import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data exposing (..)
 
 
@@ -35,6 +35,15 @@ type alias SyncData =
     , id : String
     , synchedWith : Dict String VClock
     , myShares : Dict GroupId SecretSharing.Share
+
+    -- TODO: instead of keeping these two here, create a concept of a todolist.
+    -- This can than be used for things like:
+    --      Move Password for AccountId from (local) stash into GroupId
+    --          => user needs to unlock GroupId
+    --      Move Password for AccountId from GroupId1 into GroupId2
+    --          => user needs to unlock both groups 1 and 2
+    --      Create shares for Ids for GroupIds
+    --          => user needs to unlock GroupIds
     , passwordStash : Dict AccountId ( GroupId, Password )
     , groupPasswordStash : Dict GroupId GroupPassword
     , seed : Seed
@@ -98,17 +107,6 @@ getShare groupId sync =
     Dict.get groupId sync.myShares
 
 
-encryptPassword : Time -> GroupPassword -> Password -> Result String EncryptedPassword
-encryptPassword time groupPw pw =
-    AES.encrypt (RandomC.initialSeed (round time)) groupPw pw
-        |> Result.map (\( encPw, seedC ) -> EncryptedPassword encPw)
-
-
-decryptPassword : GroupPassword -> EncryptedPassword -> Result String Password
-decryptPassword groupPw (EncryptedPassword encryptedPw) =
-    AES.decrypt groupPw encryptedPw
-
-
 init : Seed -> String -> SyncData
 init seed uuid =
     { shared = initShared seed uuid
@@ -131,6 +129,17 @@ initShared seed uuid =
     }
 
 
+togglePassword : AccountId -> SyncData -> SyncData
+togglePassword accountId sync =
+    { sync
+        | groupPasswordRequestsState =
+            Request.togglePassword accountId
+                (Dict.get accountId (encryptedPasswords sync))
+                (Dict.get accountId sync.passwordStash |> Maybe.map Tuple.second)
+                sync.groupPasswordRequestsState
+    }
+
+
 getAccountsForSite : String -> SyncData -> List ( String, GroupId )
 getAccountsForSite site sync =
     accounts sync
@@ -144,6 +153,8 @@ getAccountsForSite site sync =
         |> Dict.values
 
 
+{-| TODO: only increment if nececairry, e.g. if we aren't already newer than all the other devices
+-}
 updateShared : (SharedData -> SharedData) -> SyncData -> SyncData
 updateShared f sync =
     { sync
@@ -223,16 +234,15 @@ renameDevice newName sync =
     updateShared (\s -> { s | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) s.knownIds }) sync
 
 
-{-| TODO: Insert a site. To call this we need to know the group password or
-on first invocation generate a new groupId + password
+{-| The caller is expected to call Api.requestShare if the last part of the tuple is True.
 -}
-insertSite : Time -> RandomE.Seed -> AccountId -> GroupId -> Password -> SyncData -> ( SyncData, RandomE.Seed )
+insertSite : Time -> RandomE.Seed -> AccountId -> GroupId -> Password -> SyncData -> ( SyncData, RandomE.Seed, Bool )
 insertSite time seed accountId groupId pw sync =
     case Request.getGroupPassword groupId sync.groupPasswordRequestsState of
         -- if have group password then
         Just groupPw ->
             -- insert into passwords
-            ( insertToStorage time groupPw accountId groupId pw sync, seed )
+            ( insertToStorage time groupPw accountId groupId pw sync, seed, False )
 
         Nothing ->
             let
@@ -245,8 +255,10 @@ insertSite time seed accountId groupId pw sync =
             in
                 -- if groupId exists then
                 if List.member groupId (groups sync) then
-                    -- request shares
-                    Debug.crash "TODO"
+                    ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId sync)) newSync
+                    , seed
+                    , True
+                    )
                 else
                     let
                         -- generate group password
@@ -277,6 +289,8 @@ insertSite time seed accountId groupId pw sync =
                                         ( sync.myShares, shares )
 
                         newSync2 =
+                            -- TODO: here we should encrypt the shares for the others
+                            -- share with others
                             { newSync | myShares = myShares }
                                 |> updateShared
                                     (\s ->
@@ -288,14 +302,14 @@ insertSite time seed accountId groupId pw sync =
                                                     s.sharesToDistribute
                                         }
                                     )
-
-                        -- add groupPw to stash
-                        newSync3 =
-                            { newSync2 | groupPasswordStash = Dict.insert groupId groupPw newSync2.groupPasswordStash }
+                                -- add groupPw to stash
+                                |> (\s -> { s | groupPasswordStash = Dict.insert groupId groupPw s.groupPasswordStash })
+                                -- store pw in passwords
+                                |> insertToStorage time groupPw accountId groupId pw
+                                -- add both groupPw and pw to cache
+                                |> updateGroupPasswordRequest (Request.cacheAccountPw accountId pw False >> Request.cacheGroupPw groupId groupPw)
                     in
-                        -- TODO: start distributing shares
-                        -- This should happen automatically, right??
-                        ( newSync3, seed3 )
+                        ( newSync2, seed3, False )
 
 
 insertToStorage : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
@@ -304,7 +318,7 @@ insertToStorage timestamp groupPw accountId groupId pw sync =
         updateFn p fn =
             fn sync.id timestamp ( groupId, p )
     in
-        case encryptPassword timestamp groupPw pw of
+        case AES.encryptPassword timestamp groupPw pw of
             Ok encPw ->
                 sync
                     |> updateShared
@@ -336,6 +350,14 @@ deletePassword key sync =
     -- TODO: also remove my shares + tell others to delete theirs?
     -- Or better, link the datastructures to automatically remove them
     -- TODO: should this even be allowed without unlocking the group??
+    -- delete should only be possible by solving a challenge, proving you know the password.
+    -- e.g. store hash(hash(pw||rand)) = challenge, rand
+    -- to delete solve challenge with hash(pw||rand) = solution, others can check if hash(solution) = challenge
+    --
+    -- Also, we probably never really want to delete stuff, so it should go into a bin first.
+    -- Then a user can empty a bin, but this will only empty the local bin, not all bins.
+    --
+    -- Also clear cache in the groupPasswordRequestsState and stash here
     updateShared (\s -> { s | passwords = ORDict.remove key s.passwords }) sync
 
 
@@ -354,12 +376,13 @@ getStatusForSite site sync =
             accounts
 
 
-mapAccounts : (Status -> AccountId -> GroupId -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
+mapAccounts : (PasswordStatus -> AccountId -> GroupId -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
 mapAccounts f sync =
-    (accounts sync)
+    (encryptedPasswords sync)
         |> Dict.foldl
-            (\accountId groupId acc ->
-                f (Request.getStatus groupId sync.groupPasswordRequestsState)
+            (\accountId ( groupId, encPw ) acc ->
+                f
+                    (Request.getPwStatus accountId groupId sync.groupPasswordRequestsState)
                     accountId
                     groupId
                     (Dict.get groupId sync.myShares)
@@ -368,22 +391,33 @@ mapAccounts f sync =
             []
 
 
-addShare : GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe FillFormData )
-addShare key share sync =
+addShare : Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe FillFormData )
+addShare time groupId share sync =
     -- TODO: anything else to do here?
     -- Yes: check if some of the tasks inside the stash can be completed
+    -- If so, don't forget to insert in storage => Doesn't work yet => INVESTIGATE
     -- TODO: test if this works
     let
         ( newReqState, mayForm ) =
-            Request.addShare key share sync.groupPasswordRequestsState
+            Request.addShare groupId share sync.groupPasswordRequestsState
 
         newSync =
             { sync | groupPasswordRequestsState = newReqState }
     in
-        case Request.getGroupPassword key newReqState of
-            Just pw ->
-                -- remove pw from stash(es)
-                ( clearStashes key newSync, mayForm )
+        case Request.getGroupPassword groupId newReqState of
+            Just groupPw ->
+                -- insert password from stash into storage
+                ( (Dict.foldl
+                    (\accountId ( groupId, pw ) accSync ->
+                        insertToStorage time groupPw accountId groupId pw accSync
+                    )
+                    newSync
+                    newSync.passwordStash
+                  )
+                    -- remove pw from stash(es)
+                    |> clearStashes groupId
+                , mayForm
+                )
 
             Nothing ->
                 ( newSync, mayForm )
@@ -392,11 +426,8 @@ addShare key share sync =
 requestPasswordPressed : GroupId -> Maybe AccountId -> SyncData -> ( SyncData, Maybe FillFormData )
 requestPasswordPressed groupId mayAccount sync =
     let
-        maybeMyShare =
-            getShare groupId sync
-
         newReqState =
-            Request.waitFor groupId mayAccount maybeMyShare sync.groupPasswordRequestsState
+            Request.waitFor groupId mayAccount (getShare groupId sync) sync.groupPasswordRequestsState
 
         newSync =
             { sync | groupPasswordRequestsState = newReqState }

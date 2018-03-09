@@ -63,11 +63,12 @@ update msg model =
 
         InsertSite accountId groupId password timestamp ->
             let
-                ( newSync, newSeed ) =
+                ( newSync, newSeed, shouldAsk ) =
                     Data.Sync.insertSite timestamp model.seed accountId groupId password model.syncData
             in
                 { model | syncData = newSync, seed = newSeed }
                     |> Api.syncToOthers
+                    |> andThenUpdateIf shouldAsk (Api.requestShare groupId)
 
         SiteNameChanged s ->
             { model
@@ -86,6 +87,10 @@ update msg model =
 
         UserNameChanged n ->
             { model | newSiteEntry = (\e -> { e | userName = n }) model.newSiteEntry }
+                |> noCmd
+
+        TogglePassword accountId ->
+            { model | syncData = Data.Sync.togglePassword accountId model.syncData }
                 |> noCmd
 
         DeletePassword key ->

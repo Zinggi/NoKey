@@ -15,7 +15,7 @@ import Styles
 import Elements
 import Data.Sync exposing (SyncData)
 import Data exposing (AccountId, GroupId)
-import Data.RequestGroupPassword as RequestPassword exposing (Status(..))
+import Data.RequestGroupPassword as RequestPassword exposing (Status(..), PasswordStatus(..))
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
 import Views.Pairing
@@ -85,7 +85,7 @@ viewSavedSites sync =
         |> Element.Keyed.column []
 
 
-viewSavedSite : RequestPassword.Status -> AccountId -> GroupId -> Maybe SecretSharing.Share -> ( String, Element Msg )
+viewSavedSite : PasswordStatus -> AccountId -> GroupId -> Maybe SecretSharing.Share -> ( String, Element Msg )
 viewSavedSite status (( siteName, userName ) as accountId) groupId mayShare =
     column []
         [ column []
@@ -96,17 +96,17 @@ viewSavedSite status (( siteName, userName ) as accountId) groupId mayShare =
                 ]
             , row []
                 [ case status of
-                    NotRequested ->
-                        Elements.button (Just (RequestPasswordPressed groupId Nothing)) "Request password"
+                    Locked ->
+                        Elements.button (Just (RequestPasswordPressed groupId Nothing)) ("Unlock " ++ toString groupId)
 
-                    Waiting n m ->
-                        Elements.text ("Received " ++ toString n ++ "/" ++ toString m ++ " shares")
+                    WaitForUnlockGroup n m ->
+                        Elements.text ("Unlocking group " ++ toString groupId ++ " (" ++ toString n ++ "/" ++ toString m ++ ")")
 
-                    Done _ pw ->
-                        Elements.text ("Password: " ++ pw)
+                    Unlocked pw ->
+                        row [] [ Elements.text ("Password: " ++ pw), Elements.button (Just (TogglePassword accountId)) "Hide" ]
 
-                    Error error ->
-                        Elements.text ("Couldn't recover password, reason:\n" ++ error)
+                    UnlockedButHidden ->
+                        row [] [ Elements.text ("Password: ******"), Elements.button (Just (TogglePassword accountId)) "Show" ]
                 , Elements.button (Just (DeletePassword ( siteName, userName ))) "Delete"
                 ]
             ]
