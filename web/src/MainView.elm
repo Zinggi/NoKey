@@ -22,6 +22,7 @@ import Views.Pairing
 import Views.Notifications
 import Views.PasswordGenerator
 import Views.Devices
+import Views.Passwords
 import Model exposing (Model, Msg(..))
 
 
@@ -53,13 +54,22 @@ view model =
                       else
                         text "pair a device to save your first password"
                     , Elements.line
-                    , lazy viewSavedSites model.syncData
+                    , lazy (Views.Passwords.view passwordsConfig model.passwordsView) model.syncData
                     , Elements.line
                     , Elements.button (Just ResetDevice) "Reset Device"
                     ]
                 )
             ]
             |> Element.layout Styles.background
+
+
+passwordsConfig : Views.Passwords.Config Msg
+passwordsConfig =
+    { toMsg = UpdatePasswordView
+    , onDeletePassword = DeletePassword
+    , onRequestPasswordPressed = RequestPasswordPressed
+    , onTogglePassword = TogglePassword
+    }
 
 
 notificationsConfig : Views.Notifications.Config Msg
@@ -75,43 +85,6 @@ notificationsConfig =
 pairingConfig : Views.Pairing.Config Msg
 pairingConfig =
     { onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
-
-
-{-| TODO: this should be like in the UI scetch "Passwords"
--}
-viewSavedSites : SyncData -> Element Msg
-viewSavedSites sync =
-    Data.Sync.mapAccounts viewSavedSite sync
-        |> Element.Keyed.column []
-
-
-viewSavedSite : PasswordStatus -> AccountId -> GroupId -> Maybe SecretSharing.Share -> ( String, Element Msg )
-viewSavedSite status (( siteName, userName ) as accountId) groupId mayShare =
-    column []
-        [ column []
-            [ Elements.h3 siteName
-            , row []
-                [ Elements.text userName
-                , Elements.text (" -> has share: " ++ toString (Nothing /= mayShare))
-                ]
-            , row []
-                [ case status of
-                    Locked ->
-                        Elements.button (Just (RequestPasswordPressed groupId Nothing)) ("Unlock " ++ toString groupId)
-
-                    WaitForUnlockGroup n m ->
-                        Elements.text ("Unlocking group " ++ toString groupId ++ " (" ++ toString n ++ "/" ++ toString m ++ ")")
-
-                    Unlocked pw ->
-                        row [] [ Elements.text ("Password: " ++ pw), Elements.button (Just (TogglePassword accountId)) "Hide" ]
-
-                    UnlockedButHidden ->
-                        row [] [ Elements.text ("Password: ******"), Elements.button (Just (TogglePassword accountId)) "Show" ]
-                , Elements.button (Just (DeletePassword ( siteName, userName ))) "Delete"
-                ]
-            ]
-        ]
-        |> (\elem -> ( siteName ++ userName, elem ))
 
 
 newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> String -> Int -> Seed -> Element Msg

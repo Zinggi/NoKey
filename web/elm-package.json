@@ -10,6 +10,7 @@
     "exposed-modules": [],
     "native-modules": true,
     "dependencies": {
+        "1602/elm-feather": "2.2.0 <= v < 3.0.0",
         "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "Zinggi/elm-hash-icon": "2.0.1 <= v < 3.0.0",
         "Zinggi/elm-random-pcg-extended": "2.0.0 <= v < 3.0.0",
@@ -22,6 +23,7 @@
         "elm-lang/http": "1.0.0 <= v < 2.0.0",
         "gilbertkennen/bigint": "1.0.1 <= v < 2.0.0",
         "jinjor/elm-debounce": "2.1.2 <= v < 3.0.0",
+        "jpagex/elm-loader": "1.0.0 <= v < 2.0.0",
         "krisajenkins/remotedata": "4.3.3 <= v < 5.0.0",
         "mdgriffith/stylish-elephants": "5.0.0 <= v < 6.0.0",
         "mgold/elm-random-pcg": "5.0.2 <= v < 6.0.0",

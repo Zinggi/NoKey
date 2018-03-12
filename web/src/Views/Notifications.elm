@@ -43,7 +43,7 @@ viewEntry config sync maxSecurityLevel n state =
         ShareRequestT req ->
             column []
                 [ column [] [ Elements.h4 req.id ]
-                , -- TODO: create a view for this, e.g. Id -> Icon + name/partOfId
+                , -- TODO: use Elements.avatar
                   row []
                     [ Elements.hashIcon req.id
                     , Elements.text (" wants to view password for: " ++ toString req.key)
@@ -64,7 +64,7 @@ viewEntry config sync maxSecurityLevel n state =
                     )
                     [ Elements.inputWithLabel Nothing "Site" "" entry.site
                     , Elements.inputWithLabel Nothing "Login" "" entry.login
-                    , Elements.passwordEntry Nothing "Password" entry.password
+                    , Elements.passwordEntry Nothing "Password" False entry.password
                     , Elements.withLabel "Security Level" <| Elements.clampedNumberInput config.toMsg ( 2, 2, maxSecurityLevel ) state
                     ]
                 , Elements.buttonRow []

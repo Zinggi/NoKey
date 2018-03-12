@@ -17,6 +17,7 @@ import Data.Storage
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
+import Views.Passwords
 import Model exposing (..)
 
 
@@ -193,6 +194,9 @@ update msg model =
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd
+
+        UpdatePasswordView m ->
+            { model | passwordsView = Views.Passwords.update m model.passwordsView } |> noCmd
 
         FillForm config ->
             model |> withCmds [ Ports.fillForm config ]

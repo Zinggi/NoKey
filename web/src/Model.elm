@@ -25,6 +25,7 @@ import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
 import Views.Pairing
 import Views.Notifications
+import Views.Passwords
 import Ports
 
 
@@ -54,6 +55,7 @@ type Msg
     | DeletePassword AccountId
     | TogglePassword AccountId
     | UpdateNotifications Views.Notifications.State
+    | UpdatePasswordView Views.Passwords.Msg
     | SaveEntry Notifications.Id String SiteEntry
     | DismissNotification Notifications.Id
     | FillForm { login : String, site : String, password : String }
@@ -74,6 +76,7 @@ type alias Model =
     , seed : RandomE.Seed
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
+    , passwordsView : Views.Passwords.State
     , protocolState : Protocol.State
 
     -- Keep the current site, to provide site specific actions
@@ -120,6 +123,7 @@ init { initialSeed, storedState } =
             , showPairingDialogue = True
             , notifications = Notifications.init
             , notificationsView = Views.Notifications.init
+            , passwordsView = Views.Passwords.init
             , protocolState = Protocol.init
             , currentSite = Nothing
             }

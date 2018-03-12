@@ -10,6 +10,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Styles
 import HashIcon
+import Icons
 
 
 -- attributes
@@ -168,6 +169,11 @@ h4 txt =
     el [ Font.size (Styles.scaled 1), Font.bold, alignLeft ] (Element.text txt)
 
 
+b : String -> Element msg
+b txt =
+    el [ Font.bold ] (text txt)
+
+
 button : Maybe msg -> String -> Element msg
 button onPress txt =
     Input.button []
@@ -185,6 +191,38 @@ button onPress txt =
                     :: Styles.borderStyle
                 )
                 (text txt)
+            )
+        , onPress = onPress
+        }
+
+
+delete onPress =
+    Input.button []
+        { label =
+            (el ([ padding (Styles.paddingScale 1) ] ++ Styles.borderStyle)
+                (row [ spacing (Styles.paddingScale 0) ] [ Icons.delete, text "Delete" ])
+            )
+        , onPress = Just onPress
+        }
+
+
+customButton : Maybe msg -> Element msg -> Element msg
+customButton onPress inner =
+    Input.button []
+        { label =
+            (el
+                (padding (Styles.paddingScale 1)
+                    :: (Background.color <|
+                            case onPress of
+                                Nothing ->
+                                    Styles.disabledColor
+
+                                Just _ ->
+                                    Styles.accentColor
+                       )
+                    :: Styles.borderStyle
+                )
+                inner
             )
         , onPress = onPress
         }
@@ -296,16 +334,21 @@ inputWithLabel onChange label placeholder value =
         ]
 
 
+search : (String -> msg) -> String -> Element msg
+search onChange value =
+    inputHelper Input.search [] (Just onChange) "search" value
+
+
 textInput : Maybe (String -> msg) -> String -> String -> Element msg
 textInput onChange placeholder value =
     inputHelper Input.text [] onChange placeholder value
 
 
-passwordEntry : Maybe (String -> msg) -> String -> String -> Element msg
-passwordEntry onChange label value =
+passwordEntry : Maybe (String -> msg) -> String -> Bool -> String -> Element msg
+passwordEntry onChange label shouldShow value =
     row []
         [ el [ width (fillPortion 1), htmlAttribute (Attr.type_ "password"), htmlAttribute (Attr.name "password") ] (text label)
-        , password [ width (fillPortion 3) ] onChange value
+        , password [ width (fillPortion 3) ] onChange shouldShow value
         ]
 
 
@@ -324,21 +367,15 @@ table headers data =
         }
 
 
-password attr onChange value =
+password attr onChange shouldShow value =
     Input.currentPassword
-        (attr
-            ++ [ padding 0
-               , htmlAttribute (Attr.disabled (onChange == Nothing))
-               ]
-        )
+        (attr ++ [ padding 0, width shrink ])
         { onChange = onChange
         , text = value
-        , label = Input.labelLeft [ padding 0 ] (empty)
+        , label = Input.labelLeft [ padding 0 ] empty
         , placeholder =
             Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text "********")
-        , show =
-            -- TODO: add button to show
-            False
+        , show = shouldShow
         }
 
 

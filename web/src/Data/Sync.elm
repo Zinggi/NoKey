@@ -391,6 +391,31 @@ mapAccounts f sync =
             []
 
 
+mapGroups : (GroupId -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
+mapGroups f sync =
+    (encryptedPasswords sync)
+        |> Dict.foldl
+            (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
+                let
+                    status =
+                        Request.getPwStatus accountId groupId sync.groupPasswordRequestsState
+
+                    inner =
+                        Dict.singleton userName status
+                in
+                    Helper.insertOrUpdate groupId
+                        (Dict.singleton siteName inner)
+                        (Helper.insertOrUpdate siteName inner (Dict.insert userName status))
+                        acc
+            )
+            Dict.empty
+        |> Dict.foldl
+            (\groupId dict acc ->
+                f groupId (Request.getStatus groupId sync.groupPasswordRequestsState) dict :: acc
+            )
+            []
+
+
 addShare : Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe FillFormData )
 addShare time groupId share sync =
     -- TODO: anything else to do here?

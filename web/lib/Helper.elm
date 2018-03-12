@@ -132,6 +132,20 @@ combineResults =
 -- Dict
 
 
+insertOrUpdate : comparable -> a -> (a -> a) -> Dict comparable a -> Dict comparable a
+insertOrUpdate key insert update dict =
+    Dict.update key
+        (\mayVal ->
+            case mayVal of
+                Just val ->
+                    Just <| update val
+
+                Nothing ->
+                    Just <| insert
+        )
+        dict
+
+
 filterDict : Dict comparable ( Bool, a ) -> List a
 filterDict sets =
     Dict.toList sets

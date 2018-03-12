@@ -70,12 +70,12 @@ endPointUrl pre path =
     -- TODO: change
     -- "localhost"
     {- etz upper -}
-    "10.2.120.53"
-        -- {- etz lower -}
-        -- "10.2.122.231"
-        -- {- hg lower -}
-        -- "10.2.54.70"
-        -- "floyogaarch.fritz.box"
+    -- "10.2.120.53"
+    -- {- etz lower -}
+    -- "10.2.122.231"
+    -- {- hg lower -}
+    -- "10.2.54.70"
+    "floyogaarch.fritz.box"
         |> (\ip -> pre ++ ip ++ ":4000" ++ path)
 
 
