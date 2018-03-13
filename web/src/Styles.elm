@@ -16,6 +16,10 @@ paddingScale =
     modular 6 1.414 >> round
 
 
+paddingLeft x =
+    paddingEach { bottom = 0, left = x, right = 0, top = 0 }
+
+
 
 -- Colors
 

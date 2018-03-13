@@ -76,6 +76,13 @@ type alias SharedData =
     -- These shares will be taken out one by one by the device whose id matches the id
     -- in the second dict
     -- TODO: here we should store encrypted shares with e.g. RSA
+    -- TODO: we should also store who has a share for which pw
+    --       This way we can:
+    --          + TODO: remove a pw from the stash, once enough devices took their share
+    --          + give the user a better understanding of how it works:
+    --              - E.g. if the user clicks on a group in the passwords view, show which devices have a share
+    --          + automatically calculate new shares on unlock group for devices
+    --            that have no share yet and aren't in the to distribute list
     , sharesToDistribute : ORDict GroupId (TimestampedVersionRegister (Dict String SecretSharing.Share))
 
     -- here we store all passwords, encrypted with the group password
@@ -361,34 +368,13 @@ deletePassword key sync =
     updateShared (\s -> { s | passwords = ORDict.remove key s.passwords }) sync
 
 
-getStatusForSite : String -> SyncData -> Dict String Status
-getStatusForSite site sync =
-    let
-        accounts =
-            getAccountsForSite site sync
-    in
-        List.foldl
-            (\( loginName, groupId ) acc ->
-                Request.getStatus groupId sync.groupPasswordRequestsState
-                    |> \info -> Dict.insert loginName info acc
-            )
-            Dict.empty
-            accounts
-
-
-mapAccounts : (PasswordStatus -> AccountId -> GroupId -> Maybe SecretSharing.Share -> a) -> SyncData -> List a
-mapAccounts f sync =
-    (encryptedPasswords sync)
-        |> Dict.foldl
-            (\accountId ( groupId, encPw ) acc ->
-                f
-                    (Request.getPwStatus accountId groupId sync.groupPasswordRequestsState)
-                    accountId
-                    groupId
-                    (Dict.get groupId sync.myShares)
-                    :: acc
-            )
-            []
+mapAccountsForSite : String -> (GroupId -> AccountId -> Status -> a) -> SyncData -> List a
+mapAccountsForSite site f sync =
+    List.map
+        (\( loginName, groupId ) ->
+            f groupId ( site, loginName ) (Request.getStatus groupId sync.groupPasswordRequestsState)
+        )
+        (getAccountsForSite site sync)
 
 
 mapGroups : (GroupId -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a

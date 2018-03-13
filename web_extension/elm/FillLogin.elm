@@ -1,7 +1,6 @@
 module FillLogin exposing (main)
 
 import Html exposing (Html)
-import Dict
 import Element exposing (..)
 import Elements
 import Loader
@@ -9,7 +8,9 @@ import Styles
 import Background
 import Model exposing (Model, Msg(..))
 import ExternalStateView
-import Data.RequestPassword exposing (Status(..))
+import Data.RequestGroupPassword exposing (Status(..))
+import Data.Sync
+import Data exposing (..)
 
 
 view : Model -> Html Msg
@@ -19,45 +20,39 @@ view model =
             empty
 
         Just site ->
-            List.map (viewStatus site) (sortedLogins site model.syncData model.sitesState)
+            Data.Sync.mapAccountsForSite site viewStatus model.syncData
                 |> Elements.inputGroup "Choose login"
     )
         |> Element.layout Styles.background
 
 
-sortedLogins site sync sitesState =
-    -- Well this isn't sorted, but sorting might be confusing...
-    Data.RequestPassword.getStatusForSite site sync sitesState
-        |> Dict.toList
-
-
-viewStatus : String -> ( String, Status ) -> Element Msg
-viewStatus site ( login, status ) =
+viewStatus : GroupId -> AccountId -> Status -> Element Msg
+viewStatus groupId (( siteName, userName ) as accountId) status =
     case status of
         Done fill pw ->
-            labled login
-                [ Elements.button (Just (FillForm { login = login, site = site, password = pw })) "Fill"
+            labled userName
+                [ Elements.button (Just (FillForm { login = userName, site = siteName, password = pw })) "Fill"
                 ]
 
         Waiting n m ->
-            labled login
+            labled userName
                 [ row [ width fill ]
                     [ Element.html <| Loader.loaderWithOptions { loaderOptions | color = Styles.black }
                     , Elements.text <| toString n ++ "/" ++ toString m
                     ]
-                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed ( site, login ) True)) "Retry")
+                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed groupId (Just accountId))) "Retry")
                 ]
 
         Error error ->
-            labled login
+            labled userName
                 [ el [ width fill ] (Elements.text ("Error:\n" ++ error))
-                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed ( site, login ) True)) "retry")
+                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed groupId (Just accountId))) "retry")
                 ]
 
         NotRequested ->
             -- We aren't waiting on any shares yet
-            labled login
-                [ el [ alignRight ] (Elements.button (Just (RequestPasswordPressed ( site, login ) True)) "Request")
+            labled userName
+                [ el [ alignRight ] (Elements.button (Just (RequestPasswordPressed groupId (Just accountId))) "Request")
                 ]
 
 

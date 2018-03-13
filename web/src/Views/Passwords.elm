@@ -8,6 +8,7 @@ import Icons
 import Data.RequestGroupPassword as RequestPassword exposing (Status(..), PasswordStatus(..))
 import Data.Sync exposing (SyncData)
 import Data exposing (..)
+import Simple.Fuzzy as Fuzzy
 
 
 {- TODO: groups should have names:
@@ -51,7 +52,7 @@ view config state sync =
     Elements.miniPage "Passwords"
         [ tasks sync.passwordStash
         , search config state.search
-        , passwords config sync
+        , passwords config state.search sync
         ]
 
 
@@ -68,40 +69,50 @@ tasks stash =
         ]
 
 
-passwords : Config msg -> SyncData -> Element msg
-passwords config sync =
+passwords : Config msg -> String -> SyncData -> Element msg
+passwords config search sync =
     Elements.container <|
-        stash sync.passwordStash
-            :: Data.Sync.mapGroups (viewGroups config) sync
+        stash search sync.passwordStash
+            :: Data.Sync.mapGroups (viewGroups config search) sync
 
 
-stash pwStash =
-    Elements.h4 "Local stash"
-        :: (Dict.foldl
+stash : String -> Dict AccountId ( GroupId, String ) -> Element msg
+stash search pwStash =
+    let
+        filtered =
+            Dict.foldl
                 (\accountId ( groupId, pw ) acc ->
-                    Elements.text (toString accountId ++ " pw: " ++ pw) :: acc
+                    if Fuzzy.match search (toString accountId) then
+                        Elements.text (toString accountId ++ " pw: " ++ pw) :: acc
+                    else
+                        acc
                 )
                 []
                 pwStash
-           )
-        |> column []
+    in
+        if List.isEmpty filtered then
+            empty
+        else
+            (Elements.h4 "Local stash" :: filtered)
+                |> column []
 
 
-viewGroups : Config msg -> GroupId -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
-viewGroups config groupId groupStatus accounts =
+viewGroups : Config msg -> String -> GroupId -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
+viewGroups config search groupId groupStatus accounts =
     [ viewGroupHeader config groupId groupStatus
     , (Dict.foldl
         (\siteName userNames acc ->
-            viewPw config siteName userNames :: acc
+            viewPw config search siteName userNames :: acc
         )
         []
         accounts
-        |> column [ paddingXY (Styles.scaled 1) 0 ]
+        |> column [ Styles.paddingLeft (Styles.scaled 1) ]
       )
     ]
         |> column []
 
 
+viewGroupHeader : Config msg -> GroupId -> Status -> Element msg
 viewGroupHeader config groupId groupStatus =
     row []
         [ el [ alignLeft ] (viewGroup groupId groupStatus)
@@ -109,28 +120,44 @@ viewGroupHeader config groupId groupStatus =
         ]
 
 
-viewPw : Config msg -> String -> Dict String PasswordStatus -> Element msg
-viewPw config siteName userNames =
-    case Dict.toList userNames of
-        [ ( userName, status ) ] ->
-            pwRow config [ Elements.h4 siteName ] ( siteName, userName ) status
-
-        other ->
-            column []
-                (Elements.h4 siteName
-                    :: (List.map
-                            (\( userName, status ) ->
-                                pwRow config [] ( siteName, userName ) status
-                            )
-                            other
-                       )
+viewPw : Config msg -> String -> String -> Dict String PasswordStatus -> Element msg
+viewPw config search siteName userNames =
+    let
+        filterd =
+            List.filterMap
+                (\( userName, status ) ->
+                    if Fuzzy.match search (siteName ++ userName) then
+                        Just ( siteName, userName, status )
+                    else
+                        Nothing
                 )
+                (Dict.toList userNames)
+    in
+        case filterd of
+            [] ->
+                empty
+
+            [ ( siteName, userName, status ) ] ->
+                pwRow config [ Elements.h4 siteName ] ( siteName, userName ) status
+
+            other ->
+                column []
+                    [ Elements.h4 siteName
+                    , (List.map
+                        (\( siteName, userName, status ) ->
+                            pwRow config [] ( siteName, userName ) status
+                        )
+                        other
+                      )
+                        |> column [ Styles.paddingLeft (Styles.scaled 1) ]
+                    ]
 
 
+pwRow : Config msg -> List (Element msg) -> AccountId -> PasswordStatus -> Element msg
 pwRow config pre (( _, userName ) as accountId) status =
     row []
         [ el [ alignLeft ]
-            (row [ padding (Styles.paddingScale 0) ]
+            (row [ spacing (Styles.scaled 1) ]
                 (pre ++ [ Elements.b userName, viewStatus config accountId status ])
             )
         , el [ alignRight ] (Elements.delete (config.onDeletePassword accountId))
@@ -168,6 +195,7 @@ viewGroupStatus config groupId status =
             Elements.text ("Error: " ++ e)
 
 
+viewStatus : Config msg -> AccountId -> PasswordStatus -> Element msg
 viewStatus config accountId status =
     case status of
         Unlocked pw ->

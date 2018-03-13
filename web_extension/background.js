@@ -18,6 +18,7 @@ setup(Elm.MainBackground.worker, (app) => {
     // ports are stored in this object
     let ports = {};
     let lastPort = null;
+    let hasPopupOpen = false;
 
     chrome.runtime.onConnect.addListener(function(port) {
         // console.log("(background) port connected", port.name);
@@ -70,6 +71,11 @@ setup(Elm.MainBackground.worker, (app) => {
             browser.browserAction.setBadgeText({text: ""+count});
             // this is the tooltip
             browser.browserAction.setTitle({title: "NoKey: User interaction required"});
+
+            if (hasPopupOpen) {
+                return;
+            }
+            hasPopupOpen = true;
             const popupUrl = browser.extension.getURL("dist/main.html");
             browser.windows.create({
                 url: popupUrl,
@@ -78,11 +84,16 @@ setup(Elm.MainBackground.worker, (app) => {
                 type: 'popup', // TODO: test difference between:"normal" "popup" ("panel": deprecated on chrome) ("detached_panel" doesn't exist on chrome)
                 allowScriptsToClose: true // TODO: make window close on esc and save and forget button: window.close
             }).then((win) => {
-                // console.log(win);
+                chrome.windows.onRemoved.addListener((id) => {
+                    console.log("on remove window");
+                    if (id == win.id) {
+                        hasPopupOpen = false;
+                        console.log("close popup window");
+                    }
+                });
             }, (err) => {
                 console.error("creating window failed!", err);
             });
-
         } else {
             browser.browserAction.setBadgeText({text: ""});
             browser.browserAction.setTitle({title: "NoKey"});

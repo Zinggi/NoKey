@@ -86,7 +86,7 @@ const onNodeAdded = (accounts) => () => {
     // console.log("onNodeAdded");
 
     groups = pwLib.classifyForms();
-    // console.log("groups:", groups);
+    console.log("groups:", groups); // TODO: comment out
 
     const hijackedOnSubmit = (group) => (event) => {
         const entry = getFormData(group);

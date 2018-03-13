@@ -243,7 +243,7 @@ update model msg =
                     |> mapModel (\m -> { m | pairingDialogue = Views.Pairing.pairingCompleted res m.pairingDialogue })
 
             ( Server (PairedWith _), _ ) ->
-                Debug.crash "got PairedWith, but we were not expecting it now" ( msg, state )
+                Debug.crash ("got PairedWith, but we were not expecting it now:\n" ++ toString ( msg, state ))
                     |> always ( model, Cmd.none )
 
             ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForPaired t0 token ) ->

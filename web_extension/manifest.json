@@ -1,8 +1,14 @@
 {
   "manifest_version": 2,
 
-  "name": "NoPass!",
-  "version": "0.1",
+  "name": "NoKey",
+  "version": "0.1.1",
+
+  "applications": {
+    "gecko": {
+      "id": "nokey@something.nokey.com"
+    }
+  },
 
   "description": "A distributed password manager without a master passwords",
 
@@ -17,7 +23,7 @@
 
   "browser_action": {
     "default_icon": "icons/library.svg",
-    "default_title": "NoPass!",
+    "default_title": "NoKey",
     "default_popup": "dist/main.html"
   },
 

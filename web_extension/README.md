@@ -1,4 +1,4 @@
-# The WebExtension for NoPass
+# The WebExtension for NoKey
 
 ## Develop
 (optional) [web-ext](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Getting_started_with_web-ext):

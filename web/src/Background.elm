@@ -95,6 +95,7 @@ update msg model =
                 |> noCmd
 
         DeletePassword key ->
+            -- TODO: first require confirmation
             { model | syncData = Data.Sync.deletePassword key model.syncData }
                 |> Api.syncToOthers
 
@@ -124,6 +125,7 @@ update msg model =
                 |> withCmds [ withTimestamp DoTokenSubmitted ]
 
         RemoveDevice uuid ->
+            -- TODO: require confirmation
             let
                 ( sync, removeCmd ) =
                     Api.removeDevice uuid model.syncData
@@ -176,8 +178,9 @@ update msg model =
                 |> updateNotifications (Notifications.remove id)
 
         ResetDevice ->
+            -- TODO: require confirmation
             Model.reset model
-                |> withCmds [ Ports.resetStorage () ]
+                |> withCmds [ Ports.resetStorage (), storeState (Model.reset model) ]
 
         SendOutAccountsFor site ->
             { model | currentSite = Just site }
