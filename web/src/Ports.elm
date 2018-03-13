@@ -11,7 +11,9 @@ port setTitle : String -> Cmd msg
 port storeState : Value -> Cmd msg
 
 
-port resetStorage : () -> Cmd msg
+{-| the js side is expected to reset the storage and store the newly provided state instead
+-}
+port resetStorage : Value -> Cmd msg
 
 
 {-| we should call this whenever there is a new state, this is used to inform other views of our state
@@ -35,7 +37,6 @@ port onRequestAccountsForSite : (String -> msg) -> Sub msg
 
 
 {-| This sends out the accounts that we have saved for a site, as an answer to onRequestAccountsForSite
-TODO: change JS caller
 -}
 port accountsForSite : List ( String, GroupId ) -> Cmd msg
 

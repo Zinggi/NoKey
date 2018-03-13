@@ -180,7 +180,7 @@ update msg model =
         ResetDevice ->
             -- TODO: require confirmation
             Model.reset model
-                |> withCmds [ Ports.resetStorage (), storeState (Model.reset model) ]
+                |> withCmds [ resetStorage (Model.reset model) ]
 
         SendOutAccountsFor site ->
             { model | currentSite = Just site }
@@ -224,6 +224,11 @@ updateSeed model =
         | seed = RandomE.step (RandomE.int 1 42) model.seed |> Tuple.second
         , requirementsState = PW.nextPassword model.requirementsState
     }
+
+
+resetStorage : Model -> Cmd Msg
+resetStorage model =
+    Ports.resetStorage (Data.Storage.encode model)
 
 
 storeState : Model -> Cmd Msg

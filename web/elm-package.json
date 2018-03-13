@@ -11,6 +11,7 @@
     "native-modules": true,
     "dependencies": {
         "1602/elm-feather": "2.2.0 <= v < 3.0.0",
+        "Gizra/elm-all-set": "1.0.0 <= v < 2.0.0",
         "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "NoRedInk/elm-simple-fuzzy": "1.0.2 <= v < 2.0.0",
         "Zinggi/elm-hash-icon": "2.0.1 <= v < 3.0.0",

@@ -38,9 +38,9 @@ type alias SyncData =
 
     -- TODO: instead of keeping these two here, create a concept of a todolist.
     -- This can than be used for things like:
-    --      Move Password for AccountId from (local) stash into GroupId
+    --      Move Passwords for AccountId from (local) stash into GroupId
     --          => user needs to unlock GroupId
-    --      Move Password for AccountId from GroupId1 into GroupId2
+    --      Move Passwords for AccountId from GroupId1 into GroupId2
     --          => user needs to unlock both groups 1 and 2
     --      Create shares for Ids for GroupIds
     --          => user needs to unlock GroupIds
@@ -70,7 +70,7 @@ type alias OtherSharedData =
 {-| the data we want to share across all known devices
 -}
 type alias SharedData =
-    { -- TODO: add device type, e.g. android, browser, extension, ...
+    { -- TODO: add device type, e.g. android, browser, extension, ... + public key
       knownIds : ORDict String (SingleVersionRegister String)
 
     -- These shares will be taken out one by one by the device whose id matches the id

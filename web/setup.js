@@ -55,12 +55,13 @@ const getState = (onGot) => {
     }
 };
 
-const resetStorage = () => {
+const resetStorage = (state) => {
     if (runsInsideExtension()) {
         browser.storage.local.clear();
     } else {
         window.localStorage.clear();
     }
+    storedState(state);
 };
 
 

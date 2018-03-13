@@ -11,10 +11,14 @@ import Data exposing (..)
 import Simple.Fuzzy as Fuzzy
 
 
-{- TODO: groups should have names:
-   - when saving a new password, user can choose name.
-   - by default the name is empty
-   - The displayed name is level + name (+ parts of id if necessary)
+{-
+   - TODO: groups should have names:
+       - when saving a new password, user can choose name.
+       - by default the name is empty
+       - The displayed name is level + name (+ parts of id if necessary)
+
+   - TODO: hide stash pw
+   - TODO: collapse entries, e.g. collapsed only show site name, expanded show accounts + pws
 -}
 
 
@@ -72,6 +76,7 @@ tasks stash =
 passwords : Config msg -> String -> SyncData -> Element msg
 passwords config search sync =
     Elements.container <|
+        -- TODO: use mapStash from SyncData
         stash search sync.passwordStash
             :: Data.Sync.mapGroups (viewGroups config search) sync
 
@@ -160,7 +165,10 @@ pwRow config pre (( _, userName ) as accountId) status =
             (row [ spacing (Styles.scaled 1) ]
                 (pre ++ [ Elements.b userName, viewStatus config accountId status ])
             )
-        , el [ alignRight ] (Elements.delete (config.onDeletePassword accountId))
+        , if RequestPassword.isUnlocked status then
+            el [ alignRight ] (Elements.delete (config.onDeletePassword accountId))
+          else
+            empty
         ]
 
 

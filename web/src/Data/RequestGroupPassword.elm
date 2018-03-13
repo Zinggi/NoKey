@@ -6,6 +6,7 @@ module Data.RequestGroupPassword
         , init
         , getStatus
         , getPwStatus
+        , isUnlocked
         , togglePassword
         , addShare
         , waitFor
@@ -139,6 +140,19 @@ type PasswordStatus
     | Locked
     | UnlockedButHidden
     | Unlocked Password
+
+
+isUnlocked : PasswordStatus -> Bool
+isUnlocked status =
+    case status of
+        Unlocked _ ->
+            True
+
+        UnlockedButHidden ->
+            True
+
+        _ ->
+            False
 
 
 getPwStatus : AccountId -> GroupId -> State -> PasswordStatus
