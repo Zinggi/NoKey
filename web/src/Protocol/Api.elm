@@ -32,6 +32,7 @@ import Model exposing (Model, updateNotifications, updateProtocol, protocolMsg)
 import Protocol.Data as Protocol exposing (..)
 import Ports
 import Data.Storage
+import Data exposing (..)
 
 
 {- TODO: do some more exhaustive tests of performance
@@ -278,7 +279,7 @@ update model msg =
                         Just formData ->
                             -- if done and fillForm is set, call port to fill the form
                             newModel
-                                |> withCmds [ Ports.fillForm formData ]
+                                |> withCmds [ Task.perform (\_ -> Model.FillForm formData) (Task.succeed ()) ]
                                 |> andThenUpdate syncToOthers
 
                         Nothing ->
@@ -378,7 +379,7 @@ update model msg =
                             |> noCmd
 
                     ShareRequest nId ->
-                        { model | notifications = Notifications.remove nId model.notifications } |> noCmd
+                        updateNotifications (Notifications.remove nId) model
 
             ( Self NoReply, _ ) ->
                 ( model, Cmd.none )
@@ -506,7 +507,7 @@ requestShare key model =
 
 doRequestShare : GroupId -> SyncData -> Cmd Model.Msg
 doRequestShare key sync =
-    sendMsgToAll sync "RequestShare" [ ( "shareId", Data.Sync.encodeGroupId key ) ]
+    sendMsgToAll sync "RequestShare" [ ( "shareId", encodeGroupId key ) ]
 
 
 grantRequest : { key : GroupId, id : String } -> SyncData -> Cmd Model.Msg
@@ -517,7 +518,7 @@ grantRequest req sync =
                 req.id
                 "GrantedShareRequest"
                 [ ( "share", SecretSharing.encodeShare share )
-                , ( "shareId", Data.Sync.encodeGroupId req.key )
+                , ( "shareId", encodeGroupId req.key )
                 ]
 
         Nothing ->
@@ -561,12 +562,12 @@ serverResponseDecoder time =
                             |> JD.map (Authenticated id time)
 
                     "RequestShare" ->
-                        JD.map RequestShare (JD.field "shareId" Data.Sync.groupIdDecoder)
+                        JD.map RequestShare (JD.field "shareId" groupIdDecoder)
                             |> JD.map (Authenticated id time)
 
                     "GrantedShareRequest" ->
                         JD.map2 GrantedShareRequest
-                            (JD.field "shareId" Data.Sync.groupIdDecoder)
+                            (JD.field "shareId" groupIdDecoder)
                             (JD.field "share" SecretSharing.shareDecoder)
                             |> JD.map (Authenticated id time)
 

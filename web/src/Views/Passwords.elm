@@ -8,6 +8,7 @@ import Icons
 import Data.RequestGroupPassword as RequestPassword exposing (Status(..), PasswordStatus(..))
 import Data.Sync exposing (SyncData)
 import Data exposing (..)
+import Data.TaskList as Tasks exposing (Task(..))
 import Simple.Fuzzy as Fuzzy
 
 
@@ -17,7 +18,6 @@ import Simple.Fuzzy as Fuzzy
        - by default the name is empty
        - The displayed name is level + name (+ parts of id if necessary)
 
-   - TODO: hide stash pw
    - TODO: collapse entries, e.g. collapsed only show site name, expanded show accounts + pws
 -}
 
@@ -54,7 +54,7 @@ init =
 view : Config msg -> State -> SyncData -> Element msg
 view config state sync =
     Elements.miniPage "Passwords"
-        [ tasks sync.passwordStash
+        [ tasks config state.search (Data.Sync.getTasks sync)
         , search config state.search
         , passwords config state.search sync
         ]
@@ -65,56 +65,85 @@ search config searchValue =
     Elements.search (config.toMsg << UpdateSearch) searchValue
 
 
-tasks : a -> Element msg
-tasks stash =
-    Elements.container
-        [ Elements.h3 "Tasks"
-        , toString stash |> Elements.p
-        ]
+tasks : Config msg -> String -> List Task -> Element msg
+tasks config search ts =
+    if List.isEmpty ts then
+        empty
+    else
+        Elements.container
+            [ Elements.h3 "Tasks"
+            , List.map (viewTask config search) ts |> column [ Styles.paddingLeft (Styles.scaled 1), spacing (Styles.paddingScale 0) ]
+            ]
+
+
+viewTask : Config msg -> String -> Task -> Element msg
+viewTask config search task =
+    case task of
+        MoveFromStashToGroup { accounts, group, status } ->
+            Elements.card []
+                [ row [] [ viewGroupStatus config group status, Elements.p "to save" ]
+                , viewSites config search accounts
+                , row [] [ Elements.p "into", viewGroup group status ]
+                ]
+
+        WaitForKeysDistributed { accounts, group, status, progress } ->
+            let
+                ( level, _ ) =
+                    group
+            in
+                Elements.card []
+                    [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString level ++ ") keys are distributed to save")
+                    , viewSites config search accounts
+                    , row [] [ Elements.p "into", viewGroup group status ]
+                    ]
 
 
 passwords : Config msg -> String -> SyncData -> Element msg
 passwords config search sync =
     Elements.container <|
-        -- TODO: use mapStash from SyncData
-        stash search sync.passwordStash
-            :: Data.Sync.mapGroups (viewGroups config search) sync
+        ({- stash config search sync :: -} Data.Sync.mapGroups (viewGroups config search) sync)
 
 
-stash : String -> Dict AccountId ( GroupId, String ) -> Element msg
-stash search pwStash =
-    let
-        filtered =
-            Dict.foldl
-                (\accountId ( groupId, pw ) acc ->
-                    if Fuzzy.match search (toString accountId) then
-                        Elements.text (toString accountId ++ " pw: " ++ pw) :: acc
-                    else
-                        acc
-                )
-                []
-                pwStash
-    in
-        if List.isEmpty filtered then
-            empty
-        else
-            (Elements.h4 "Local stash" :: filtered)
-                |> column []
+
+-- stash : Config msg -> String -> SyncData -> Element msg
+-- stash config search sync =
+--     let
+--         stash =
+--             (Tasks.getStash sync.tasks)
+--     in
+--         if Dict.isEmpty stash then
+--             empty
+--         else
+--             [ Elements.h3 "Local stash"
+--             , (Dict.foldl
+--                 (\siteName userNames acc ->
+--                     viewPw config search siteName userNames :: acc
+--                 )
+--                 []
+--                 stash
+--                 |> column [ Styles.paddingLeft (Styles.scaled 1) ]
+--               )
+--             ]
+--                 |> column []
 
 
 viewGroups : Config msg -> String -> GroupId -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
 viewGroups config search groupId groupStatus accounts =
     [ viewGroupHeader config groupId groupStatus
-    , (Dict.foldl
+    , viewSites config search accounts
+    ]
+        |> column []
+
+
+viewSites : Config msg -> String -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSites config search accounts =
+    Dict.foldl
         (\siteName userNames acc ->
             viewPw config search siteName userNames :: acc
         )
         []
         accounts
         |> column [ Styles.paddingLeft (Styles.scaled 1) ]
-      )
-    ]
-        |> column []
 
 
 viewGroupHeader : Config msg -> GroupId -> Status -> Element msg
@@ -174,6 +203,8 @@ pwRow config pre (( _, userName ) as accountId) status =
 
 viewGroup : GroupId -> Status -> Element msg
 viewGroup ( level, _ ) status =
+    -- TODO: show more info here, e.g. who has a key + if we don't have enough keys to unlock display
+    -- grayed out
     case status of
         Done _ _ ->
             row [] [ Elements.h3 (toString level), Icons.unlocked ]

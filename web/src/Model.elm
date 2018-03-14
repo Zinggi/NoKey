@@ -58,7 +58,7 @@ type Msg
     | UpdatePasswordView Views.Passwords.Msg
     | SaveEntry Notifications.Id String SiteEntry
     | DismissNotification Notifications.Id
-    | FillForm { login : String, site : String, password : String }
+    | FillForm AccountId
     | ProtocolMsg Protocol.Msg
     | OnStateRequest
 
@@ -133,11 +133,10 @@ init { initialSeed, storedState } =
                 makeInit (Just uniqueIdentifyier) (Just syncData)
 
             Err err ->
-                let
-                    _ =
-                        Debug.log "couldn't decode state" err
-                in
-                    makeInit Nothing Nothing
+                -- TODO: if is null, start from 0:
+                --      makeInit Nothing Nothing
+                -- else, handle in UI, e.g. show decode error, and offer state backup
+                Debug.crash ("couldn't decode state" ++ err)
 
 
 reset : Model -> Model

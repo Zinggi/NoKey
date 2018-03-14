@@ -24,6 +24,10 @@ paddingLeft x =
 -- Colors
 
 
+shadowColor =
+    Color.rgba 0 0 0 0.37
+
+
 backgroundColor =
     Color.rgb 255 241 222
 

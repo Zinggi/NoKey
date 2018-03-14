@@ -306,6 +306,16 @@ decodeTuple2 valueDecoderA valueDecoderB =
     JD.map2 (,) (JD.index 0 valueDecoderA) (JD.index 1 valueDecoderB)
 
 
+decodeTuple3 : Decoder a -> Decoder b -> Decoder c -> Decoder ( a, b, c )
+decodeTuple3 dA dB dC =
+    JD.map3 (,,) (JD.index 0 dA) (JD.index 1 dB) (JD.index 2 dC)
+
+
+decodeTuple4 : Decoder a -> Decoder b -> Decoder c -> Decoder d -> Decoder ( a, b, c, d )
+decodeTuple4 dA dB dC dD =
+    JD.map4 (,,,) (JD.index 0 dA) (JD.index 1 dB) (JD.index 2 dC) (JD.index 3 dD)
+
+
 decodeSet : Decoder comparable -> Decoder (Set comparable)
 decodeSet valueDecoder =
     JD.map Set.fromList (JD.list valueDecoder)
@@ -323,6 +333,16 @@ encodeTuple valueEncoder ( a, b ) =
 encodeTuple2 : (a -> Value) -> (b -> Value) -> ( a, b ) -> Value
 encodeTuple2 valueEncoderA valueEncoderB ( a, b ) =
     JE.list [ valueEncoderA a, valueEncoderB b ]
+
+
+encodeTuple3 : (a -> Value) -> (b -> Value) -> (c -> Value) -> ( a, b, c ) -> Value
+encodeTuple3 fA fB fC ( a, b, c ) =
+    JE.list [ fA a, fB b, fC c ]
+
+
+encodeTuple4 : (a -> Value) -> (b -> Value) -> (c -> Value) -> (d -> Value) -> ( a, b, c, d ) -> Value
+encodeTuple4 fA fB fC fD ( a, b, c, d ) =
+    JE.list [ fA a, fB b, fC c, fD d ]
 
 
 encodeSet : (comparable -> Value) -> Set comparable -> Value

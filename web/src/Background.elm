@@ -170,12 +170,14 @@ update msg model =
         GrantShareRequest id req ->
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Api.grantRequest req model.syncData ]
+                |> addCmds [ Api.grantRequest req model.syncData, Ports.closePopup () ]
 
         RejectShareRequest id ->
             -- TODO: inform other of reject?
+            --      -> Yes, so that they stop asking
             model
                 |> updateNotifications (Notifications.remove id)
+                |> addCmds [ Ports.closePopup () ]
 
         ResetDevice ->
             -- TODO: require confirmation
@@ -201,8 +203,13 @@ update msg model =
         UpdatePasswordView m ->
             { model | passwordsView = Views.Passwords.update m model.passwordsView } |> noCmd
 
-        FillForm config ->
-            model |> withCmds [ Ports.fillForm config ]
+        FillForm (( siteName, userName ) as accountId) ->
+            case Data.Sync.getPassword accountId model.syncData of
+                Just pw ->
+                    model |> withCmds [ Ports.fillForm { site = siteName, login = userName, password = pw } ]
+
+                Nothing ->
+                    model |> noCmd
     )
         |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ] ))
 

@@ -8,6 +8,7 @@ module Data.RequestGroupPassword
         , getPwStatus
         , isUnlocked
         , togglePassword
+        , getPassword
         , addShare
         , waitFor
         , getWaiting
@@ -117,7 +118,7 @@ updatePws fn (State ({ pws } as state)) =
     State { state | pws = fn pws }
 
 
-addShare : GroupId -> Share -> State -> ( State, Maybe FillFormData )
+addShare : GroupId -> Share -> State -> ( State, Maybe AccountId )
 addShare key share state =
     let
         newState =
@@ -128,8 +129,8 @@ addShare key share state =
                 state
     in
         case getStatus key newState of
-            Done (Just ( site, login )) pw ->
-                ( newState, Just { login = login, site = site, password = pw } )
+            Done (Just accountId) groupPw ->
+                ( newState, Just accountId )
 
             _ ->
                 ( newState, Nothing )
@@ -153,6 +154,13 @@ isUnlocked status =
 
         _ ->
             False
+
+
+getPassword : AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> State -> Maybe Password
+getPassword accountId mayEncPw mayPw state =
+    tryGetAccountPassword accountId mayEncPw mayPw False state
+        |> (\(State s) -> Dict.get accountId s.pws)
+        |> Maybe.map Tuple.first
 
 
 getPwStatus : AccountId -> GroupId -> State -> PasswordStatus

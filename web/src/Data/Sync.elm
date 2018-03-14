@@ -23,6 +23,7 @@ import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersi
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.VClock as VClock exposing (VClock)
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
+import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
 
 
@@ -35,17 +36,7 @@ type alias SyncData =
     , id : String
     , synchedWith : Dict String VClock
     , myShares : Dict GroupId SecretSharing.Share
-
-    -- TODO: instead of keeping these two here, create a concept of a todolist.
-    -- This can than be used for things like:
-    --      Move Passwords for AccountId from (local) stash into GroupId
-    --          => user needs to unlock GroupId
-    --      Move Passwords for AccountId from GroupId1 into GroupId2
-    --          => user needs to unlock both groups 1 and 2
-    --      Create shares for Ids for GroupIds
-    --          => user needs to unlock GroupIds
-    , passwordStash : Dict AccountId ( GroupId, Password )
-    , groupPasswordStash : Dict GroupId GroupPassword
+    , tasks : TaskList
     , seed : Seed
 
     -- ephemeral
@@ -55,10 +46,7 @@ type alias SyncData =
 
 clearStashes : GroupId -> SyncData -> SyncData
 clearStashes groupId sync =
-    { sync
-        | groupPasswordStash = Dict.remove groupId sync.groupPasswordStash
-        , passwordStash = Dict.filter (\accountId ( grId, _ ) -> grId /= groupId) sync.passwordStash
-    }
+    { sync | tasks = Tasks.clearStash groupId sync.tasks }
 
 
 {-| the data we receive on a sync update
@@ -121,8 +109,7 @@ init seed uuid =
     , id = uuid
     , seed = seed
     , myShares = Dict.empty
-    , passwordStash = Dict.empty
-    , groupPasswordStash = Dict.empty
+    , tasks = Tasks.init
     , groupPasswordRequestsState = Request.init
     }
 
@@ -142,8 +129,9 @@ togglePassword accountId sync =
         | groupPasswordRequestsState =
             Request.togglePassword accountId
                 (Dict.get accountId (encryptedPasswords sync))
-                (Dict.get accountId sync.passwordStash |> Maybe.map Tuple.second)
+                (Tasks.getStashPw accountId sync.tasks)
                 sync.groupPasswordRequestsState
+        , tasks = Tasks.togglePassword accountId sync.tasks
     }
 
 
@@ -241,6 +229,14 @@ renameDevice newName sync =
     updateShared (\s -> { s | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) s.knownIds }) sync
 
 
+getPassword : AccountId -> SyncData -> Maybe Password
+getPassword accountId sync =
+    Request.getPassword accountId
+        (Dict.get accountId (encryptedPasswords sync))
+        (Tasks.getStashPw accountId sync.tasks)
+        sync.groupPasswordRequestsState
+
+
 {-| The caller is expected to call Api.requestShare if the last part of the tuple is True.
 -}
 insertSite : Time -> RandomE.Seed -> AccountId -> GroupId -> Password -> SyncData -> ( SyncData, RandomE.Seed, Bool )
@@ -253,16 +249,18 @@ insertSite time seed accountId groupId pw sync =
 
         Nothing ->
             let
-                -- add password to stash
-                newSync =
-                    insertToStash accountId groupId pw sync
+                addToStash reason =
+                    { sync | tasks = Tasks.insertPwToStash reason groupId accountId pw sync.tasks }
 
                 ( level, _ ) =
                     groupId
             in
-                -- if groupId exists then
+                -- if groupId already exists then
                 if List.member groupId (groups sync) then
-                    ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId sync)) newSync
+                    -- ask others for their shares/keys
+                    ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId sync))
+                        -- add password to stash (since the group is locked)
+                        (addToStash Tasks.GroupLocked)
                     , seed
                     , True
                     )
@@ -272,7 +270,7 @@ insertSite time seed accountId groupId pw sync =
                         ( groupPw, seed2 ) =
                             RandomE.step Helper.groupPwGenerator seed
 
-                        -- generate shares
+                        -- generate shares/keys
                         ( genShares, seed3 ) =
                             SecretSharing.splitString
                                 ( level
@@ -292,13 +290,15 @@ insertSite time seed accountId groupId pw sync =
                                     ( Dict.insert groupId share sync.myShares, Dict.remove sync.id shares )
 
                                 Nothing ->
-                                    Debug.log "This should never happen, but there is a save default, so we don't crash" <|
+                                    Debug.log "This should never happen, but there is a save default, so we don't crash"
                                         ( sync.myShares, shares )
 
-                        newSync2 =
-                            -- TODO: here we should encrypt the shares for the others
-                            -- share with others
-                            { newSync | myShares = myShares }
+                        newSync =
+                            -- add password to stash (since keys aren't distributed yet)
+                            addToStash Tasks.KeysNotYetDistributed
+                                |> (\s -> { s | myShares = myShares })
+                                -- TODO: here we should encrypt the shares for the others
+                                -- share with others
                                 |> updateShared
                                     (\s ->
                                         { s
@@ -309,14 +309,15 @@ insertSite time seed accountId groupId pw sync =
                                                     s.sharesToDistribute
                                         }
                                     )
-                                -- add groupPw to stash
-                                |> (\s -> { s | groupPasswordStash = Dict.insert groupId groupPw s.groupPasswordStash })
+                                -- insert groupPw to stash (since the keys are not yet distributed)
+                                |> (\s -> { s | tasks = Tasks.insertGroupPw groupId groupPw s.tasks })
                                 -- store pw in passwords
                                 |> insertToStorage time groupPw accountId groupId pw
-                                -- add both groupPw and pw to cache
+                                -- add both groupPw and pw to cache (TODO: should I really do this?
+                                --   might be easier to just pass the stash along when needed by Request. module)
                                 |> updateGroupPasswordRequest (Request.cacheAccountPw accountId pw False >> Request.cacheGroupPw groupId groupPw)
                     in
-                        ( newSync2, seed3, False )
+                        ( newSync, seed3, False )
 
 
 insertToStorage : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
@@ -347,15 +348,8 @@ insertToStorage timestamp groupPw accountId groupId pw sync =
                     )
 
 
-insertToStash : AccountId -> GroupId -> Password -> SyncData -> SyncData
-insertToStash accountId groupId pw sync =
-    { sync | passwordStash = Dict.insert accountId ( groupId, pw ) sync.passwordStash }
-
-
 deletePassword : AccountId -> SyncData -> SyncData
 deletePassword key sync =
-    -- TODO: also remove my shares + tell others to delete theirs?
-    -- Or better, link the datastructures to automatically remove them
     -- TODO: should this even be allowed without unlocking the group??
     -- delete should only be possible by solving a challenge, proving you know the password.
     -- e.g. store hash(hash(pw||rand)) = challenge, rand
@@ -364,8 +358,9 @@ deletePassword key sync =
     -- Also, we probably never really want to delete stuff, so it should go into a bin first.
     -- Then a user can empty a bin, but this will only empty the local bin, not all bins.
     --
-    -- Also clear cache in the groupPasswordRequestsState and stash here
+    -- Also clear cache in the groupPasswordRequestsState
     updateShared (\s -> { s | passwords = ORDict.remove key s.passwords }) sync
+        |> (\s -> { s | tasks = Tasks.deletePwFromStash key sync.tasks })
 
 
 mapAccountsForSite : String -> (GroupId -> AccountId -> Status -> a) -> SyncData -> List a
@@ -402,12 +397,10 @@ mapGroups f sync =
             []
 
 
-addShare : Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe FillFormData )
+addShare : Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe AccountId )
 addShare time groupId share sync =
     -- TODO: anything else to do here?
     -- Yes: check if some of the tasks inside the stash can be completed
-    -- If so, don't forget to insert in storage => Doesn't work yet => INVESTIGATE
-    -- TODO: test if this works
     let
         ( newReqState, mayForm ) =
             Request.addShare groupId share sync.groupPasswordRequestsState
@@ -419,11 +412,11 @@ addShare time groupId share sync =
             Just groupPw ->
                 -- insert password from stash into storage
                 ( (Dict.foldl
-                    (\accountId ( groupId, pw ) accSync ->
+                    (\accountId pw accSync ->
                         insertToStorage time groupPw accountId groupId pw accSync
                     )
                     newSync
-                    newSync.passwordStash
+                    (Tasks.getStashFor groupId newSync.tasks)
                   )
                     -- remove pw from stash(es)
                     |> clearStashes groupId
@@ -451,6 +444,11 @@ requestPasswordPressed groupId mayAccount sync =
                 ( newSync, Nothing )
 
 
+getTasks : SyncData -> List Task
+getTasks sync =
+    Tasks.getTasks sync.groupPasswordRequestsState sync.tasks
+
+
 updateGroupPasswordRequest : (Request.State -> Request.State) -> SyncData -> SyncData
 updateGroupPasswordRequest f sync =
     { sync | groupPasswordRequestsState = f sync.groupPasswordRequestsState }
@@ -474,6 +472,7 @@ hasPasswordFor key sync =
 
 merge : Time -> OtherSharedData -> SyncData -> SyncData
 merge timestamp other my =
+    -- TODO: if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash (as they are already stored)).
     let
         newSharesToDistribute =
             ORDict.merge TimestampedVersionRegister.merge
@@ -602,21 +601,6 @@ sharedDecoderV1 =
         (JD.field "version" VClock.decoder)
 
 
-encryptedPasswordDecoder : Decoder EncryptedPassword
-encryptedPasswordDecoder =
-    JD.map EncryptedPassword JD.string
-
-
-groupIdDecoder : Decoder GroupId
-groupIdDecoder =
-    decodeTuple2 JD.int JD.string
-
-
-accountIdDecoder : Decoder AccountId
-accountIdDecoder =
-    decodeTuple JD.string
-
-
 completeDecoder : Decoder SyncData
 completeDecoder =
     JD.field "dataVersion" JD.int
@@ -626,9 +610,33 @@ completeDecoder =
                     1 ->
                         completeDecoderV1
 
+                    2 ->
+                        JD.field "data" completeDecoderV2
+
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
             )
+
+
+completeDecoderV2 : Decoder SyncData
+completeDecoderV2 =
+    JD.map6
+        (\id shared myShares synchedWith tasks seed ->
+            { id = id
+            , shared = shared
+            , myShares = myShares
+            , synchedWith = synchedWith
+            , tasks = tasks
+            , groupPasswordRequestsState = Request.init
+            , seed = seed
+            }
+        )
+        (JD.field "id" JD.string)
+        (JD.field "shared" sharedDecoder)
+        (JD.field "myShares" <| JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
+        (JD.field "synchedWith" <| JD.dict VClock.decoder)
+        (JD.field "tasks" Tasks.decoder)
+        (JD.field "seed" Random.fromJson)
 
 
 completeDecoderV1 : Decoder SyncData
@@ -639,8 +647,10 @@ completeDecoderV1 =
             , shared = shared
             , myShares = myShares
             , synchedWith = synchedWith
-            , passwordStash = passwordStash
-            , groupPasswordStash = groupPasswordStash
+
+            -- We should actually read passwordStash and groupPasswordStash and convert it to Tasks, but
+            -- Since I was the only user at the time of v1, I didn't bother. (My stash was empty anyway)
+            , tasks = Tasks.init
             , groupPasswordRequestsState = Request.init
             , seed = seed
             }
@@ -679,34 +689,22 @@ encodeShared shared =
         ]
 
 
-encodeEncryptedPassword : EncryptedPassword -> Value
-encodeEncryptedPassword (EncryptedPassword pw) =
-    JE.string pw
-
-
-encodeAccountId : AccountId -> Value
-encodeAccountId id =
-    encodeTuple JE.string id
-
-
-encodeGroupId : GroupId -> Value
-encodeGroupId id =
-    encodeTuple2 JE.int JE.string id
-
-
 encodeComplete : SyncData -> Value
 encodeComplete s =
     JE.object
-        [ ( "id", JE.string s.id )
-        , ( "shared", encodeShared s.shared )
-        , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
-        , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
-        , ( "passwordStash", JE.dict (encodeAccountId >> JE.encode 0) (encodeTuple2 encodeGroupId JE.string) s.passwordStash )
-        , ( "groupPasswordStash", JE.dict (encodeGroupId >> JE.encode 0) JE.string s.groupPasswordStash )
-        , ( "seed", Random.toJson s.seed )
+        [ ( "data"
+          , JE.object
+                [ ( "id", JE.string s.id )
+                , ( "shared", encodeShared s.shared )
+                , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
+                , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
+                , ( "tasks", Tasks.encode s.tasks )
+                , ( "seed", Random.toJson s.seed )
+                ]
+          )
 
         -- TODO: change if data format changes
-        , ( "dataVersion", JE.int 1 )
+        , ( "dataVersion", JE.int 2 )
         ]
 
 

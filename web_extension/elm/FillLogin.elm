@@ -31,7 +31,7 @@ viewStatus groupId (( siteName, userName ) as accountId) status =
     case status of
         Done fill pw ->
             labled userName
-                [ Elements.button (Just (FillForm { login = userName, site = siteName, password = pw })) "Fill"
+                [ Elements.button (Just (FillForm accountId)) "Fill"
                 ]
 
         Waiting n m ->

@@ -1,5 +1,6 @@
 module Elements exposing (..)
 
+import Color
 import Html.Attributes as Attr
 import Html.Events
 import Json.Decode as JD
@@ -65,6 +66,20 @@ miniPage title children =
 buttonRow : List (Attribute msg) -> List (Element msg) -> Element msg
 buttonRow attrs btns =
     row ([ padding (Styles.paddingScale 3) ] ++ attrs) (List.intersperse spacer btns)
+
+
+card : List (Attribute msg) -> List (Element msg) -> Element msg
+card attr children =
+    column
+        ([ Background.color Styles.white
+         , padding (Styles.scaled 1)
+         , Border.shadow { offset = ( 1, 1 ), blur = 3, size = 0, color = Styles.shadowColor }
+
+         -- 1px 1px 3px 0px ;
+         ]
+            ++ attr
+        )
+        children
 
 
 
