@@ -132,10 +132,12 @@ init { initialSeed, storedState } =
             Ok { syncData, uniqueIdentifyier } ->
                 makeInit (Just uniqueIdentifyier) (Just syncData)
 
+            Err "Expecting an object with a field named `syncData` but instead got: null" ->
+                -- This happens when we reset or when used the first time. It's ok.
+                makeInit Nothing Nothing
+
             Err err ->
-                -- TODO: if is null, start from 0:
-                --      makeInit Nothing Nothing
-                -- else, handle in UI, e.g. show decode error, and offer state backup
+                -- TODO: handle in UI, e.g. show decode error, and offer state backup
                 Debug.crash ("couldn't decode state" ++ err)
 
 

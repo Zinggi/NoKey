@@ -16,6 +16,10 @@ type alias FillFormData =
 -- Common Data
 
 
+type alias DeviceId =
+    String
+
+
 type alias Password =
     String
 

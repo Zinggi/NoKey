@@ -61,7 +61,7 @@ const resetStorage = (state) => {
     } else {
         window.localStorage.clear();
     }
-    storedState(state);
+    storeState(state);
 };
 
 

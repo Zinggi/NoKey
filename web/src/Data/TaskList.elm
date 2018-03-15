@@ -4,6 +4,7 @@ module Data.TaskList
         , Task(..)
           -- , getStash
         , getTasks
+        , resolveWaitingTasks
         , getStashFor
         , clearStash
         , init
@@ -78,8 +79,34 @@ type
     | WaitForKeysDistributed { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status, progress : Int }
 
 
-getTasks : Request.State -> TaskList -> List Task
-getTasks request tasks =
+resolveWaitingTasks : Dict GroupId (Set String) -> TaskList -> TaskList
+resolveWaitingTasks dict tasks =
+    Dict.foldl
+        (\(( level, _ ) as groupId) set acc ->
+            if Set.size set >= level then
+                { acc
+                    | groupPws = Dict.remove groupId acc.groupPws
+                    , stash =
+                        Dict.filter
+                            (\accountId ( gId, reason, pw ) ->
+                                not (gId == groupId && reason == KeysNotYetDistributed)
+                            )
+                            acc.stash
+                }
+            else
+                acc
+        )
+        tasks
+        dict
+
+
+getProgress : GroupId -> Dict GroupId (Set String) -> Int
+getProgress groupId dict =
+    Dict.get groupId dict |> Maybe.map Set.size |> Maybe.withDefault 0
+
+
+getTasks : Request.State -> Dict GroupId (Set String) -> TaskList -> List Task
+getTasks request progress tasks =
     -- Collect all same groups into a single task
     Dict.foldl
         (\(( siteName, userName ) as accountId) ( groupId, reason, pw ) acc ->
@@ -121,7 +148,13 @@ getTasks request tasks =
                     ++ (if Dict.isEmpty waitForKeysDistributed then
                             []
                         else
-                            [ WaitForKeysDistributed { accounts = waitForKeysDistributed, group = groupId, progress = 0, status = Request.getStatus groupId request } ]
+                            [ WaitForKeysDistributed
+                                { accounts = waitForKeysDistributed
+                                , group = groupId
+                                , progress = getProgress groupId progress
+                                , status = Request.getStatus groupId request
+                                }
+                            ]
                        )
                     ++ acc
             )

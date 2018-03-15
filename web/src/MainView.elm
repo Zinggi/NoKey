@@ -36,6 +36,7 @@ view model =
             [ alignTop ]
             -- TODO: use width (fillBetween { min = Just 150, max = Just 800 })
             -- once https://github.com/mdgriffith/stylish-elephants/issues/54 is resolved
+            -- TODO: display notification on top of other as popup, (card with high elevation)
             [ column [ centerX, htmlAttribute (Attr.style [ ( "maxWidth", "800px" ) ]) ]
                 (if Notifications.count model.notifications > 0 then
                     [ Views.Notifications.view notificationsConfig model.syncData model.notifications numberOfKnownDevices model.notificationsView ]
