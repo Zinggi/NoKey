@@ -68,7 +68,7 @@ type alias SharedData =
 
     -- Store who has a share for which group
     --      This way we can:
-    --          + TODO: remove a pw from the stash, once enough devices took their share
+    --          + remove a pw from the stash, once enough devices took their share
     --          + give the user a better understanding of how it works:
     --              - E.g. if the user clicks on a group in the passwords view, show which devices have a share
     --          + TODO: automatically calculate new shares on unlock group for devices
@@ -380,7 +380,7 @@ mapAccountsForSite site f sync =
         (getAccountsForSite site sync)
 
 
-mapGroups : (GroupId -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
+mapGroups : (GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
 mapGroups f sync =
     (encryptedPasswords sync)
         |> Dict.foldl
@@ -400,7 +400,11 @@ mapGroups f sync =
             Dict.empty
         |> Dict.foldl
             (\groupId dict acc ->
-                f groupId (Request.getStatus groupId sync.groupPasswordRequestsState) dict :: acc
+                f groupId
+                    (Tasks.getProgress groupId (distributedShares sync))
+                    (Request.getStatus groupId sync.groupPasswordRequestsState)
+                    dict
+                    :: acc
             )
             []
 
@@ -456,7 +460,12 @@ requestPasswordPressed groupId mayAccount sync =
 
 getTasks : SyncData -> List Task
 getTasks sync =
-    Tasks.getTasks sync.groupPasswordRequestsState (ORDict.getWith GSet.get sync.shared.distributedShares) sync.tasks
+    Tasks.getTasks sync.groupPasswordRequestsState (distributedShares sync) sync.tasks
+
+
+distributedShares : SyncData -> Dict GroupId (Set DeviceId)
+distributedShares sync =
+    ORDict.getWith GSet.get sync.shared.distributedShares
 
 
 updateGroupPasswordRequest : (Request.State -> Request.State) -> SyncData -> SyncData
@@ -482,7 +491,6 @@ hasPasswordFor key sync =
 
 merge : Time -> OtherSharedData -> SyncData -> SyncData
 merge timestamp other my =
-    -- TODO: if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash (as they are already stored)).
     let
         newSharesToDistribute =
             ORDict.merge TimestampedVersionRegister.merge
@@ -520,6 +528,7 @@ merge timestamp other my =
             , myShares = myShares
         }
             |> receiveVersion other.id other.shared.version
+            -- if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash).
             |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (ORDict.getWith GSet.get newDistributedShares) s.tasks })
             |> incrementIf (not (Set.isEmpty sharesITook))
 

@@ -4,6 +4,7 @@ module Data.TaskList
         , Task(..)
           -- , getStash
         , getTasks
+        , getProgress
         , resolveWaitingTasks
         , getStashFor
         , clearStash
@@ -75,6 +76,7 @@ type
     Task
     -- TODO: add more cases, e.g:
     --      MoveFromGroupToGroup { pws: List AccountId, from: GroupId, to: GroupId }
+    --      CreateMoreShares { for: List DeviceId, group: GroupIds }
     = MoveFromStashToGroup { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status }
     | WaitForKeysDistributed { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status, progress : Int }
 

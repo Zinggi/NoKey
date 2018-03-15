@@ -189,8 +189,8 @@ b txt =
     el [ Font.bold ] (text txt)
 
 
-button : Maybe msg -> String -> Element msg
-button onPress txt =
+primaryButton : Maybe msg -> String -> Element msg
+primaryButton onPress txt =
     Input.button []
         { label =
             (el
@@ -204,6 +204,26 @@ button onPress txt =
                                     Styles.accentColor
                        )
                     :: Styles.borderStyle
+                )
+                (text txt)
+            )
+        , onPress = onPress
+        }
+
+
+button : Maybe msg -> String -> Element msg
+button onPress txt =
+    Input.button []
+        { label =
+            (el
+                (padding (Styles.paddingScale 1)
+                    :: (case onPress of
+                            Nothing ->
+                                Styles.disabledBorder
+
+                            Just _ ->
+                                Styles.borderStyle
+                       )
                 )
                 (text txt)
             )
@@ -227,15 +247,13 @@ customButton onPress inner =
         { label =
             (el
                 (padding (Styles.paddingScale 1)
-                    :: (Background.color <|
-                            case onPress of
-                                Nothing ->
-                                    Styles.disabledColor
+                    :: (case onPress of
+                            Nothing ->
+                                Styles.disabledBorder
 
-                                Just _ ->
-                                    Styles.accentColor
+                            Just _ ->
+                                Styles.borderStyle
                        )
-                    :: Styles.borderStyle
                 )
                 inner
             )

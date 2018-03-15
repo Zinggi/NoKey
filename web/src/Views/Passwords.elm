@@ -1,6 +1,7 @@
 module Views.Passwords exposing (..)
 
 import Dict exposing (Dict)
+import Set exposing (Set)
 import Element exposing (..)
 import Elements
 import Styles
@@ -81,8 +82,8 @@ viewTask config search task =
     case task of
         MoveFromStashToGroup { accounts, group, status } ->
             Elements.card []
-                [ row [] [ viewGroupStatus config group status, Elements.p "to save" ]
-                , viewSites config search accounts
+                [ row [] [ viewGroupStatus config group False status, Elements.p "to save" ]
+                , viewSitesList config search accounts
                 , row [] [ Elements.p "into", viewGroup group status ]
                 ]
 
@@ -93,18 +94,20 @@ viewTask config search task =
             in
                 Elements.card []
                     [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString level ++ ") keys are distributed to save")
-                    , viewSites config search accounts
+                    , viewSitesList config search accounts
                     , row [] [ Elements.p "into", viewGroup group status ]
                     ]
 
 
 passwords : Config msg -> String -> SyncData -> Element msg
 passwords config search sync =
-    Elements.container <|
-        ({- stash config search sync :: -} Data.Sync.mapGroups (viewGroups config search) sync)
+    Elements.container (Data.Sync.mapGroups (viewSites config search) sync)
 
 
 
+-- {- I decided the tasks are enough to see what's in the stash.
+--  - There is no need to show the stash seperately
+--  -}
 -- stash : Config msg -> String -> SyncData -> Element msg
 -- stash config search sync =
 --     let
@@ -127,16 +130,16 @@ passwords config search sync =
 --                 |> column []
 
 
-viewGroups : Config msg -> String -> GroupId -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
-viewGroups config search groupId groupStatus accounts =
-    [ viewGroupHeader config groupId groupStatus
-    , viewSites config search accounts
+viewSites : Config msg -> String -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSites config search groupId shares groupStatus accounts =
+    [ viewGroupHeader config groupId (shares < Tuple.first groupId) groupStatus
+    , viewSitesList config search accounts
     ]
-        |> column []
+        |> column (Styles.grayedOutIf (shares < Tuple.first groupId))
 
 
-viewSites : Config msg -> String -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSites config search accounts =
+viewSitesList : Config msg -> String -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSitesList config search accounts =
     Dict.foldl
         (\siteName userNames acc ->
             viewPw config search siteName userNames :: acc
@@ -146,11 +149,11 @@ viewSites config search accounts =
         |> column [ Styles.paddingLeft (Styles.scaled 1) ]
 
 
-viewGroupHeader : Config msg -> GroupId -> Status -> Element msg
-viewGroupHeader config groupId groupStatus =
+viewGroupHeader : Config msg -> GroupId -> Bool -> Status -> Element msg
+viewGroupHeader config groupId disabled groupStatus =
     row []
         [ el [ alignLeft ] (viewGroup groupId groupStatus)
-        , el [ alignRight ] (viewGroupStatus config groupId groupStatus)
+        , el [ alignRight ] (viewGroupStatus config groupId disabled groupStatus)
         ]
 
 
@@ -203,18 +206,17 @@ pwRow config pre (( _, userName ) as accountId) status =
 
 viewGroup : GroupId -> Status -> Element msg
 viewGroup ( level, _ ) status =
-    -- TODO: show more info here, e.g. who has a key + if we don't have enough keys to unlock display
-    -- grayed out
+    -- TODO: maybe show more info here, e.g. who has a key
     case status of
         Done _ _ ->
-            row [] [ Elements.h3 (toString level), Icons.unlocked ]
+            row [ width shrink ] [ Elements.h3 (toString level), Icons.unlocked ]
 
         _ ->
-            row [] [ Elements.h3 (toString level), Icons.locked ]
+            row [ width shrink ] [ Elements.h3 (toString level), Icons.locked ]
 
 
-viewGroupStatus : Config msg -> GroupId -> Status -> Element msg
-viewGroupStatus config groupId status =
+viewGroupStatus : Config msg -> GroupId -> Bool -> Status -> Element msg
+viewGroupStatus config groupId disabled status =
     case status of
         Waiting n m ->
             row [ spacing (Styles.paddingScale 0) ]
@@ -224,8 +226,11 @@ viewGroupStatus config groupId status =
                 ]
 
         NotRequested ->
-            Elements.customButton (Just (config.onRequestPasswordPressed groupId Nothing))
-                (row [ spacing (Styles.paddingScale 0) ] [ Elements.text "Unlock", viewGroup groupId status ])
+            if disabled then
+                empty
+            else
+                Elements.customButton (Just (config.onRequestPasswordPressed groupId Nothing))
+                    (row [ spacing (Styles.paddingScale 0) ] [ Elements.text "Unlock", viewGroup groupId status ])
 
         Done _ _ ->
             empty

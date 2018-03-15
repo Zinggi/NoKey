@@ -68,6 +68,7 @@ import Data exposing (..)
 
 endPointUrl : String -> String -> String
 endPointUrl pre path =
+    -- TODO: make this configurable in a Settings UI
     -- TODO: change
     -- "localhost"
     {- etz upper -}

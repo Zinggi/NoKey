@@ -43,7 +43,9 @@ view model =
                  else
                     [ Views.Devices.view model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
                     , Elements.line
-                    , Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
+                    , -- TODO: consider if we should just automatically request a pairing code
+                      -- upon navigating to this view. This way a user doesn't have to decide what to press
+                      Views.Pairing.view pairingConfig model.showPairingDialogue model.pairingDialogue
                     , Elements.line
                     , if numberOfKnownDevices >= 2 then
                         newSiteForm model.requirementsState

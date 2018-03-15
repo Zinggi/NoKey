@@ -72,12 +72,26 @@ borderStyle =
     ]
 
 
+disabledBorder =
+    [ Border.width 1
+    , Border.color disabledColor
+    , Border.rounded 4
+    ]
+
+
 background =
     [ Background.color backgroundColor
     , Font.color textColor
     , normalFont
     , padding (paddingScale 3)
     ]
+
+
+grayedOutIf b =
+    if b then
+        [ Font.color disabledColor ]
+    else
+        []
 
 
 groupHeading =
