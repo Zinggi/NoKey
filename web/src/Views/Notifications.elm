@@ -42,15 +42,14 @@ viewEntry config sync maxSecurityLevel n state =
     case n.data of
         ShareRequestT req ->
             column []
-                [ column [] [ Elements.h4 req.id ]
-                , -- TODO: use Elements.avatar
-                  row []
-                    [ Elements.hashIcon req.id
-                    , Elements.text (" wants to view password for: " ++ toString req.key)
+                [ column []
+                    [ Elements.avatar [] (Data.Sync.getDevice req.id sync)
+                    , Elements.p "wants to view password for"
+                    , Elements.groupIcon True req.key
                     ]
-                , column []
+                , row []
                     [ Elements.button (Just (config.onRejectRequest n.id)) "Reject"
-                    , Elements.button (Just (config.onGrantRequest n.id req)) "Grant"
+                    , Elements.primaryButton (Just (config.onGrantRequest n.id req)) "Grant"
                     ]
                 ]
 

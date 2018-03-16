@@ -12,6 +12,7 @@ import Element.Font as Font
 import Styles
 import HashIcon
 import Icons
+import Data exposing (..)
 
 
 -- attributes
@@ -286,12 +287,24 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
         }
 
 
-avatar : String -> ( String, String ) -> List (Attribute msg) -> Element msg
-avatar id ( name, idPart ) attrs =
+groupIcon : Bool -> GroupId -> Element msg
+groupIcon isLocked ( level, _ ) =
+    row [ width shrink ]
+        [ h3 (toString level)
+        , (if isLocked then
+            Icons.locked
+           else
+            Icons.unlocked
+          )
+        ]
+
+
+avatar : List (Attribute msg) -> Data.Device -> Element msg
+avatar attrs { id, name, postFix } =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
         , paragraph [ alignLeft, width fill, spacing (Styles.scaled -2) ]
-            (helperMayName name :: helperMayIdPart idPart :: [])
+            (helperMayName name :: helperMayIdPart postFix :: [])
         ]
 
 

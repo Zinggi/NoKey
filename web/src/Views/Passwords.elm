@@ -82,7 +82,8 @@ viewTask config search task =
     case task of
         MoveFromStashToGroup { accounts, group, status } ->
             Elements.card []
-                [ row [] [ viewGroupStatus config group False status, Elements.p "to save" ]
+                [ row [ spacing (Styles.paddingScale 1) ]
+                    [ viewGroupStatus config group False status, Elements.text "to save" ]
                 , viewSitesList config search accounts
                 , row [] [ Elements.p "into", viewGroup group status ]
                 ]
@@ -97,6 +98,15 @@ viewTask config search task =
                     , viewSitesList config search accounts
                     , row [] [ Elements.p "into", viewGroup group status ]
                     ]
+
+        CreateMoreShares { for, group, status } ->
+            Elements.card []
+                [ row [ spacing (Styles.paddingScale 1) ]
+                    [ viewGroupStatus config group False status
+                    , Elements.text "to create keys for:"
+                    ]
+                , column [ Styles.paddingLeft (Styles.scaled 1) ] (List.map (Elements.avatar []) for)
+                ]
 
 
 passwords : Config msg -> String -> SyncData -> Element msg
@@ -205,14 +215,14 @@ pwRow config pre (( _, userName ) as accountId) status =
 
 
 viewGroup : GroupId -> Status -> Element msg
-viewGroup ( level, _ ) status =
+viewGroup groupId status =
     -- TODO: maybe show more info here, e.g. who has a key
     case status of
         Done _ _ ->
-            row [ width shrink ] [ Elements.h3 (toString level), Icons.unlocked ]
+            Elements.groupIcon False groupId
 
         _ ->
-            row [ width shrink ] [ Elements.h3 (toString level), Icons.locked ]
+            Elements.groupIcon True groupId
 
 
 viewGroupStatus : Config msg -> GroupId -> Bool -> Status -> Element msg

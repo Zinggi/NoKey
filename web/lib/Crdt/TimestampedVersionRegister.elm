@@ -1,4 +1,14 @@
-module Crdt.TimestampedVersionRegister exposing (TimestampedVersionRegister, init, set, merge, get, encode, decoder)
+module Crdt.TimestampedVersionRegister
+    exposing
+        ( TimestampedVersionRegister
+        , init
+        , set
+        , merge
+        , get
+        , encode
+        , update
+        , decoder
+        )
 
 import Time exposing (Time)
 import Json.Decode as JD exposing (Decoder)
@@ -35,6 +45,11 @@ encode valueEncoder reg =
 set : String -> Time -> a -> TimestampedVersionRegister a -> TimestampedVersionRegister a
 set id t v reg =
     { version = VClock.increment id reg.version, value = v, timestamp = t }
+
+
+update : String -> Time -> (a -> a) -> TimestampedVersionRegister a -> TimestampedVersionRegister a
+update id t fn reg =
+    set id t (fn (get reg)) reg
 
 
 {-| The merge function ignores the timestamp, if the version number can determin a clear winner.

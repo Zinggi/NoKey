@@ -3,6 +3,7 @@ module SecretSharing exposing (..)
 import BigInt exposing (BigInt)
 import Json.Decode as JD
 import Json.Encode as JE
+import Dict exposing (Dict)
 import Random.Pcg.Extended as Random exposing (Generator, Seed)
 import String.UTF8 as UTF8
 
@@ -16,7 +17,7 @@ import FiniteField
         , makeField
         , primeBiggerThan
         , secretPolynom
-        , getPolynomialPoints
+        , getPolynomialPointsFor
         , lagrangeInterpolation
         )
 
@@ -126,7 +127,7 @@ bigIntToStringHelp n acc =
         acc
 
 
-splitString : ( Int, Int ) -> String -> Seed -> ( List Share, Seed )
+splitString : ( Int, Dict comparable Int ) -> String -> Seed -> ( Dict comparable Share, Seed )
 splitString config secret =
     splitSecret config (stringToBigInt secret)
 
@@ -137,8 +138,8 @@ joinToString shares =
         |> Result.map bigIntToString
 
 
-splitSecret : ( Int, Int ) -> Secret -> Seed -> ( List Share, Seed )
-splitSecret ( level, numPoints ) secret seed =
+splitSecret : ( Int, Dict comparable Int ) -> Secret -> Seed -> ( Dict comparable Share, Seed )
+splitSecret ( level, xValues ) secret seed =
     let
         prime =
             primeBiggerThan secret
@@ -149,28 +150,22 @@ splitSecret ( level, numPoints ) secret seed =
         field =
             makeField prime
     in
-        ( getPolynomialPoints field coefficients numPoints
-            |> List.map (\( x, y ) -> { requiredParts = level, x = x, y = y, prime = prime })
+        ( getPolynomialPointsFor field coefficients xValues
+            |> Dict.map (\id ( x, y ) -> ({ requiredParts = level, x = x, y = y, prime = prime }))
         , newSeed
         )
 
 
-createMoreShares : Int -> List Share -> Result String (List Share)
-createMoreShares n existingShares =
+createMoreShares : Dict comparable Int -> List Share -> Result String (Dict comparable Share)
+createMoreShares xVals existingShares =
     withEnoughShares
         (\requiredParts prime ->
             let
                 poly x =
                     lagrangeInterpolation (makeField prime) (sharesToPoints existingShares) (BigInt.fromInt x)
             in
-                List.sortBy .x existingShares
-                    |> List.head
-                    |> Maybe.map .x
-                    |> Maybe.withDefault 1
-                    |> (\maxx ->
-                            List.range (maxx + 1) (maxx + n)
-                                |> List.map (\x -> { requiredParts = requiredParts, x = x, y = poly x, prime = prime })
-                       )
+                xVals
+                    |> Dict.map (\id x -> { requiredParts = requiredParts, x = x, y = poly x, prime = prime })
         )
         existingShares
 
@@ -180,11 +175,11 @@ sharesToPoints =
     List.map (\s -> ( BigInt.fromInt s.x, s.y ))
 
 
-redistributeShares : List Share -> ( Int, Int ) -> Seed -> Result String ( List Share, Seed )
-redistributeShares shares ( n, m ) seed =
+redistributeShares : List Share -> ( Int, Dict comparable Int ) -> Seed -> Result String ( Dict comparable Share, Seed )
+redistributeShares shares ( n, xVals ) seed =
     withSecret
         (\s ->
-            splitSecret ( n, m ) s seed
+            splitSecret ( n, xVals ) s seed
         )
         shares
 

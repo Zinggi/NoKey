@@ -10,6 +10,7 @@ import Json.Encode.Extra as JE
 import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Time exposing (Time)
+import Murmur3
 
 
 --
@@ -64,7 +65,7 @@ type alias SharedData =
     -- These shares will be taken out one by one by the device whose id matches the id
     -- in the second dict
     -- TODO: here we should store encrypted shares with e.g. RSA
-    , sharesToDistribute : ORDict GroupId (TimestampedVersionRegister (Dict String SecretSharing.Share))
+    , sharesToDistribute : ORDict GroupId (TimestampedVersionRegister (Dict DeviceId SecretSharing.Share))
 
     -- Store who has a share for which group
     --      This way we can:
@@ -79,6 +80,11 @@ type alias SharedData =
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
     , version : VClock
     }
+
+
+sharesToDistribute : SyncData -> Dict GroupId (Dict DeviceId SecretSharing.Share)
+sharesToDistribute sync =
+    ORDict.getWith TimestampedVersionRegister.get sync.shared.sharesToDistribute
 
 
 encryptedPasswords : SyncData -> Dict AccountId ( GroupId, EncryptedPassword )
@@ -179,7 +185,7 @@ isKnownId id sync =
 {-| returns Dict Id (Name, IdPart)
 the IdPart is used to distinguish devices with the same name
 -}
-knownDevices : SyncData -> Dict String ( String, String )
+knownDevices : SyncData -> Dict DeviceId ( String, String )
 knownDevices sync =
     ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
         |> Dict.toList
@@ -198,6 +204,90 @@ knownDevices sync =
                     |> Dict.union acc
             )
             Dict.empty
+
+
+{-| get all groups that have their shares not fully distributed yet.
+The value in the Dict is the list of devices that don't have a share yet
+-}
+groupsNotFullyDistributed : SyncData -> Dict GroupId (List Device)
+groupsNotFullyDistributed sync =
+    let
+        shares : Dict GroupId (Set DeviceId)
+        shares =
+            distributedShares sync
+
+        distShares : Dict GroupId (Dict DeviceId SecretSharing.Share)
+        distShares =
+            sharesToDistribute sync
+
+        known : Dict DeviceId ( String, String )
+        known =
+            knownDevices sync
+
+        allDevs : Set DeviceId
+        allDevs =
+            Dict.foldl (\key _ -> Set.insert key) Set.empty known
+
+        numDevices =
+            Dict.size known
+
+        groupsWithShares : Dict GroupId (Set DeviceId)
+        groupsWithShares =
+            Dict.foldl
+                (\groupId devices acc ->
+                    let
+                        add s =
+                            Set.union s (Dict.keys devices |> Set.fromList)
+                    in
+                        Helper.insertOrUpdate groupId (add Set.empty) add acc
+                )
+                shares
+                distShares
+    in
+        Dict.foldl
+            (\groupId devs acc ->
+                if Set.size devs <= numDevices then
+                    let
+                        others =
+                            Set.diff allDevs devs
+                    in
+                        if Set.isEmpty others then
+                            acc
+                        else
+                            Dict.insert groupId
+                                (Set.foldl
+                                    (\devId acc ->
+                                        let
+                                            ( name, post ) =
+                                                Dict.get devId known |> Maybe.withDefault ( "", "" )
+                                        in
+                                            { id = devId, name = name, postFix = post } :: acc
+                                    )
+                                    []
+                                    others
+                                )
+                                acc
+                else
+                    acc
+            )
+            Dict.empty
+            groupsWithShares
+
+
+devicesNeedingSharesFor : GroupId -> SyncData -> List DeviceId
+devicesNeedingSharesFor groupId sync =
+    case Dict.get groupId (groupsNotFullyDistributed sync) of
+        Just devs ->
+            List.map .id devs
+
+        Nothing ->
+            []
+
+
+displayNamesKnownDevices : SyncData -> List Device
+displayNamesKnownDevices sync =
+    knownDevices sync
+        |> Dict.foldl (\name ( id, part ) acc -> { id = id, name = name, postFix = part } :: acc) []
 
 
 knownIds : SyncData -> List String
@@ -241,6 +331,32 @@ getPassword accountId sync =
         sync.groupPasswordRequestsState
 
 
+getXValues : SyncData -> Dict DeviceId Int
+getXValues sync =
+    -- TODO: what do in case of a collision???
+    knownDevices sync
+        {- 42 might seem like a random value, but it has to be 42!
+           The reason is that Zinggi/elm-hash-icon uses the same hash function with a seed of 42 as well.
+           This way, a collision here will also show in the icon (the reverse is not true):
+           If there is a collision here, you will also have two icons that are the same.
+           My theory is that users don't want to have the same icons, so they reset one device to get a new icon
+           which in turn also resolves the collision here!
+        -}
+        |> Dict.map (\id _ -> Murmur3.hashString 42 id)
+
+
+getXValuesFor : List DeviceId -> SyncData -> Dict DeviceId Int
+getXValuesFor devs _ =
+    -- TODO: the sync parameter is ignored, because we just use the hash until we have an idea how
+    -- to deal with hash collisions
+    devs
+        |> List.foldl
+            (\id acc ->
+                Dict.insert id (Murmur3.hashString 42 id) acc
+            )
+            Dict.empty
+
+
 {-| The caller is expected to call Api.requestShare if the last part of the tuple is True.
 -}
 insertSite : Time -> RandomE.Seed -> AccountId -> GroupId -> Password -> SyncData -> ( SyncData, RandomE.Seed, Bool )
@@ -275,17 +391,13 @@ insertSite time seed accountId groupId pw sync =
                             RandomE.step Helper.groupPwGenerator seed
 
                         -- generate shares/keys
-                        ( genShares, seed3 ) =
+                        ( shares, seed3 ) =
                             SecretSharing.splitString
                                 ( level
-                                , knownIds sync |> List.length
+                                , getXValues sync
                                 )
                                 groupPw
                                 seed2
-
-                        shares =
-                            List.map2 (,) (knownIds sync) genShares
-                                |> Dict.fromList
 
                         -- take out our share
                         ( myShares, sharesForOthers, newDistributedShares ) =
@@ -306,17 +418,8 @@ insertSite time seed accountId groupId pw sync =
                                 |> (\s -> { s | myShares = myShares })
                                 -- TODO: here we should encrypt the shares for the others
                                 -- share with others
-                                |> updateShared
-                                    (\s ->
-                                        { s
-                                            | sharesToDistribute =
-                                                ORDict.updateOrInsert groupId
-                                                    (TimestampedVersionRegister.set sync.id time sharesForOthers)
-                                                    (TimestampedVersionRegister.init sync.id time sharesForOthers)
-                                                    s.sharesToDistribute
-                                            , distributedShares = newDistributedShares
-                                        }
-                                    )
+                                |> addNewShares time groupId sharesForOthers
+                                |> updateShared (\s -> { s | distributedShares = newDistributedShares })
                                 -- insert groupPw to stash (since the keys are not yet distributed)
                                 |> (\s -> { s | tasks = Tasks.insertGroupPw groupId groupPw s.tasks })
                                 -- store pw in passwords
@@ -326,6 +429,21 @@ insertSite time seed accountId groupId pw sync =
                                 |> updateGroupPasswordRequest (Request.cacheAccountPw accountId pw False >> Request.cacheGroupPw groupId groupPw)
                     in
                         ( newSync, seed3, False )
+
+
+addNewShares : Time -> GroupId -> Dict DeviceId SecretSharing.Share -> SyncData -> SyncData
+addNewShares time groupId shares sync =
+    updateShared
+        (\s ->
+            { s
+                | sharesToDistribute =
+                    ORDict.updateOrInsert groupId
+                        (TimestampedVersionRegister.update sync.id time (Dict.union shares))
+                        (TimestampedVersionRegister.init sync.id time shares)
+                        s.sharesToDistribute
+            }
+        )
+        sync
 
 
 insertToStorage : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
@@ -380,6 +498,13 @@ mapAccountsForSite site f sync =
         (getAccountsForSite site sync)
 
 
+getDevice : DeviceId -> SyncData -> Device
+getDevice id sync =
+    Dict.get id (knownDevices sync)
+        |> Maybe.map (\( name, post ) -> { id = id, name = name, postFix = post })
+        |> Maybe.withDefault { id = id, name = "", postFix = "" }
+
+
 mapGroups : (GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
 mapGroups f sync =
     (encryptedPasswords sync)
@@ -413,8 +538,6 @@ addShare : Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, May
 addShare time groupId share sync =
     -- TODO: anything else to do here?
     -- Yes: check if some of the tasks inside the stash can be completed
-    -- TODO: generate new shares here if we just unlocked a group and there are devices that aren't in
-    -- distributedShares and not in sharesToDistribute
     let
         ( newReqState, mayForm ) =
             Request.addShare groupId share sync.groupPasswordRequestsState
@@ -434,6 +557,21 @@ addShare time groupId share sync =
                   )
                     -- remove pw from stash(es)
                     |> clearStashes groupId
+                    -- Generate new shares for those that need them
+                    |> (\s ->
+                            let
+                                newShares =
+                                    SecretSharing.createMoreShares
+                                        (getXValuesFor (devicesNeedingSharesFor groupId s) s)
+                                        (Request.getAllShares groupId newReqState)
+                            in
+                                case newShares of
+                                    Ok shares ->
+                                        addNewShares time groupId shares s
+
+                                    Err e ->
+                                        s
+                       )
                 , mayForm
                 )
 
@@ -460,7 +598,7 @@ requestPasswordPressed groupId mayAccount sync =
 
 getTasks : SyncData -> List Task
 getTasks sync =
-    Tasks.getTasks sync.groupPasswordRequestsState (distributedShares sync) sync.tasks
+    Tasks.getTasks sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) sync.tasks
 
 
 distributedShares : SyncData -> Dict GroupId (Set DeviceId)

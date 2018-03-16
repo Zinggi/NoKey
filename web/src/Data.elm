@@ -20,6 +20,10 @@ type alias DeviceId =
     String
 
 
+type alias Device =
+    { id : DeviceId, name : String, postFix : String }
+
+
 type alias Password =
     String
 

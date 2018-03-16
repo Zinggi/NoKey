@@ -3,6 +3,7 @@ module Helper exposing (..)
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Set exposing (Set)
+import EverySet exposing (EverySet)
 import Char
 import Random.Pcg.Extended as RandomE exposing (Generator)
 import Random.Pcg as RandomP
@@ -126,6 +127,30 @@ boolToMaybe b a =
 combineResults : List (Result x a) -> Result x (List a)
 combineResults =
     List.foldr (Result.map2 (::)) (Ok [])
+
+
+
+-- Set
+
+
+maybeToSet : Maybe comparable -> Set comparable
+maybeToSet ma =
+    case ma of
+        Just a ->
+            Set.singleton a
+
+        Nothing ->
+            Set.empty
+
+
+maybeToEverySet : Maybe a -> EverySet a
+maybeToEverySet ma =
+    case ma of
+        Just a ->
+            EverySet.singleton a
+
+        Nothing ->
+            EverySet.empty
 
 
 

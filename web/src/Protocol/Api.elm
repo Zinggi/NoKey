@@ -72,12 +72,12 @@ endPointUrl pre path =
     -- TODO: change
     -- "localhost"
     {- etz upper -}
-    -- "10.2.120.53"
-    -- {- etz lower -}
-    -- "10.2.122.231"
-    -- {- hg lower -}
-    -- "10.2.54.70"
-    "floyogaarch.fritz.box"
+    "10.2.120.53"
+        -- {- etz lower -}
+        -- "10.2.122.231"
+        -- {- hg lower -}
+        -- "10.2.54.70"
+        -- "floyogaarch.fritz.box"
         |> (\ip -> pre ++ ip ++ ":4000" ++ path)
 
 
@@ -269,6 +269,7 @@ update model msg =
                         |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
 
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
+                -- TODO: stop asking the ones that already gave us a share
                 let
                     ( newSync, mayForm ) =
                         Data.Sync.addShare time key share model.syncData
@@ -506,6 +507,8 @@ requestShare key model =
         |> addCmds [ doRequestShare key model.syncData ]
 
 
+{-| TODO: have a unique request id, such that we can ignore requests accidentally sent multiple times
+-}
 doRequestShare : GroupId -> SyncData -> Cmd Model.Msg
 doRequestShare key sync =
     sendMsgToAll sync "RequestShare" [ ( "shareId", encodeGroupId key ) ]

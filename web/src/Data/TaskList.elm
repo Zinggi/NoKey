@@ -76,9 +76,9 @@ type
     Task
     -- TODO: add more cases, e.g:
     --      MoveFromGroupToGroup { pws: List AccountId, from: GroupId, to: GroupId }
-    --      CreateMoreShares { for: List DeviceId, group: GroupIds }
     = MoveFromStashToGroup { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status }
     | WaitForKeysDistributed { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status, progress : Int }
+    | CreateMoreShares { for : List Device, group : GroupId, status : Status }
 
 
 resolveWaitingTasks : Dict GroupId (Set String) -> TaskList -> TaskList
@@ -107,8 +107,8 @@ getProgress groupId dict =
     Dict.get groupId dict |> Maybe.map Set.size |> Maybe.withDefault 0
 
 
-getTasks : Request.State -> Dict GroupId (Set String) -> TaskList -> List Task
-getTasks request progress tasks =
+getTasks : Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> TaskList -> List Task
+getTasks request groupsNotFullyDistributed progress tasks =
     -- Collect all same groups into a single task
     Dict.foldl
         (\(( siteName, userName ) as accountId) ( groupId, reason, pw ) acc ->
@@ -138,7 +138,6 @@ getTasks request progress tasks =
         Dict.empty
         tasks.stash
         -- convert to tasks
-        -- TODO: needs more information for WaitForKeysDistributed, e.g. for progress
         |> Dict.foldl
             (\groupId { moveFromStashToGroup, waitForKeysDistributed } acc ->
                 (if Dict.isEmpty moveFromStashToGroup then
@@ -161,6 +160,15 @@ getTasks request progress tasks =
                     ++ acc
             )
             []
+        -- add CreateMoreShares task
+        |> (\ts ->
+                Dict.foldl
+                    (\groupId devices acc ->
+                        CreateMoreShares { group = groupId, status = Request.getStatus groupId request, for = devices } :: acc
+                    )
+                    ts
+                    groupsNotFullyDistributed
+           )
 
 
 insertGroupPw : GroupId -> GroupPassword -> TaskList -> TaskList

@@ -105,7 +105,12 @@ view config doShow diag =
                     ( Failure e, _ ) ->
                         case e of
                             NetworkError ->
-                                inp True [ Elements.p "Either you or the pairing server are offline. Sorry about that :(" ]
+                                inp True
+                                    [ Elements.p
+                                        ("Either you or the pairing server are offline."
+                                            ++ " Or you have the wrong server URL. Sorry about that :("
+                                        )
+                                    ]
 
                             _ ->
                                 inp True [ Elements.p ("Something went wrong: " ++ toString e) ]

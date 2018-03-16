@@ -14,15 +14,17 @@ module Data.RequestGroupPassword
         , getWaiting
         , removeWaiting
         , cacheAccountPw
+        , getAllShares
         , cacheGroupPw
         , getGroupPassword
         )
 
 import Dict exposing (Dict)
+import EverySet as Set exposing (EverySet)
 import AES
 import SecretSharing exposing (Share)
 import Data exposing (GroupId, AccountId, GroupPassword, FillFormData, Password, EncryptedPassword)
-import Helper exposing (maybeToList)
+import Helper exposing (maybeToEverySet)
 
 
 type State
@@ -30,7 +32,7 @@ type State
 
 
 type alias Info =
-    { fillForm : Maybe AccountId, shares : List Share, password : Maybe (Result String String) }
+    { fillForm : Maybe AccountId, shares : EverySet Share, password : Maybe (Result String String) }
 
 
 type Status
@@ -43,6 +45,13 @@ type Status
 init : State
 init =
     State { groupPws = Dict.empty, pws = Dict.empty }
+
+
+getAllShares : GroupId -> State -> List Share
+getAllShares groupId (State state) =
+    Dict.get groupId state.groupPws
+        |> Maybe.map (.shares >> Set.toList)
+        |> Maybe.withDefault []
 
 
 getGroupPassword : GroupId -> State -> Maybe GroupPassword
@@ -75,7 +84,7 @@ mayInfoToStatus ( level, _ ) mayInfo =
                     Error r
 
                 Nothing ->
-                    Waiting (List.length info.shares) level
+                    Waiting (Set.size info.shares) level
 
 
 waitFor : GroupId -> Maybe AccountId -> Maybe Share -> State -> State
@@ -84,7 +93,7 @@ waitFor key fillForm maybeMyShare =
         (Dict.insert key
             (tryGetPassword key
                 { fillForm = fillForm
-                , shares = maybeToList maybeMyShare
+                , shares = maybeToEverySet maybeMyShare
                 , password = Nothing
                 }
             )
@@ -124,7 +133,7 @@ addShare key share state =
         newState =
             updateGroupPws
                 (Dict.update key
-                    (Maybe.map (\info -> tryGetPassword key { info | shares = share :: info.shares }))
+                    (Maybe.map (\info -> tryGetPassword key { info | shares = Set.insert share info.shares }))
                 )
                 state
     in
@@ -241,7 +250,7 @@ cacheGroupPw groupId groupPw (State state) =
                                 Just { info | password = Just (Ok groupPw) }
 
                             Nothing ->
-                                Just { fillForm = Nothing, shares = [], password = Just (Ok groupPw) }
+                                Just { fillForm = Nothing, shares = Set.empty, password = Just (Ok groupPw) }
                     )
                     state.groupPws
         }
@@ -254,8 +263,8 @@ tryGetPassword ( level, _ ) info =
             info
 
         Nothing ->
-            if (List.length info.shares) >= level then
+            if (Set.size info.shares) >= level then
                 -- expensive operation
-                { info | password = Just <| SecretSharing.joinToString info.shares }
+                { info | password = Just <| SecretSharing.joinToString (Set.toList info.shares) }
             else
                 info

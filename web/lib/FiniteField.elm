@@ -1,6 +1,18 @@
-module FiniteField exposing (Field, Prime, makeField, primeBiggerThan, lagrangeInterpolation, getPolynomialPoints, secretPolynom, evalPolynom)
+module FiniteField
+    exposing
+        ( Field
+        , Prime
+        , makeField
+        , primeBiggerThan
+        , lagrangeInterpolation
+        , getPolynomialPoints
+        , secretPolynom
+        , evalPolynom
+        , getPolynomialPointsFor
+        )
 
 import BigInt exposing (BigInt)
+import Dict exposing (Dict)
 import Random.Pcg.Extended as Random exposing (Generator)
 
 
@@ -119,6 +131,11 @@ getPolynomialPoints : Field -> List BigInt -> Int -> List ( Int, BigInt )
 getPolynomialPoints f coeffs numPoints =
     List.range 1 numPoints
         |> List.map (\x -> ( x, evalPolynom f coeffs (BigInt.fromInt x) ))
+
+
+getPolynomialPointsFor : Field -> List BigInt -> Dict comparable Int -> Dict comparable ( Int, BigInt )
+getPolynomialPointsFor f coeffs xVals =
+    Dict.map (\id x -> ( x, evalPolynom f coeffs (BigInt.fromInt x) )) xVals
 
 
 evalPolynom : Field -> List BigInt -> BigInt -> BigInt

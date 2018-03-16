@@ -27,11 +27,8 @@ viewDeviceEntry myId uuid ( name, idPart ) =
         empty
     else
         row []
-            [ Elements.avatar uuid ( name, idPart ) [ width fill ]
-            , -- TODO: add nice icons, e.g. trash-2 from:
-              -- http://package.elm-lang.org/packages/1602/elm-feather/2.2.0
-              -- https://feathericons.com/
-              (Elements.button (Just (RemoveDevice uuid)) "Remove!")
+            [ Elements.avatar [ width fill ] { id = uuid, name = name, postFix = idPart }
+            , Elements.delete (RemoveDevice uuid)
             ]
 
 
