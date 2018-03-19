@@ -60,7 +60,7 @@ type alias OtherSharedData =
 -}
 type alias SharedData =
     { -- TODO: add device type, e.g. android, browser, extension, ... + public key
-      knownIds : ORDict String (SingleVersionRegister String)
+      knownIds : ORDict DeviceId (SingleVersionRegister DeviceInfo)
 
     -- These shares will be taken out one by one by the device whose id matches the id
     -- in the second dict
@@ -80,6 +80,24 @@ type alias SharedData =
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
     , version : VClock
     }
+
+
+type alias DeviceInfo =
+    { deviceType : DeviceType, name : String }
+
+
+type DeviceType
+    = Browser
+    | Android
+    | WebExtension
+    | Unknown
+
+
+{-| TODO! change before compiling for other platforms
+-}
+myDeviceType : DeviceType
+myDeviceType =
+    Browser
 
 
 sharesToDistribute : SyncData -> Dict GroupId (Dict DeviceId SecretSharing.Share)
@@ -125,7 +143,7 @@ init seed uuid =
 
 initShared : Seed -> String -> SharedData
 initShared seed uuid =
-    { knownIds = ORDict.init seed |> ORDict.insert uuid (SingleVersionRegister.init "")
+    { knownIds = ORDict.init seed |> ORDict.insert uuid (SingleVersionRegister.init { name = "", deviceType = myDeviceType })
     , sharesToDistribute = ORDict.init seed
     , distributedShares = ORDict.init seed
     , passwords = ORDict.init seed
@@ -182,15 +200,20 @@ isKnownId id sync =
     ORDict.get sync.shared.knownIds |> Dict.member id
 
 
+knownIds : SyncData -> Dict DeviceId DeviceInfo
+knownIds sync =
+    ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
+
+
 {-| returns Dict Id (Name, IdPart)
 the IdPart is used to distinguish devices with the same name
 -}
 knownDevices : SyncData -> Dict DeviceId ( String, String )
 knownDevices sync =
-    ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
+    knownIds sync
         |> Dict.toList
-        |> Dict.groupBy Tuple.second
-        -- Now we have a Dict Name (List (Id, Name))
+        |> Dict.groupBy (Tuple.second >> .name)
+        -- Now we have a Dict Name (List (Id, DevInfo))
         |> Dict.map
             (\name idsToName ->
                 List.map Tuple.first idsToName
@@ -290,11 +313,6 @@ displayNamesKnownDevices sync =
         |> Dict.foldl (\name ( id, part ) acc -> { id = id, name = name, postFix = part } :: acc) []
 
 
-knownIds : SyncData -> List String
-knownIds sync =
-    ORDict.get sync.shared.knownIds |> Dict.keys
-
-
 knownOtherIds : SyncData -> List String
 knownOtherIds sync =
     ORDict.get sync.shared.knownIds |> Dict.remove sync.id |> Dict.keys
@@ -320,7 +338,16 @@ gotRemoved sync =
 
 renameDevice : String -> SyncData -> SyncData
 renameDevice newName sync =
-    updateShared (\s -> { s | knownIds = ORDict.update sync.id (SingleVersionRegister.update newName) s.knownIds }) sync
+    updateShared
+        (\s ->
+            { s
+                | knownIds =
+                    ORDict.update sync.id
+                        (SingleVersionRegister.update (\v -> { v | name = newName }))
+                        s.knownIds
+            }
+        )
+        sync
 
 
 getPassword : AccountId -> SyncData -> Maybe Password
@@ -766,7 +793,7 @@ sharedDecoderV2 =
             , version = version
             }
         )
-        (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder JD.string))
+        (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo))
         (JD.field "passwords" <|
             ORDict.decoder2 accountIdDecoder
                 (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
@@ -779,11 +806,15 @@ sharedDecoderV2 =
         (JD.field "version" VClock.decoder)
 
 
+v1ToV2KnownIds v1 =
+    ORDict.map (\k v -> SingleVersionRegister.map (\n -> { name = n, deviceType = Unknown }) v) v1
+
+
 sharedDecoderV1 : Decoder SharedData
 sharedDecoderV1 =
     JD.map4
         (\knownIds passwords sharesToDistribute version ->
-            { knownIds = knownIds
+            { knownIds = v1ToV2KnownIds knownIds
             , passwords = passwords
             , sharesToDistribute = sharesToDistribute
             , distributedShares = ORDict.init (Random.initialSeed 0)
@@ -817,6 +848,28 @@ completeDecoder =
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
             )
+        |> JD.map setDevTypeIfWrong
+
+
+setDevTypeIfWrong sync =
+    case Dict.get sync.id (knownIds sync) of
+        Just dev ->
+            if dev.deviceType /= myDeviceType then
+                updateShared
+                    (\s ->
+                        { s
+                            | knownIds =
+                                ORDict.update sync.id
+                                    (SingleVersionRegister.update (\v -> { v | deviceType = myDeviceType }))
+                                    s.knownIds
+                        }
+                    )
+                    sync
+            else
+                sync
+
+        Nothing ->
+            sync
 
 
 completeDecoderV2 : Decoder SyncData
@@ -870,7 +923,7 @@ encodeShared shared =
     JE.object
         [ ( "data"
           , JE.object
-                [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode JE.string) shared.knownIds )
+                [ ( "knownIds", ORDict.encode (SingleVersionRegister.encode encodeDeviceInfo) shared.knownIds )
                 , ( "passwords"
                   , ORDict.encode2 encodeAccountId
                         (TimestampedVersionRegister.encode (encodeTuple2 encodeGroupId encodeEncryptedPassword))
@@ -889,6 +942,41 @@ encodeShared shared =
         -- TODO: change if data format changes
         , ( "dataVersion", JE.int 2 )
         ]
+
+
+encodeDeviceInfo : DeviceInfo -> Value
+encodeDeviceInfo info =
+    JE.object [ ( "name", JE.string info.name ), ( "type", JE.string (toString info.deviceType) ) ]
+
+
+decodeDeviceInfo : Decoder DeviceInfo
+decodeDeviceInfo =
+    JD.map2 (\name type_ -> { name = name, deviceType = type_ })
+        (JD.field "name" JD.string)
+        (JD.field "type" deviceTypeDecoder)
+
+
+deviceTypeDecoder : Decoder DeviceType
+deviceTypeDecoder =
+    JD.string
+        |> JD.andThen
+            (\s ->
+                case s of
+                    "WebExtension" ->
+                        JD.succeed WebExtension
+
+                    "Browser" ->
+                        JD.succeed Browser
+
+                    "Android" ->
+                        JD.succeed Android
+
+                    "Unknown" ->
+                        JD.succeed Unknown
+
+                    e ->
+                        JD.fail (e ++ " isn't a valid instance of DeviceType")
+            )
 
 
 encodeComplete : SyncData -> Value

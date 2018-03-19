@@ -24,17 +24,38 @@ import Model exposing (..)
 -- Init
 
 
-init : Flags -> ( Model, Cmd Msg )
+init : Flags -> ( ModelState, Cmd Msg )
 init flags =
     let
-        newModel =
+        newState =
             Model.init flags
     in
-        newModel |> withCmds [ storeState newModel, Api.askForNewVersion newModel.syncData ]
+        case newState of
+            Loaded model ->
+                newState |> withCmds [ onLoaded model ]
+
+            _ ->
+                newState |> noCmd
+
+
+onLoaded : Model -> Cmd Msg
+onLoaded model =
+    Cmd.batch [ storeState model, Api.askForNewVersion model.syncData ]
 
 
 
 -- Update
+
+
+updateModelState : Msg -> ModelState -> ( ModelState, Cmd Msg )
+updateModelState msg state =
+    case state of
+        LoadingError err ->
+            state |> noCmd
+
+        Loaded model ->
+            update msg model
+                |> (\( m, cmd ) -> ( Loaded m, cmd ))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -247,12 +268,19 @@ storeState model =
 -- Subs
 
 
-subs : Model -> Sub Msg
-subs model =
-    [ Api.connectPrivateSocket model.uniqueIdentifyier
-    , Ports.onStateRequest (always OnStateRequest)
-    , Ports.onReceiveMsg Model.decodeMsg
-    , Ports.onRequestAccountsForSite SendOutAccountsFor
-    , Ports.onAddSiteEntry AddSiteEntry
-    ]
+subs : ModelState -> Sub Msg
+subs state =
+    ((case state of
+        Loaded model ->
+            [ Api.connectPrivateSocket model.uniqueIdentifyier ]
+
+        _ ->
+            []
+     )
+        ++ [ Ports.onStateRequest (always OnStateRequest)
+           , Ports.onReceiveMsg Model.decodeMsg
+           , Ports.onRequestAccountsForSite SendOutAccountsFor
+           , Ports.onAddSiteEntry AddSiteEntry
+           ]
+    )
         |> Sub.batch

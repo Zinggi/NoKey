@@ -1,4 +1,4 @@
-module Crdt.SingleVersionRegister exposing (SingleVersionRegister, init, update, merge, decoder, encode, get)
+module Crdt.SingleVersionRegister exposing (SingleVersionRegister, init, update, merge, decoder, encode, get, set, map)
 
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
@@ -19,9 +19,14 @@ get ( _, a ) =
     a
 
 
-update : a -> SingleVersionRegister a -> SingleVersionRegister a
-update newValue ( n, _ ) =
+set : a -> SingleVersionRegister a -> SingleVersionRegister a
+set newValue ( n, _ ) =
     ( n + 1, newValue )
+
+
+update : (a -> a) -> SingleVersionRegister a -> SingleVersionRegister a
+update f ( n, v ) =
+    ( n + 1, f v )
 
 
 decoder : Decoder a -> Decoder (SingleVersionRegister a)
@@ -40,3 +45,10 @@ merge ( nOther, a ) ( nMy, b ) =
         ( nOther, a )
     else
         ( nMy, b )
+
+
+{-| CAUTION: doesn't increment version, only use if you know what you are doing
+-}
+map : (a -> b) -> SingleVersionRegister a -> SingleVersionRegister b
+map f ( n, v ) =
+    ( n, f v )

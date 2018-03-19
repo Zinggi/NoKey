@@ -6,9 +6,6 @@ const getRandom32bitInt = () => {
     crypto.getRandomValues(randInt);
     return randInt[0];
 };
-
-
-
 // Not usefull for elm, as the random library only uses 32bit anyway.
 const getRandom53bitInt = () => {
     // get two cryptographically secure random ints
@@ -24,11 +21,70 @@ const getRandom53bitInt = () => {
     return randInts[0] + (randInts[1] & mask) * 4294967296;
 };*/
 
+
+
 const runsInsideExtension = () => {
     if (window.browser && browser.runtime && browser.runtime.id)
         return true;
     return false;
 };
+
+
+// returns a promise with two keys, [encryptionKey, signKey]
+// TODO: call this if we haven't stored a key yet or if resetStorage is called
+// send the public keys via a flag to elm and put it inside sync data.
+// if there is an error anywhere, pass error along to elm inside flag to display error message
+const genKeys = () => {
+    // console.log("gen RSA-OAEP key: (encryption):");
+    // TODO: should use this polyfill
+    // https://github.com/PeculiarVentures/webcrypto-liner
+    return Promise.all([
+        crypto.subtle.generateKey({
+            name: "RSA-OAEP",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([0x03]),
+            hash: { name: "SHA-256" }
+        }, true, ["encrypt", "decrypt"]),
+        window.crypto.subtle.generateKey({
+            name: "RSA-PSS",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([0x03]),
+            hash: { name: "SHA-256" },
+        }, true, ["sign", "verify"])
+    ]);
+};
+// TODO: use the given key to encrypt the data.
+// Use this via a port, to encrypt shares
+const encrypt = (key, data) => {};
+// should be used when we want to take out our share
+const decrypt = (key, data) => {};
+
+// TODO: sign a message with our key
+// should be used in API, before we send out a message
+const sign = (key, data) => {};
+// should be used when we receive a message to check if it is authentic
+const verify = (key, data) => {};
+
+// TODO: save key in storage
+// TODO: do this everytime we store the state
+const saveKey = (key) => {
+    Promise.all([
+        crypto.subtle.exportKey("jwk", key.publicKey),
+        crypto.subtle.exportKey("jwk", key.privateKey)
+    ]).then(([ePubK, ePrivK]) => {
+        console.log("exported pub key: ", ePubK);
+        console.log("exported priv key: ", ePrivK);
+    }).catch((err) => {
+        console.error(err);
+    });
+};
+// TODO: get keys from storage
+const retrieveKeys = () => {
+};
+
+
+
+
 
 const storeState = (state) => {
     if (runsInsideExtension()) {
@@ -62,6 +118,7 @@ const resetStorage = (state) => {
         window.localStorage.clear();
     }
     storeState(state);
+    // TODO: reset keypto keys and generate new ones
 };
 
 

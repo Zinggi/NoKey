@@ -14,5 +14,5 @@ main =
         { init = Background.init
         , subscriptions = Background.subs
         , view = MainView.view
-        , update = Background.update
+        , update = Background.updateModelState
         }

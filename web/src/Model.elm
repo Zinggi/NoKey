@@ -65,6 +65,16 @@ type Msg
 
 
 -- Model
+-- TODO: create other top level type that represents Loading | Loaded Model | Error
+-- remember to store state on first loaded, e.g.
+--      |> withCmds [ storeState newModel, Api.askForNewVersion newModel.syncData ]
+-- This is for both showing decode errors to user and on startup we need to generate two RSA keys, which takes some time
+
+
+type ModelState
+    = Loaded Model
+      -- TODO: handle in UI, e.g. show decode error, and offer state backup
+    | LoadingError String
 
 
 type alias Model =
@@ -96,8 +106,22 @@ type alias Flags =
     }
 
 
-init : Flags -> Model
-init { initialSeed, storedState } =
+init : Flags -> ModelState
+init ({ initialSeed, storedState } as flags) =
+    case Data.Storage.decode storedState of
+        Ok { syncData, uniqueIdentifyier } ->
+            -- TODO: here we should have the keys ready and store them
+            Loaded <| initModel initialSeed (Just uniqueIdentifyier) (Just syncData)
+
+        Err "Expecting an object with a field named `syncData` but instead got: null" ->
+            -- This happens when we reset or when used the first time. It's ok.
+            Loaded <| initModel initialSeed Nothing Nothing
+
+        Err err ->
+            LoadingError ("couldn't decode state" ++ err)
+
+
+initModel initialSeed mayId maySync =
     let
         ( base, ext ) =
             initialSeed
@@ -111,34 +135,21 @@ init { initialSeed, storedState } =
 
         ( indepSeed, seed3 ) =
             Random.step Random.independentSeed seed2
-
-        makeInit mayId maySync =
-            { newSiteEntry = Data.PasswordMeta.default
-            , expandSiteEntry = False
-            , requirementsState = PW.init (RandomE.initialSeed base ext)
-            , seed = RandomE.initialSeed base ext
-            , uniqueIdentifyier = Maybe.withDefault uuid mayId
-            , syncData = Maybe.withDefault (Data.Sync.init indepSeed uuid) maySync
-            , pairingDialogue = Views.Pairing.init
-            , showPairingDialogue = True
-            , notifications = Notifications.init
-            , notificationsView = Views.Notifications.init
-            , passwordsView = Views.Passwords.init
-            , protocolState = Protocol.init
-            , currentSite = Nothing
-            }
     in
-        case Data.Storage.decode storedState of
-            Ok { syncData, uniqueIdentifyier } ->
-                makeInit (Just uniqueIdentifyier) (Just syncData)
-
-            Err "Expecting an object with a field named `syncData` but instead got: null" ->
-                -- This happens when we reset or when used the first time. It's ok.
-                makeInit Nothing Nothing
-
-            Err err ->
-                -- TODO: handle in UI, e.g. show decode error, and offer state backup
-                Debug.crash ("couldn't decode state" ++ err)
+        { newSiteEntry = Data.PasswordMeta.default
+        , expandSiteEntry = False
+        , requirementsState = PW.init (RandomE.initialSeed base ext)
+        , seed = RandomE.initialSeed base ext
+        , uniqueIdentifyier = Maybe.withDefault uuid mayId
+        , syncData = Maybe.withDefault (Data.Sync.init indepSeed uuid) maySync
+        , pairingDialogue = Views.Pairing.init
+        , showPairingDialogue = True
+        , notifications = Notifications.init
+        , notificationsView = Views.Notifications.init
+        , passwordsView = Views.Passwords.init
+        , protocolState = Protocol.init
+        , currentSite = Nothing
+        }
 
 
 reset : Model -> Model
@@ -150,7 +161,7 @@ reset model =
         ( initSeed, _ ) =
             RandomE.step (RandomE.map2 (,) int32 (RandomE.list 8 int32)) model.seed
     in
-        init { initialSeed = initSeed, storedState = JE.null }
+        initModel initSeed Nothing Nothing
 
 
 updateNotifications : (Notifications -> Notifications) -> Model -> ( Model, Cmd Msg )

@@ -20,6 +20,7 @@ module Crdt.ORDict
         , completeDecoder
         , completeDecoder2
         , updateOrInsert
+        , map
         , resetExceptOne
         )
 
@@ -164,6 +165,14 @@ updateWithDict f dict ordict =
         )
         ordict
         dict
+
+
+{-| CAUTION: using this can very easily break the CRDT guarantees.
+Only use when you know what you are doing
+-}
+map : (comparable -> a -> b) -> ORDict comparable a -> ORDict comparable b
+map f dict =
+    { dict | store = Dict.map f dict.store }
 
 
 remove : comparable -> ORDict comparable value -> ORDict comparable value

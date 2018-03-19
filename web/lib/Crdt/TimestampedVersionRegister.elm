@@ -8,6 +8,7 @@ module Crdt.TimestampedVersionRegister
         , encode
         , update
         , decoder
+        , map
         )
 
 import Time exposing (Time)
@@ -74,3 +75,11 @@ merge a b =
 get : TimestampedVersionRegister a -> a
 get { value } =
     value
+
+
+{-| CAUTION: this doesn't update the CRDT and can easily break the CRDT.
+Only use this if you know what you are doing
+-}
+map : (a -> b) -> TimestampedVersionRegister a -> TimestampedVersionRegister b
+map f reg =
+    { reg | value = f reg.value }

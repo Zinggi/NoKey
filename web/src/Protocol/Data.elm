@@ -70,7 +70,6 @@ type CollectSharesState
 type PairingState
     = Init
     | WaitForPaired Time String
-      -- TODO: Why keep otherId here? Is it to resend?
     | WaitForFinished Time String String
 
 
