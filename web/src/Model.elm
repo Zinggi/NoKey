@@ -1,6 +1,7 @@
 module Model exposing (..)
 
 import Json.Encode as JE exposing (Value)
+import Json.Decode as JD
 import Time exposing (Time)
 import Dict exposing (Dict)
 
@@ -103,25 +104,28 @@ type alias Model =
 type alias Flags =
     { initialSeed : ( Int, List Int )
     , storedState : Value
+    , encryptionKey : Value
+    , signingKey : Value
+    , deviceType : Value
     }
 
 
 init : Flags -> ModelState
-init ({ initialSeed, storedState } as flags) =
-    case Data.Storage.decode storedState of
-        Ok { syncData, uniqueIdentifyier } ->
+init ({ initialSeed, storedState, encryptionKey, signingKey, deviceType } as flags) =
+    case ( Data.Storage.decode storedState, JD.decodeValue Data.Sync.deviceTypeDecoder deviceType ) of
+        ( Ok { syncData, uniqueIdentifyier }, Ok devType ) ->
             -- TODO: here we should have the keys ready and store them
-            Loaded <| initModel initialSeed (Just uniqueIdentifyier) (Just syncData)
+            Loaded <| initModel initialSeed encryptionKey signingKey devType (Just uniqueIdentifyier) (Just syncData)
 
-        Err "Expecting an object with a field named `syncData` but instead got: null" ->
+        ( Err "Expecting an object with a field named `syncData` but instead got: null", Ok devType ) ->
             -- This happens when we reset or when used the first time. It's ok.
-            Loaded <| initModel initialSeed Nothing Nothing
+            Loaded <| initModel initialSeed encryptionKey signingKey devType Nothing Nothing
 
-        Err err ->
-            LoadingError ("couldn't decode state" ++ err)
+        ( err, devType ) ->
+            LoadingError ("couldn't decode state or deviceType:\n\n" ++ toString err ++ "\n\nDevice type:" ++ toString devType)
 
 
-initModel initialSeed mayId maySync =
+initModel initialSeed encryptionKey signingKey devType mayId maySync =
     let
         ( base, ext ) =
             initialSeed
@@ -141,7 +145,7 @@ initModel initialSeed mayId maySync =
         , requirementsState = PW.init (RandomE.initialSeed base ext)
         , seed = RandomE.initialSeed base ext
         , uniqueIdentifyier = Maybe.withDefault uuid mayId
-        , syncData = Maybe.withDefault (Data.Sync.init indepSeed uuid) maySync
+        , syncData = Maybe.withDefault (Data.Sync.init indepSeed encryptionKey signingKey devType uuid) maySync
         , pairingDialogue = Views.Pairing.init
         , showPairingDialogue = True
         , notifications = Notifications.init
@@ -161,7 +165,7 @@ reset model =
         ( initSeed, _ ) =
             RandomE.step (RandomE.map2 (,) int32 (RandomE.list 8 int32)) model.seed
     in
-        initModel initSeed Nothing Nothing
+        initModel initSeed model.syncData.encryptionKey model.syncData.signingKey model.syncData.deviceType Nothing Nothing
 
 
 updateNotifications : (Notifications -> Notifications) -> Model -> ( Model, Cmd Msg )

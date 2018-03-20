@@ -7,6 +7,7 @@ import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
+import Json.Decode.Pipeline exposing (decode, required)
 import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Time exposing (Time)
@@ -39,6 +40,9 @@ type alias SyncData =
     , myShares : Dict GroupId SecretSharing.Share
     , tasks : TaskList
     , seed : Seed
+    , encryptionKey : Value
+    , signingKey : Value
+    , deviceType : DeviceType
 
     -- ephemeral
     , groupPasswordRequestsState : Request.State
@@ -59,7 +63,10 @@ type alias OtherSharedData =
 {-| the data we want to share across all known devices
 -}
 type alias SharedData =
-    { -- TODO: add device type, e.g. android, browser, extension, ... + public key
+    { -- TODO: It shouldn't be possible to change the public key under any circumstances to prevent
+      -- a byzantine error. E.g. a malicous device could easily change all public keys making communication impossible.
+      -- a device could also just delete and then re-add an entry, circumventing any protection.
+      -- => the protection would have to be at the ORDict level
       knownIds : ORDict DeviceId (SingleVersionRegister DeviceInfo)
 
     -- These shares will be taken out one by one by the device whose id matches the id
@@ -83,14 +90,13 @@ type alias SharedData =
 
 
 type alias DeviceInfo =
-    { deviceType : DeviceType, name : String }
+    { deviceType : DeviceType, name : String, encryptionKey : Value, signingKey : Value }
 
 
 type DeviceType
     = Browser
     | Android
     | WebExtension
-    | Unknown
 
 
 {-| TODO! change before compiling for other platforms
@@ -129,11 +135,14 @@ getShare groupId sync =
     Dict.get groupId sync.myShares
 
 
-init : Seed -> String -> SyncData
-init seed uuid =
-    { shared = initShared seed uuid
+init : Seed -> Value -> Value -> DeviceType -> String -> SyncData
+init seed encryptionKey signingKey devType uuid =
+    { shared = initShared seed encryptionKey signingKey devType uuid
     , synchedWith = Dict.empty
     , id = uuid
+    , encryptionKey = encryptionKey
+    , signingKey = signingKey
+    , deviceType = devType
     , seed = seed
     , myShares = Dict.empty
     , tasks = Tasks.init
@@ -141,9 +150,18 @@ init seed uuid =
     }
 
 
-initShared : Seed -> String -> SharedData
-initShared seed uuid =
-    { knownIds = ORDict.init seed |> ORDict.insert uuid (SingleVersionRegister.init { name = "", deviceType = myDeviceType })
+initShared : Seed -> Value -> Value -> DeviceType -> String -> SharedData
+initShared seed encryptionKey signingKey devType uuid =
+    { knownIds =
+        ORDict.init seed
+            |> ORDict.insert uuid
+                (SingleVersionRegister.init
+                    { name = ""
+                    , deviceType = devType
+                    , encryptionKey = encryptionKey
+                    , signingKey = signingKey
+                    }
+                )
     , sharesToDistribute = ORDict.init seed
     , distributedShares = ORDict.init seed
     , passwords = ORDict.init seed
@@ -331,7 +349,7 @@ getName sync =
 gotRemoved : SyncData -> SyncData
 gotRemoved sync =
     -- clear all data
-    (init sync.seed sync.id)
+    (init sync.seed sync.encryptionKey sync.signingKey sync.deviceType sync.id)
         -- keep version history of this device
         |> updateShared (\s -> { s | knownIds = ORDict.resetExceptOne sync.id sync.shared.knownIds })
 
@@ -774,16 +792,13 @@ sharedDecoder =
                     1 ->
                         JD.field "data" sharedDecoderV1
 
-                    2 ->
-                        JD.field "data" sharedDecoderV2
-
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
             )
 
 
-sharedDecoderV2 : Decoder SharedData
-sharedDecoderV2 =
+sharedDecoderV1 : Decoder SharedData
+sharedDecoderV1 =
     JD.map5
         (\knownIds passwords sharesToDistribute distributedShares version ->
             { knownIds = knownIds
@@ -806,31 +821,26 @@ sharedDecoderV2 =
         (JD.field "version" VClock.decoder)
 
 
-v1ToV2KnownIds v1 =
-    ORDict.map (\k v -> SingleVersionRegister.map (\n -> { name = n, deviceType = Unknown }) v) v1
+encodeComplete : SyncData -> Value
+encodeComplete s =
+    JE.object
+        [ ( "data"
+          , JE.object
+                [ ( "id", JE.string s.id )
+                , ( "encryptionKey", s.encryptionKey )
+                , ( "signingKey", s.signingKey )
+                , ( "deviceType", encodeDeviceType s.deviceType )
+                , ( "shared", encodeShared s.shared )
+                , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
+                , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
+                , ( "tasks", Tasks.encode s.tasks )
+                , ( "seed", Random.toJson s.seed )
+                ]
+          )
 
-
-sharedDecoderV1 : Decoder SharedData
-sharedDecoderV1 =
-    JD.map4
-        (\knownIds passwords sharesToDistribute version ->
-            { knownIds = v1ToV2KnownIds knownIds
-            , passwords = passwords
-            , sharesToDistribute = sharesToDistribute
-            , distributedShares = ORDict.init (Random.initialSeed 0)
-            , version = version
-            }
-        )
-        (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder JD.string))
-        (JD.field "passwords" <|
-            ORDict.decoder2 accountIdDecoder
-                (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
-        )
-        (JD.field "sharesToDistribute" <|
-            ORDict.decoder2 groupIdDecoder
-                (TimestampedVersionRegister.decoder (JD.dict SecretSharing.shareDecoder))
-        )
-        (JD.field "version" VClock.decoder)
+        -- TODO: change if data format changes
+        , ( "dataVersion", JE.int 1 )
+        ]
 
 
 completeDecoder : Decoder SyncData
@@ -840,43 +850,21 @@ completeDecoder =
             (\v ->
                 case v of
                     1 ->
-                        completeDecoderV1
-
-                    2 ->
-                        JD.field "data" completeDecoderV2
+                        JD.field "data" completeDecoderV1
 
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
             )
-        |> JD.map setDevTypeIfWrong
 
 
-setDevTypeIfWrong sync =
-    case Dict.get sync.id (knownIds sync) of
-        Just dev ->
-            if dev.deviceType /= myDeviceType then
-                updateShared
-                    (\s ->
-                        { s
-                            | knownIds =
-                                ORDict.update sync.id
-                                    (SingleVersionRegister.update (\v -> { v | deviceType = myDeviceType }))
-                                    s.knownIds
-                        }
-                    )
-                    sync
-            else
-                sync
-
-        Nothing ->
-            sync
-
-
-completeDecoderV2 : Decoder SyncData
-completeDecoderV2 =
-    JD.map6
-        (\id shared myShares synchedWith tasks seed ->
+completeDecoderV1 : Decoder SyncData
+completeDecoderV1 =
+    decode
+        (\id encryptionKey signingKey deviceType shared myShares synchedWith tasks seed ->
             { id = id
+            , encryptionKey = encryptionKey
+            , signingKey = signingKey
+            , deviceType = deviceType
             , shared = shared
             , myShares = myShares
             , synchedWith = synchedWith
@@ -885,37 +873,15 @@ completeDecoderV2 =
             , seed = seed
             }
         )
-        (JD.field "id" JD.string)
-        (JD.field "shared" sharedDecoder)
-        (JD.field "myShares" <| JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
-        (JD.field "synchedWith" <| JD.dict VClock.decoder)
-        (JD.field "tasks" Tasks.decoder)
-        (JD.field "seed" Random.fromJson)
-
-
-completeDecoderV1 : Decoder SyncData
-completeDecoderV1 =
-    JD.map7
-        (\id shared myShares synchedWith passwordStash groupPasswordStash seed ->
-            { id = id
-            , shared = shared
-            , myShares = myShares
-            , synchedWith = synchedWith
-
-            -- We should actually read passwordStash and groupPasswordStash and convert it to Tasks, but
-            -- Since I was the only user at the time of v1, I didn't bother. (My stash was empty anyway)
-            , tasks = Tasks.init
-            , groupPasswordRequestsState = Request.init
-            , seed = seed
-            }
-        )
-        (JD.field "id" JD.string)
-        (JD.field "shared" sharedDecoder)
-        (JD.field "myShares" <| JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
-        (JD.field "synchedWith" <| JD.dict VClock.decoder)
-        (JD.field "passwordStash" <| JD.dict2 accountIdDecoder (decodeTuple2 groupIdDecoder JD.string))
-        (JD.field "groupPasswordStash" <| JD.dict2 groupIdDecoder JD.string)
-        (JD.field "seed" Random.fromJson)
+        |> required "id" JD.string
+        |> required "encryptionKey" JD.value
+        |> required "signingKey" JD.value
+        |> required "deviceType" deviceTypeDecoder
+        |> required "shared" sharedDecoder
+        |> required "myShares" (JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
+        |> required "synchedWith" (JD.dict VClock.decoder)
+        |> required "tasks" Tasks.decoder
+        |> required "seed" Random.fromJson
 
 
 encodeShared : SharedData -> Value
@@ -940,20 +906,35 @@ encodeShared shared =
           )
 
         -- TODO: change if data format changes
-        , ( "dataVersion", JE.int 2 )
+        , ( "dataVersion", JE.int 1 )
         ]
 
 
 encodeDeviceInfo : DeviceInfo -> Value
 encodeDeviceInfo info =
-    JE.object [ ( "name", JE.string info.name ), ( "type", JE.string (toString info.deviceType) ) ]
+    JE.object
+        [ ( "name", JE.string info.name )
+        , ( "type", encodeDeviceType info.deviceType )
+        , ( "encryptionKey", info.encryptionKey )
+        , ( "signingKey", info.signingKey )
+        ]
 
 
 decodeDeviceInfo : Decoder DeviceInfo
 decodeDeviceInfo =
-    JD.map2 (\name type_ -> { name = name, deviceType = type_ })
+    JD.map4
+        (\name type_ encryptionKey signingKey ->
+            { name = name, deviceType = type_, encryptionKey = encryptionKey, signingKey = signingKey }
+        )
         (JD.field "name" JD.string)
         (JD.field "type" deviceTypeDecoder)
+        (JD.field "encryptionKey" JD.value)
+        (JD.field "signingKey" JD.value)
+
+
+encodeDeviceType : DeviceType -> Value
+encodeDeviceType t =
+    JE.string (toString t)
 
 
 deviceTypeDecoder : Decoder DeviceType
@@ -971,31 +952,9 @@ deviceTypeDecoder =
                     "Android" ->
                         JD.succeed Android
 
-                    "Unknown" ->
-                        JD.succeed Unknown
-
                     e ->
                         JD.fail (e ++ " isn't a valid instance of DeviceType")
             )
-
-
-encodeComplete : SyncData -> Value
-encodeComplete s =
-    JE.object
-        [ ( "data"
-          , JE.object
-                [ ( "id", JE.string s.id )
-                , ( "shared", encodeShared s.shared )
-                , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
-                , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
-                , ( "tasks", Tasks.encode s.tasks )
-                , ( "seed", Random.toJson s.seed )
-                ]
-          )
-
-        -- TODO: change if data format changes
-        , ( "dataVersion", JE.int 2 )
-        ]
 
 
 encodeVersion : SyncData -> Value

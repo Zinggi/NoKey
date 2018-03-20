@@ -67,9 +67,6 @@ view state =
                         )
                     ]
 
-        Loading _ ->
-            Elements.text "Loading"
-
         LoadingError err ->
             column []
                 [ Elements.h2 "Error"
