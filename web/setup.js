@@ -1,5 +1,3 @@
-const crypto = window.crypto || window.msCrypto;
-
 /*// get a single random number
 const getRandom32bitInt = () => {
     const randInt = new Uint32Array(1);
@@ -22,6 +20,9 @@ const getRandom53bitInt = () => {
 };*/
 
 
+//--------------------------------------------------------------------------------
+// Util lib
+//--------------------------------------------------------------------------------
 
 // check if we run inside an extension.
 // TODO: possibly extend to detect android as well
@@ -31,6 +32,11 @@ const runsInsideExtension = () => {
     return false;
 };
 
+
+//--------------------------------------------------------------------------------
+// Crypto lib
+//--------------------------------------------------------------------------------
+const crypto = window.crypto || window.msCrypto;
 
 // returns a promise with two keys, [encryptionKey, signKey]
 // TODO: call this if we haven't stored a key yet
@@ -46,7 +52,7 @@ const genKeys = () => {
             publicExponent: new Uint8Array([0x03]),
             hash: { name: "SHA-256" }
         }, true, ["encrypt", "decrypt"]),
-        window.crypto.subtle.generateKey({
+        crypto.subtle.generateKey({
             name: "RSA-PSS",
             modulusLength: 2048,
             publicExponent: new Uint8Array([0x03]),
@@ -56,20 +62,34 @@ const genKeys = () => {
 };
 // TODO: use the given key to encrypt the data.
 // Use this via a port, to encrypt shares
-const encrypt = (key, data) => {};
+const encrypt = (publicKey, data) => {
+    return crypto.subtle.importKey(
+        "jwk", publicKey, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["encrypt"]
+    ).then((key) => {
+        return crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, data);
+    });
+};
 // should be used when we want to take out our share
-const decrypt = (key, data) => {};
+const decrypt = (privateKey, data) => {
+    return crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, data);
+};
 
 // TODO: sign a message with our key
 // should be used in API, before we send out a message
-const sign = (key, data) => {};
+const sign = (privateKey, data) => {
+    return crypto.subtle.sign({ name: "RSA-PSS", saltLength: 128 }, privateKey, data);
+};
 // should be used when we receive a message to check if it is authentic
-const verify = (key, data) => {};
+const verify = (publicKey, signature, data) => {
+    return crypto.subtle.importKey(
+        "jwk", publicKey, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["verify"]
+    ).then((key) => {
+        return crypto.subtle.verify({ name: "RSA-PSS", saltLength: 128 }, key, signature, data);
+    });
+};
 
-
-
-
-
+// store state + keys in storage
+// for keys, we can't store them directely, we can only store the exported keys
 const storeState = (state, keys) => {
     const forStorageKeys = {
         encryptionKey: {
@@ -89,9 +109,9 @@ const storeState = (state, keys) => {
     }
 };
 
-
+// create new keys
 const genNewKeys = (onGot) => {
-    genKeys().then(([encryptionKey, signKey]) => {
+    return genKeys().then(([encryptionKey, signKey]) => {
         return Promise.all([
             crypto.subtle.exportKey("jwk", encryptionKey.privateKey),
             crypto.subtle.exportKey("jwk", encryptionKey.publicKey),
@@ -113,30 +133,24 @@ const genNewKeys = (onGot) => {
                 }
             };
         });
-    }).then((keys) => {
-        onGot(keys);
     });
 };
 
-
-const genOrRestoreKeys = (state, keys, onGot) => {
+// gen new keys if keys === null, else import them
+const genOrRestoreKeys = (keys) => {
     if (keys === null) {
-        genNewKeys((keys) => {
-            onGot(state, keys);
-        });
+        return genNewKeys();
     } else {
-        importKeys(keys).then((myKeys) => {
-            onGot(state, myKeys);
-        });
+        return importKeys(keys);
     }
 };
 
 const importKeys = (keys) => {
     return Promise.all([
-        window.crypto.subtle.importKey("jwk", keys.encryptionKey.exportedPublic, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["encrypt"]),
-        window.crypto.subtle.importKey("jwk", keys.encryptionKey.exportedPrivate, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["decrypt"]),
-        window.crypto.subtle.importKey("jwk", keys.signingKey.exportedPublic, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["verify"]),
-        window.crypto.subtle.importKey("jwk", keys.signingKey.exportedPrivate, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["sign"])
+        crypto.subtle.importKey("jwk", keys.encryptionKey.exportedPublic, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["encrypt"]),
+        crypto.subtle.importKey("jwk", keys.encryptionKey.exportedPrivate, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["decrypt"]),
+        crypto.subtle.importKey("jwk", keys.signingKey.exportedPublic, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["verify"]),
+        crypto.subtle.importKey("jwk", keys.signingKey.exportedPrivate, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["sign"])
     ]).then(([pubEnc, privDec, pubVery, privSign]) => {
         return {
             encryptionKey: {
@@ -155,27 +169,29 @@ const importKeys = (keys) => {
     });
 };
 
-
-
+// retrive state and keys or if no keys are stored yet, generate new ones
 const getState = (onGot) => {
     if (runsInsideExtension()) {
         browser.storage.local.get({state: null, keys: null})
-            .then((state) => genOrRestoreKeys(state.state, state.keys, onGot))
-            .catch(() => {
+            .then((state) => {
+                return genOrRestoreKeys(state.keys).then((keys) => {
+                    onGot(state.state, keys);
+                });
+            }).catch(() => {
+                // TODO: pipe that to elm
                 console.error("couldn't get storage!");
             });
     } else {
-        const state = window.localStorage.getItem("state");
-        const keys = window.localStorage.getItem("keys");
+        let state = window.localStorage.getItem("state");
+        let keys = window.localStorage.getItem("keys");
         if (state !== null) {
-            if (keys !== null) {
-                genOrRestoreKeys(JSON.parse(state), JSON.parse(keys), onGot);
-            } else {
-                genOrRestoreKeys(JSON.parse(state), null, onGot);
-            }
-        } else {
-            genOrRestoreKeys(null, null, onGot);
+            state = JSON.parse(state);
+        } if (keys !== null) {
+            keys = JSON.parse(keys);
         }
+        genOrRestoreKeys(keys).then((myKeys) => {
+            onGot(state, myKeys);
+        });
     }
 
 };
@@ -193,12 +209,15 @@ const resetStorage = (state, keys) => {
 
 
 
+//--------------------------------------------------------------------------------
+// Random lib
+//--------------------------------------------------------------------------------
+
 const getRandomInts = (n) => {
     const randInts = new Uint32Array(n);
     crypto.getRandomValues(randInts);
     return Array.from(randInts);
 };
-
 
 
 const setup = (startFn, onStart) => {
