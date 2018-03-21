@@ -272,7 +272,10 @@ subs : ModelState -> Sub Msg
 subs state =
     ((case state of
         Loaded model ->
-            [ Api.connectPrivateSocket model.uniqueIdentifyier ]
+            [ Api.connectPrivateSocket model.uniqueIdentifyier
+            , Api.onSignedMsg
+            , Api.onAuthenticatedMsg
+            ]
 
         _ ->
             []

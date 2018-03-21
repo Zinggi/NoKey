@@ -131,6 +131,38 @@ informOfRemove myId otherId =
 
 sendMsgTo : String -> String -> String -> List ( String, Value ) -> Cmd Model.Msg
 sendMsgTo myId otherId type_ content =
+    Ports.getSignatureForMsg
+        { msg = JE.object (( "type", JE.string type_ ) :: content)
+        , otherId = otherId
+        }
+
+
+onSignedMsg : Sub Model.Msg
+onSignedMsg =
+    Ports.onSignedMsg
+        (\{ data, signature, otherId } ->
+            protocolMsg (Self (SendAuthenticatedMsgTo otherId data signature))
+        )
+
+
+sendAuthenticatedMsgTo : DeviceId -> DeviceId -> Value -> Value -> Cmd Model.Msg
+sendAuthenticatedMsgTo myId otherId content signature =
+    Http.post (apiUrl ("/sendMsgTo/" ++ otherId))
+        (Http.jsonBody
+            (JE.object
+                [ ( "type", JE.string "Authenticated" )
+                , ( "from", JE.string myId )
+                , ( "data", content )
+                , ( "signature", signature )
+                ]
+            )
+        )
+        (JD.succeed ())
+        |> Http.send (always (protocolMsg (Self NoReply)))
+
+
+sendNotAuthenticatedMsgTo : String -> String -> String -> List ( String, Value ) -> Cmd Model.Msg
+sendNotAuthenticatedMsgTo myId otherId type_ content =
     Http.post (apiUrl ("/sendMsgTo/" ++ otherId))
         (Http.jsonBody (JE.object (( "type", JE.string type_ ) :: ( "from", JE.string myId ) :: content)))
         (JD.succeed ())
@@ -248,17 +280,35 @@ update model msg =
                 Debug.crash ("got PairedWith, but we were not expecting it now:\n" ++ toString ( msg, state ))
                     |> always ( model, Cmd.none )
 
-            ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForPaired t0 token ) ->
+            --
+            ( FinishPairing otherId time otherToken otherSync, WaitForPaired t0 token ) ->
                 receiveFinishPairing token time otherToken otherId otherSync model
 
-            ( Authenticated otherId time (FinishPairing otherToken otherSync), WaitForFinished t0 token _ ) ->
+            ( FinishPairing otherId time otherToken otherSync, WaitForFinished t0 token _ ) ->
                 receiveFinishPairing token time otherToken otherId otherSync model
 
-            ( Authenticated _ _ (FinishPairing _ _), Init ) ->
+            ( FinishPairing otherId time otherToken otherSync, Init ) ->
                 -- This happens when we are already paired, beacause finishPairing is sent multiple times
                 ( model, Cmd.none )
 
             -- Independant of current state
+            ( Unverified otherId time data signature, _ ) ->
+                case Data.Sync.getSigningKeyOf otherId model.syncData of
+                    Just key ->
+                        model
+                            |> withCmds
+                                [ Ports.verifyAuthenticity
+                                    { data = data, signature = signature, key = key, from = otherId, time = time }
+                                ]
+
+                    Nothing ->
+                        let
+                            _ =
+                                Debug.log "Received a msg from an unknown source (id, time, data, signature)" ( otherId, time, data, signature )
+                        in
+                            model |> noCmd
+
+            --
             ( Authenticated otherId time (RequestShare key), _ ) ->
                 let
                     ( nId, notifications ) =
@@ -305,6 +355,7 @@ update model msg =
                 { model | syncData = Data.Sync.receiveVersion otherId version model.syncData }
                     |> syncToOthers
 
+            --
             ( Self (JoinedChannel v), _ ) ->
                 let
                     _ =
@@ -316,6 +367,9 @@ update model msg =
             ( Self (NewMsg v), _ ) ->
                 model
                     |> withCmds [ withTimestamp (jsonToMsg v >> protocolMsg) ]
+
+            ( Self (SendAuthenticatedMsgTo otherId data signature), _ ) ->
+                model |> withCmds [ sendAuthenticatedMsgTo model.syncData.id otherId data signature ]
 
             ( Self (SyncToOthers msg), _ ) ->
                 -- delay the sync update to others, as we might get multiple updates in a short time, so wait until it settled.
@@ -340,7 +394,13 @@ update model msg =
                         |> withCmds [ cmd, Ports.storeState (Data.Storage.encode newModel) ]
 
             ( Self (DecodeError e), _ ) ->
+                -- TODO: dont crash!!!
                 Debug.crash ("faild to decode msg" ++ e)
+                    |> always ( model, Cmd.none )
+
+            ( Self (FailedToVerifyAuthenticityOf otherId time data), _ ) ->
+                -- TODO: don't crash!!!
+                Debug.crash ("faild to verify authenticity of (otherId, time, msg):\n\n" ++ toString ( otherId, time, data ))
                     |> always ( model, Cmd.none )
 
             ( Self (Timer m), _ ) ->
@@ -484,7 +544,7 @@ pairWith myId time model =
 
 finishPairing : String -> String -> SyncData -> Cmd Model.Msg
 finishPairing otherId token sync =
-    sendMsgTo sync.id otherId "FinishPairing" [ ( "token", JE.string token ), ( "sync", Data.Sync.encodeShared sync.shared ) ]
+    sendNotAuthenticatedMsgTo sync.id otherId "FinishPairing" [ ( "token", JE.string token ), ( "sync", Data.Sync.encodeShared sync.shared ) ]
 
 
 syncToOthers : Model -> ( Model, Cmd Model.Msg )
@@ -502,6 +562,7 @@ syncToOthers model =
 
 requestShare : GroupId -> Model -> ( Model, Cmd Model.Msg )
 requestShare key model =
+    -- TODO: keep track of who we already got a response back and only send to the ones that haven't responded yet.
     model
         |> startTimer CollectShares (60 * Time.second)
         |> addCmds [ doRequestShare key model.syncData ]
@@ -543,6 +604,56 @@ jsonToMsg msg time =
             Self (DecodeError e)
 
 
+onAuthenticatedMsg : Sub Model.Msg
+onAuthenticatedMsg =
+    Ports.onAuthenticatedMsg
+        (\{ time, from, data, isAuthentic } ->
+            if isAuthentic then
+                case JD.decodeValue (authenticatedMsgDecoder from time) data of
+                    Ok m ->
+                        m
+
+                    Err e ->
+                        Self (DecodeError e)
+            else
+                Self (FailedToVerifyAuthenticityOf from time data)
+        )
+        |> Sub.map protocolMsg
+
+
+
+-- ({ data : Value, isAuthentic : Bool } -> msg) -> Sub msg
+
+
+authenticatedMsgDecoder : DeviceId -> Time -> Decoder Msg
+authenticatedMsgDecoder id time =
+    (JD.field "type" JD.string)
+        |> JD.andThen
+            (\t ->
+                case t of
+                    "SyncUpdate" ->
+                        JD.map SyncUpdate (JD.field "syncData" (Data.Sync.otherSharedDecoder id))
+
+                    "GotRemoved" ->
+                        JD.succeed GotRemoved
+
+                    "RequestShare" ->
+                        JD.map RequestShare (JD.field "shareId" groupIdDecoder)
+
+                    "GrantedShareRequest" ->
+                        JD.map2 GrantedShareRequest
+                            (JD.field "shareId" groupIdDecoder)
+                            (JD.field "share" SecretSharing.shareDecoder)
+
+                    "NeedsUpdate" ->
+                        JD.map NeedsUpdate (JD.field "version" VClock.decoder)
+
+                    other ->
+                        JD.fail ("no recognized type: " ++ other)
+            )
+        |> JD.map (Authenticated id time)
+
+
 serverResponseDecoder : Time -> JD.Decoder Msg
 serverResponseDecoder time =
     (JD.map2 (,)
@@ -556,34 +667,15 @@ serverResponseDecoder time =
                         JD.succeed (PairedWith (Ok id))
                             |> JD.map Server
 
-                    -- TODO: these messages should be authenticated with an HMAC
-                    "SyncUpdate" ->
-                        JD.map SyncUpdate (JD.field "syncData" (Data.Sync.otherSharedDecoder id))
-                            |> JD.map (Authenticated id time)
-
-                    "GotRemoved" ->
-                        JD.succeed GotRemoved
-                            |> JD.map (Authenticated id time)
-
-                    "RequestShare" ->
-                        JD.map RequestShare (JD.field "shareId" groupIdDecoder)
-                            |> JD.map (Authenticated id time)
-
-                    "GrantedShareRequest" ->
-                        JD.map2 GrantedShareRequest
-                            (JD.field "shareId" groupIdDecoder)
-                            (JD.field "share" SecretSharing.shareDecoder)
-                            |> JD.map (Authenticated id time)
-
-                    "NeedsUpdate" ->
-                        JD.map NeedsUpdate (JD.field "version" VClock.decoder)
-                            |> JD.map (Authenticated id time)
-
                     "FinishPairing" ->
-                        JD.map2 FinishPairing
+                        JD.map2 (FinishPairing id time)
                             (JD.field "token" JD.string)
                             (JD.field "sync" (Data.Sync.otherSharedDecoder id))
-                            |> JD.map (Authenticated id time)
+
+                    "Authenticated" ->
+                        JD.map2 (Unverified id time)
+                            (JD.field "data" JD.value)
+                            (JD.field "signature" JD.value)
 
                     other ->
                         JD.fail ("no recognized type: " ++ other)

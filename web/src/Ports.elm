@@ -1,5 +1,6 @@
 port module Ports exposing (..)
 
+import Time exposing (Time)
 import Json.Encode exposing (Value)
 import Data.Notifications exposing (SiteEntry)
 import Data exposing (GroupId)
@@ -59,3 +60,19 @@ port fillForm : { login : String, site : String, password : String } -> Cmd msg
 {-| indicate to the popup that it should close itself
 -}
 port closePopup : () -> Cmd msg
+
+
+
+-- Crypto stuff
+
+
+port verifyAuthenticity : { time : Time, from : String, data : Value, signature : Value, key : Value } -> Cmd msg
+
+
+port onAuthenticatedMsg : ({ data : Value, isAuthentic : Bool, time : Time, from : String } -> msg) -> Sub msg
+
+
+port getSignatureForMsg : { msg : Value, otherId : String } -> Cmd msg
+
+
+port onSignedMsg : ({ data : Value, signature : Value, otherId : String } -> msg) -> Sub msg

@@ -223,6 +223,11 @@ knownIds sync =
     ORDict.getWith SingleVersionRegister.get sync.shared.knownIds
 
 
+getSigningKeyOf : DeviceId -> SyncData -> Maybe Value
+getSigningKeyOf id sync =
+    knownIds sync |> Dict.get id |> Maybe.map .signingKey
+
+
 {-| returns Dict Id (Name, IdPart)
 the IdPart is used to distinguish devices with the same name
 -}

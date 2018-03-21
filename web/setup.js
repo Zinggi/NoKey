@@ -33,6 +33,31 @@ const runsInsideExtension = () => {
 };
 
 
+const jsonToUint = (json) => {
+    return stringToUint(JSON.stringify(json));
+};
+
+const uintToJson = (uint) => {
+    return JSON.parse(uintToString(uint));
+};
+
+const stringToUint = (input) => {
+    return (new TextEncoder()).encode(input);
+};
+
+const uintToString = (uintArray) => {
+    return (new TextDecoder()).decode(uintArray);
+};
+
+const arrayBufferToBase64 = (buff) => {
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(buff)));
+};
+
+const base64toArrayBuffer = (str) => {
+    return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+};
+
+
 //--------------------------------------------------------------------------------
 // Crypto lib
 //--------------------------------------------------------------------------------
@@ -66,25 +91,34 @@ const encrypt = (publicKey, data) => {
     return crypto.subtle.importKey(
         "jwk", publicKey, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["encrypt"]
     ).then((key) => {
-        return crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, data);
+        return crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, jsonToUint(data));
     });
 };
 // should be used when we want to take out our share
 const decrypt = (privateKey, data) => {
-    return crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, data);
+    return crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, data).then((dec) => {
+        console.log(dec);
+        return uintToJson(dec);
+    });
 };
 
-// TODO: sign a message with our key
+// Sign a message with our key
 // should be used in API, before we send out a message
 const sign = (privateKey, data) => {
-    return crypto.subtle.sign({ name: "RSA-PSS", saltLength: 128 }, privateKey, data);
+    const signedData = JSON.stringify(data);
+    return crypto.subtle.sign({ name: "RSA-PSS", saltLength: 128 }, privateKey, stringToUint(signedData)).then((signature) => {
+        return { signature : arrayBufferToBase64(signature), signedData: signedData };
+    });
 };
 // should be used when we receive a message to check if it is authentic
 const verify = (publicKey, signature, data) => {
     return crypto.subtle.importKey(
         "jwk", publicKey, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["verify"]
     ).then((key) => {
-        return crypto.subtle.verify({ name: "RSA-PSS", saltLength: 128 }, key, signature, data);
+        return crypto.subtle.verify({ name: "RSA-PSS", saltLength: 128 }, key, base64toArrayBuffer(signature), stringToUint(data)).then((isAuthentic) => {
+            const parsedData = JSON.parse(data);
+            return { data: parsedData, isAuthentic: isAuthentic };
+        });
     });
 };
 
@@ -151,7 +185,7 @@ const importKeys = (keys) => {
         crypto.subtle.importKey("jwk", keys.encryptionKey.exportedPrivate, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["decrypt"]),
         crypto.subtle.importKey("jwk", keys.signingKey.exportedPublic, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["verify"]),
         crypto.subtle.importKey("jwk", keys.signingKey.exportedPrivate, { name: "RSA-PSS", hash: {name: "SHA-256"} }, true, ["sign"])
-    ]).then(([pubEnc, privDec, pubVery, privSign]) => {
+    ]).then(([pubEnc, privDec, pubVeri, privSign]) => {
         return {
             encryptionKey: {
                 private: privDec,
@@ -161,7 +195,7 @@ const importKeys = (keys) => {
             },
             signingKey: {
                 private: privSign,
-                public: pubVery,
+                public: pubVeri,
                 exportedPublic: keys.signingKey.exportedPublic,
                 exportedPrivate: keys.signingKey.exportedPrivate
             }
@@ -238,8 +272,17 @@ const setup = (startFn, onStart) => {
             initialSeed: [rands[0], rands.slice(1)],
             storedState: state,
             encryptionKey: keys.encryptionKey.exportedPublic,
-            signingKey: keys.signingKey.exportedPrivate,
+            signingKey: keys.signingKey.exportedPublic,
             deviceType: deviceType
+        };
+
+        // TODO: remove
+        window.testCrypto = {
+            sign: (data) => sign(keys.signingKey.private, data),
+            verify: (signature, data) => verify(keys.signingKey.exportedPublic, signature, data),
+            encrypt: (data) => encrypt(keys.encryptionKey.exportedPublic, data),
+            decrypt: (data) => decrypt(keys.encryptionKey.private, data),
+            keys: keys
         };
 
         // console.log(flags);
@@ -258,6 +301,32 @@ const setup = (startFn, onStart) => {
         app.ports.resetStorage.subscribe((state) => {
             resetStorage(state, keys);
         });
+
+
+        // Crypto stuff
+        // TODO:
+        // port verifyAuthenticity : { time : Time, from : String, data : Value, signature : Value, key : Value } -> Cmd msg
+        // port onAuthenticatedMsg : ({ data : Value, isAuthentic : Bool, time : Time, from : String } -> msg) -> Sub msg
+        app.ports.verifyAuthenticity.subscribe((msg) => {
+            console.log("verify authenticity", msg);
+            verify(msg.key, msg.signature, msg.data).then((res) => {
+                console.log("verified", res);
+                app.ports.onAuthenticatedMsg.send(
+                    { data: res.data, isAuthentic: res.isAuthentic, time: msg.time, from: msg.from }
+                );
+            });
+        });
+
+        // port getSignatureForMsg : { msg : Value, otherId : String } -> Cmd msg
+        // port onSignedMsg : ({ data : Value, signature : Value, otherId : String } -> msg) -> Sub msg
+        app.ports.getSignatureForMsg.subscribe((data) => {
+            console.log("get signature for msg", data);
+            sign(keys.signingKey.private, data.msg).then((res) => {
+                console.log("signed msg", res);
+                app.ports.onSignedMsg.send({ data: res.signedData, signature: res.signature, otherId: data.otherId });
+            });
+        });
+
 
         if (onStart) {
             onStart(app);

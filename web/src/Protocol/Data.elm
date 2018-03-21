@@ -13,13 +13,18 @@ import Timer exposing (Timer)
 --
 
 import Data.Sync exposing (SyncData, OtherSharedData)
-import Data exposing (GroupId)
+import Data exposing (GroupId, DeviceId)
 import Data.Notifications
 
 
 type Msg
     = Server ServerMsg
     | Authenticated String Time AuthenticatedMsg
+    | FinishPairing String Time String Data.Sync.OtherSharedData
+      -- We get this when we receive an authenticated msg.
+      -- We first have to check if the data matches the signature and only then will it become an AuthenticatedMsg
+      -- The two Value's are data and signature, in that order.
+    | Unverified String Time Value Value
     | Self SelfMsg
 
 
@@ -31,7 +36,9 @@ type TimerId
 
 type SelfMsg
     = NoReply
+    | SendAuthenticatedMsgTo DeviceId Value Value
     | DecodeError String
+    | FailedToVerifyAuthenticityOf String Time Value
     | JoinedChannel Value
     | NewMsg Value
     | SyncToOthers Debounce.Msg
@@ -46,8 +53,7 @@ type ServerMsg
 
 
 type AuthenticatedMsg
-    = FinishPairing String Data.Sync.OtherSharedData
-    | SyncUpdate OtherSharedData
+    = SyncUpdate OtherSharedData
     | RequestShare GroupId
     | GrantedShareRequest GroupId SecretSharing.Share
     | GotRemoved
