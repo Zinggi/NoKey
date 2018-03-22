@@ -3,7 +3,7 @@ port module Ports exposing (..)
 import Time exposing (Time)
 import Json.Encode exposing (Value)
 import Data.Notifications exposing (SiteEntry)
-import Data exposing (GroupId)
+import Data exposing (GroupId, DeviceId)
 
 
 port setTitle : String -> Cmd msg
@@ -64,6 +64,8 @@ port closePopup : () -> Cmd msg
 
 
 -- Crypto stuff
+----------------------------------------------------------------------------------
+-- Sign / verify
 
 
 port verifyAuthenticity : { time : Time, from : String, data : Value, signature : Value, key : Value } -> Cmd msg
@@ -76,3 +78,19 @@ port getSignatureForMsg : { msg : Value, otherId : String } -> Cmd msg
 
 
 port onSignedMsg : ({ data : Value, signature : Value, otherId : String } -> msg) -> Sub msg
+
+
+
+-- encrypt / decrypt
+
+
+port decryptMyShares : List ( GroupId, Value ) -> Cmd msg
+
+
+port onReceiveMyShares : (List ( GroupId, Value ) -> msg) -> Sub msg
+
+
+port encryptNewShares : { time : Time, groupId : GroupId, shares : List ( DeviceId, ( Value, Value ) ) } -> Cmd msg
+
+
+port onNewEncryptedShares : ({ time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) } -> msg) -> Sub msg

@@ -22,6 +22,7 @@ import Data.Notifications as Notifications exposing (Notifications, Notification
 import Data.Sync exposing (SyncData, OtherSharedData)
 import Data exposing (GroupId, AccountId, Password)
 import Data.Storage
+import Data exposing (..)
 import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
 import Views.Pairing
@@ -61,6 +62,8 @@ type Msg
     | DismissNotification Notifications.Id
     | FillForm AccountId
     | ProtocolMsg Protocol.Msg
+    | ReceiveMyShares (List ( GroupId, Value ))
+    | NewEncryptedShares { time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) }
     | OnStateRequest
 
 

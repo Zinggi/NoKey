@@ -85,12 +85,19 @@ update msg model =
 
         InsertSite accountId groupId password timestamp ->
             let
-                ( newSync, newSeed, shouldAsk ) =
-                    Data.Sync.insertSite timestamp model.seed accountId groupId password model.syncData
+                ( newSync, newSeed, shouldRequestShare, cmd ) =
+                    Data.Sync.insertSite encryptShares timestamp model.seed accountId groupId password model.syncData
+
+                -- TODO: here we should encrypt the shares for the others
+                -- share with others
+                -- |> addNewShares time groupId sharesForOthers
+                encryptShares time groupId shares =
+                    Ports.encryptNewShares { time = time, groupId = groupId, shares = shares }
             in
                 { model | syncData = newSync, seed = newSeed }
                     |> Api.syncToOthers
-                    |> andThenUpdateIf shouldAsk (Api.requestShare groupId)
+                    |> addCmds [ cmd ]
+                    |> andThenUpdateIf shouldRequestShare (Api.requestShare groupId)
 
         SiteNameChanged s ->
             { model
@@ -231,6 +238,13 @@ update msg model =
 
                 Nothing ->
                     model |> noCmd
+
+        ReceiveMyShares myShares ->
+            { model | syncData = Data.Sync.addToMyShares myShares model.syncData } |> noCmd
+
+        NewEncryptedShares { time, groupId, shares } ->
+            { model | syncData = Data.Sync.addNewShares time groupId shares model.syncData }
+                |> Api.syncToOthers
     )
         |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ] ))
 
@@ -275,6 +289,8 @@ subs state =
             [ Api.connectPrivateSocket model.uniqueIdentifyier
             , Api.onSignedMsg
             , Api.onAuthenticatedMsg
+            , Ports.onReceiveMyShares ReceiveMyShares
+            , Ports.onNewEncryptedShares NewEncryptedShares
             ]
 
         _ ->

@@ -7,6 +7,7 @@ import RemoteData exposing (WebData, RemoteData(..))
 import RemoteData.Http
 import Task exposing (Task)
 import Time exposing (Time)
+import Dict exposing (Dict)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -21,6 +22,7 @@ import Timer
 
 --
 
+import SecretSharing
 import Helper exposing (..)
 import Data.Sync exposing (SyncData, OtherSharedData)
 import Data exposing (GroupId)
@@ -72,7 +74,7 @@ endPointUrl pre path =
     -- TODO: change
     -- "localhost"
     {- etz upper -}
-    "10.2.120.53"
+    "10.2.118.194"
         -- {- etz lower -}
         -- "10.2.122.231"
         -- {- hg lower -}
@@ -312,6 +314,8 @@ update model msg =
             ( Authenticated otherId time (RequestShare key), _ ) ->
                 let
                     ( nId, notifications ) =
+                        -- TODO: only show message if we actually have a share!
+                        -- Otherwise, reject immediately
                         Notifications.newShareRequestWithId otherId key model.notifications
                 in
                     model
@@ -321,8 +325,8 @@ update model msg =
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
                 -- TODO: stop asking the ones that already gave us a share
                 let
-                    ( newSync, mayForm ) =
-                        Data.Sync.addShare time key share model.syncData
+                    ( newSync, mayForm, cmd ) =
+                        Data.Sync.addShare encryptNewShares time key share model.syncData
 
                     newModel =
                         { model | syncData = newSync }
@@ -331,21 +335,26 @@ update model msg =
                         Just formData ->
                             -- if done and fillForm is set, call port to fill the form
                             newModel
-                                |> withCmds [ Task.perform (\_ -> Model.FillForm formData) (Task.succeed ()) ]
+                                |> withCmds [ Task.perform (\_ -> Model.FillForm formData) (Task.succeed ()), cmd ]
                                 |> andThenUpdate syncToOthers
 
                         Nothing ->
-                            newModel |> syncToOthers
+                            newModel
+                                |> syncToOthers
+                                |> addCmds [ cmd ]
 
             ( Authenticated otherId time (SyncUpdate otherSync), _ ) ->
                 let
                     ( debounce, cmd ) =
                         Debounce.push syncToOthersDebouncer () state.debounce
+
+                    ( newSync, syncCmd ) =
+                        Data.Sync.merge decryptMyShares time otherSync sync
                 in
                     { state | debounce = debounce }
                         |> updateState model
-                        |> (\m -> { m | syncData = Data.Sync.merge time otherSync sync })
-                        |> withCmds [ cmd ]
+                        |> (\m -> { m | syncData = newSync })
+                        |> withCmds [ cmd, syncCmd ]
 
             ( Authenticated otherId time GotRemoved, _ ) ->
                 { model | syncData = Data.Sync.gotRemoved model.syncData }
@@ -453,17 +462,32 @@ receiveFinishPairing token time otherToken otherId otherSync model =
     -- merge sync, send finish and go back to init. Also save here, as this after this there is no sync update
     if token == otherToken then
         let
-            mergedSync =
-                Data.Sync.merge time otherSync model.syncData
+            ( mergedSync, cmd ) =
+                Data.Sync.merge decryptMyShares time otherSync model.syncData
 
             newModel =
                 backToInit model
                     |> (\m -> { m | syncData = mergedSync })
         in
             newModel
-                |> withCmds [ finishPairing otherId token mergedSync, Ports.storeState (Data.Storage.encode newModel) ]
+                |> withCmds [ finishPairing otherId token mergedSync, Ports.storeState (Data.Storage.encode newModel), cmd ]
+                |> andThenUpdate syncToOthers
     else
         ( model, Cmd.none )
+
+
+encryptNewShares : Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg
+encryptNewShares time groupId shares =
+    Ports.encryptNewShares
+        { time = time
+        , groupId = groupId
+        , shares = shares
+        }
+
+
+decryptMyShares : Dict GroupId Value -> Cmd Model.Msg
+decryptMyShares shares =
+    Ports.decryptMyShares (Dict.toList shares)
 
 
 backToInit : Model -> Model

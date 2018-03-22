@@ -64,8 +64,8 @@ const base64toArrayBuffer = (str) => {
 const crypto = window.crypto || window.msCrypto;
 
 // returns a promise with two keys, [encryptionKey, signKey]
-// TODO: call this if we haven't stored a key yet
-// if there is an error anywhere, pass error along to elm inside flag to display error message
+// call this if we haven't stored a key yet
+// TODO: if there is an error anywhere, pass error along to elm inside flag to display error message
 const genKeys = () => {
     // console.log("gen RSA-OAEP key: (encryption):");
     // TODO: should use this polyfill
@@ -85,19 +85,24 @@ const genKeys = () => {
         }, true, ["sign", "verify"])
     ]);
 };
-// TODO: use the given key to encrypt the data.
+
+// Use the given key to encrypt the data.
 // Use this via a port, to encrypt shares
+// Can only encrypt small data!
 const encrypt = (publicKey, data) => {
-    return crypto.subtle.importKey(
+    const imported = crypto.subtle.importKey(
         "jwk", publicKey, { name: "RSA-OAEP", hash: {name: "SHA-256"} }, true, ["encrypt"]
-    ).then((key) => {
-        return crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, jsonToUint(data));
+    );
+    return imported.then((key) => {
+        const buffer = jsonToUint(data);
+        return crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, buffer).then((enc) => {
+            return arrayBufferToBase64(enc);
+        });
     });
 };
 // should be used when we want to take out our share
 const decrypt = (privateKey, data) => {
-    return crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, data).then((dec) => {
-        console.log(dec);
+    return crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, base64toArrayBuffer(data)).then((dec) => {
         return uintToJson(dec);
     });
 };
@@ -276,7 +281,7 @@ const setup = (startFn, onStart) => {
             deviceType: deviceType
         };
 
-        // TODO: remove
+        // TODO: remove! This is only for testing
         window.testCrypto = {
             sign: (data) => sign(keys.signingKey.private, data),
             verify: (signature, data) => verify(keys.signingKey.exportedPublic, signature, data),
@@ -304,13 +309,13 @@ const setup = (startFn, onStart) => {
 
 
         // Crypto stuff
-        // TODO:
+
         // port verifyAuthenticity : { time : Time, from : String, data : Value, signature : Value, key : Value } -> Cmd msg
         // port onAuthenticatedMsg : ({ data : Value, isAuthentic : Bool, time : Time, from : String } -> msg) -> Sub msg
         app.ports.verifyAuthenticity.subscribe((msg) => {
-            console.log("verify authenticity", msg);
+            // console.log("verify authenticity", msg);
             verify(msg.key, msg.signature, msg.data).then((res) => {
-                console.log("verified", res);
+                // console.log("verified", res);
                 app.ports.onAuthenticatedMsg.send(
                     { data: res.data, isAuthentic: res.isAuthentic, time: msg.time, from: msg.from }
                 );
@@ -320,10 +325,44 @@ const setup = (startFn, onStart) => {
         // port getSignatureForMsg : { msg : Value, otherId : String } -> Cmd msg
         // port onSignedMsg : ({ data : Value, signature : Value, otherId : String } -> msg) -> Sub msg
         app.ports.getSignatureForMsg.subscribe((data) => {
-            console.log("get signature for msg", data);
+            // console.log("get signature for msg", data);
             sign(keys.signingKey.private, data.msg).then((res) => {
-                console.log("signed msg", res);
+                // console.log("signed msg", res);
                 app.ports.onSignedMsg.send({ data: res.signedData, signature: res.signature, otherId: data.otherId });
+            });
+        });
+
+        // port decryptMyShares : List ( GroupId, Value ) -> Cmd msg
+        // port onReceiveMyShares : (List ( GroupId, Value ) -> msg) -> Sub msg
+        app.ports.decryptMyShares.subscribe((shares) => {
+            // console.log("should decrypt my shares:", shares);
+            const cmds = shares.map((idShare) => {
+                let share = idShare[1];
+                return decrypt(keys.encryptionKey.private, share.y).then((newY) => {
+                    share.y = newY;
+                    return [idShare[0], share];
+                });
+            });
+            Promise.all(cmds).then((shares) => {
+                // console.log("decrypted my shares:", shares);
+                app.ports.onReceiveMyShares.send(shares);
+            });
+        });
+
+        // port encryptNewShares : { time : Time, groupId : GroupId, shares : List ( DeviceId, ( Value, Value ) ) } -> Cmd msg
+        // port onNewEncryptedShares : ({ time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) } -> msg) -> Sub msg
+        app.ports.encryptNewShares.subscribe((msg) => {
+            console.log("should encrypt new shares:", msg);
+            const cmds = msg.shares.map((idKeyShare) => {
+                let share = idKeyShare[1][1];
+                return encrypt(idKeyShare[1][0], share.y).then((yEnc) => {
+                    share.y = yEnc;
+                    return [idKeyShare[0], share ];
+                });
+            });
+            Promise.all(cmds).then((shares) => {
+                console.log("new shares encrypted:", shares);
+                app.ports.onNewEncryptedShares.send({ time: msg.time, groupId: msg.groupId, shares: shares });
             });
         });
 
