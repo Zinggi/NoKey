@@ -4,4 +4,5 @@ index.html
 .cache/
 dist/
 node_modules/
+yarn-error.log
 documentation.json

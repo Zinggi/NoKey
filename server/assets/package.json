@@ -1,0 +1,9 @@
+{
+  "name": "nokey",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "webpack": "^4.2.0"
+  }
+}

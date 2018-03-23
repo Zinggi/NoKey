@@ -45,6 +45,8 @@ defmodule NoPass.Mixfile do
       {:mnemonic_slugs, "~> 0.0.3"},
       # for required headers for CORS
       {:cors_plug, "~> 1.2"},
+      # for deployement
+      {:distillery, "~> 1.5", runtime: false},
       # for a Map where keys can expire
       # or maybe this instead:
       # https://hexdocs.pm/mem/readme.html
