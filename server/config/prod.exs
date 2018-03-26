@@ -15,7 +15,7 @@ use Mix.Config
 # which you typically run after static files are built.
 config :no_pass, NoPassWeb.Endpoint,
   load_from_system_env: true,
-  url: [host: "localhost", port: {:system, "PORT"}],
+  url: [host: "virt35.ethz.ch", port: {:system, "PORT"}],
   cache_static_manifest: "priv/static/cache_manifest.json",
   server: true,
   root: '.',
