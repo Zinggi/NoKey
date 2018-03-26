@@ -6,6 +6,8 @@ defmodule NoPassWeb.PageController do
   end
 
   def webApp(conn, _params) do
-    render conn, "webApp.html"
+    conn
+    |> put_resp_header("content-type", "text/html; charset=utf-8")
+    |> Plug.Conn.send_file(200, Application.app_dir(:no_pass, "priv/static/main.html"))
   end
 end

@@ -5,9 +5,7 @@
 # is restricted to this project.
 use Mix.Config
 
-# General application configuration
-config :no_pass,
-  ecto_repos: [NoPass.Repo]
+
 
 # Configures the endpoint
 config :no_pass, NoPassWeb.Endpoint,

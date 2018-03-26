@@ -9,11 +9,3 @@ config :no_pass, NoPassWeb.Endpoint,
 # Print only warnings and errors during test
 config :logger, level: :warn
 
-# Configure your database
-config :no_pass, NoPass.Repo,
-  adapter: Ecto.Adapters.Postgres,
-  username: "postgres",
-  password: "postgres",
-  database: "no_pass_test",
-  hostname: "localhost",
-  pool: Ecto.Adapters.SQL.Sandbox

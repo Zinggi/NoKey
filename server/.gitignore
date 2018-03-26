@@ -16,5 +16,4 @@ erl_crash.dump
 /config/*.secret.exs
 
 # these files are generated/copied from elsewhere
-priv/static/js/main.js
-priv/static/js/setup.js
+priv/static

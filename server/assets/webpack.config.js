@@ -1,10 +1,13 @@
 const path = require('path');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
+const elmSource = path.resolve(__dirname, '../../web/');
+const out = path.resolve(__dirname, '../priv/static/');
 module.exports = {
-    entry: './index.js',
+    entry: '../../web/index.js',
     output: {
         filename: 'bundle.js',
-        path: path.resolve(__dirname, 'dist')
+        path: out
     },
     module: {
         rules: [{
@@ -19,7 +22,8 @@ module.exports = {
                 loader: "elm-webpack-loader",
                 options: {
                     debug: true,
-                    warn: true
+                    warn: true,
+                    cwd: elmSource
                 }
             }
         ],
@@ -27,7 +31,8 @@ module.exports = {
     },
     devServer: {
         // inline: true,
-        contentBase: './dist',
+        contentBase: out,
         // stats: 'errors-only'
-    }
+    },
+    plugins: [new CopyWebpackPlugin([{ from: 'static' }], {})]
 };

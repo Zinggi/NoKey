@@ -1,9 +1,20 @@
 {
   "name": "nokey",
   "version": "1.0.0",
-  "main": "index.js",
   "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "errors": "webpack --mode development --display-error-details",
+    "dev": "webpack-dev-server --mode development --port 3000"
+  },
   "devDependencies": {
-    "webpack": "^4.2.0"
+    "copy-webpack-plugin": "^4.5.1",
+    "elm-webpack-loader": "^4.5.0",
+    "file-loader": "^1.1.11",
+    "webpack": "^4.2.0",
+    "webpack-cli": "^2.0.13",
+    "webpack-dev-server": "^3.1.1"
   }
 }
