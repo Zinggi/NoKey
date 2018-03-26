@@ -74,13 +74,16 @@ endPointUrl pre path =
     -- TODO: change
     -- "localhost"
     {- etz upper -}
-    "10.2.118.194"
-        -- {- etz lower -}
-        -- "10.2.122.231"
-        -- {- hg lower -}
-        -- "10.2.54.70"
-        -- "floyogaarch.fritz.box"
-        |> (\ip -> pre ++ ip ++ ":4000" ++ path)
+    -- "10.2.118.194"
+    -- {- etz lower -}
+    -- "10.2.122.231"
+    -- {- hg lower -}
+    -- "10.2.54.70"
+    -- "floyogaarch.fritz.box"
+    -- Server
+    "virt35.ethz.ch"
+        -- |> (\ip -> pre ++ ip ++ ":4000" ++ path)
+        |> (\ip -> pre ++ ip ++ path)
 
 
 apiUrl : String -> String

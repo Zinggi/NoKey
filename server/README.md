@@ -16,7 +16,9 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
 
   * Possibly increment version in `mix.exs`
   * Compile `MIX_ENV=prod mix compile`
-  * Build assets: `cd assets`, `yarn build`, `cd ..`
+  * Build elm and assets:
+    + (first time) `cd ../web/`, `elm-github-install`, `cd ../server`
+    + `cd assets`, `yarn build`, `cd ..`
   * Digest assets `MIX_ENV=prod mix phx.digest`
   * (optional) test if it works: `PORT=4001 MIX_ENV=prod mix phx.server`
   * Build release:
@@ -28,8 +30,6 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
             * (optional) to test locally: `cp _build/prod/rel/no_pass/releases/0.0.1/no_pass.tar.gz ~/Downloads/passwordManager/builds/`
         + (on server) unzip `tar xvf no_pass.tar.gz`
         + start `sudo REPLACE_OS_VARS=true PORT=80 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' ./bin/no_pass start`
-        + (if you get an error with libncursesw.so.6):
-            * `ln -s /lib/x86_64-linux-gnu/libncursesw.so.5  /lib/x86_64-linux-gnu/libncursesw.so.6`
     
     - else (TODO: TEST):
         + create upgrade: `MIX_ENV=prod mix release --env=prod --upgrade`
