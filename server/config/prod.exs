@@ -18,6 +18,8 @@ config :no_pass, NoPassWeb.Endpoint,
   url: [host: "virt35.ethz.ch", port: {:system, "PORT"}],
   cache_static_manifest: "priv/static/cache_manifest.json",
   server: true,
+  # Is this ok? We probably would be better off with a list of allowed origins
+  check_origin: false,
   root: '.',
   version: Application.spec(:myapp, :vsn),
   # get this from env
