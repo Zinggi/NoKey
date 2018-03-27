@@ -3,10 +3,10 @@ const sendSize = (id) => () => {
     const firstDiv = document.body.children[2];
     if (!firstDiv) return;
 
-    console.log(firstDiv);
+    // console.log(firstDiv);
     const width = firstDiv.scrollWidth;
     const height = firstDiv.scrollHeight;
-    console.log(id, width, height);
+    // console.log(id, width, height);
     // Send height back to parent page
     window.parent.postMessage({ type: "onSizeChanged", data: { height: height, width: width, id: id } }, "*");
 };

@@ -15,6 +15,13 @@
 * build files:
     `yarn build`
 
+
+## create a package
+
+* `rm -r * addon/*`
+* `yarn build`
+* `web-ext build -s addon/`
+
 https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
 
 

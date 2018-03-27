@@ -33,6 +33,8 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
     
     - else:
         + create upgrade: `MIX_ENV=prod mix release --env=prod --upgrade`
+        + create folder on server: `mkdir ~/nokey/builds/releases/<0.0.2>`
         + copy to server: `scp _build/prod/rel/no_pass/releases/<0.0.2>/no_pass.tar.gz ~/nokey/builds/releases/<0.0.2>/`
+        + `cd ~/nokey/builds/`
         + `<SAME_ENVS_USED_TO_START> ~/nokey/builds/bin/no_pass upgrade <0.0.2>`
 
