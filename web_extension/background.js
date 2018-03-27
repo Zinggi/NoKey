@@ -1,6 +1,5 @@
-import { setup } from '../web/setup.js';
-import Elm from './build/apps.js';
-
+import { setup } from '../web/js/setup.js';
+import Elm from "./elm/elm.js";
 // console.log("(background) start background.js");
 
 const sendMsgToAll = (msg, ports) => {
@@ -76,7 +75,7 @@ setup(Elm.MainBackground.worker, (app) => {
                 return;
             }
             hasPopupOpen = true;
-            const popupUrl = browser.extension.getURL("dist/main.html");
+            const popupUrl = browser.extension.getURL("popup/main.html");
             browser.windows.create({
                 url: popupUrl,
                 width: 600,

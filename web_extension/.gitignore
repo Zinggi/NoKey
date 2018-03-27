@@ -4,3 +4,5 @@ elm-stuff/
 node_modules/
 web-ext-artifacts/
 .cache/
+yarn-error.log
+addon/

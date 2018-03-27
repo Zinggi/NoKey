@@ -24,23 +24,23 @@
   "browser_action": {
     "default_icon": "icons/library.svg",
     "default_title": "NoKey",
-    "default_popup": "dist/main.html"
+    "default_popup": "popup/main.html"
   },
 
   "web_accessible_resources": [
       "icons/library.svg",
-      "dist/newPassword.html",
-      "dist/fillForm.html"
+      "content_scripts/newPassword.html",
+      "content_scripts/fillForm.html"
   ],
 
   "background": {
-    "scripts": ["dist/background.js"]
+    "scripts": ["commons/bundle.js", "background/bundle.js"]
   },
 
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["dist/pageUtils.js"],
+      "js": ["content/bundle.js"],
       "run_at": "document_end"
     }
   ],

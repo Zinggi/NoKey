@@ -2,16 +2,21 @@
   "name": "web_extension",
   "version": "1.0.0",
   "description": "",
+  "private": true,
   "dependencies": {
     "action-outside": "^1.0.2"
   },
-  "devDependencies": {
-    "parcel-plugin-elm": "^0.1.2-alpha"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "./watch.sh",
-    "build": "./build.sh"
+    "build": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "errors": "webpack --mode development --display-error-details"
+  },
+  "devDependencies": {
+    "copy-webpack-plugin": "^4.5.1",
+    "elm-webpack-loader": "^4.5.0",
+    "file-loader": "^1.1.11",
+    "webpack": "^4.2.0",
+    "webpack-cli": "^2.0.13"
   },
   "author": "",
   "license": "ISC"

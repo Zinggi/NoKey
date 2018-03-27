@@ -1,6 +1,6 @@
 const path = require('path');
 
-module.exports = {
+module.exports = () => ({
     entry: './index.js',
     output: {
         filename: 'bundle.js',
@@ -15,10 +15,9 @@ module.exports = {
             {
                 test: /\.elm$/,
                 exclude: [/elm-stuff/, /node_modules/],
-                // This is what you need in your own work
                 loader: "elm-webpack-loader",
                 options: {
-                    debug: true,
+                    debug: argv.mode === 'production' ? false : true,
                     warn: true
                 }
             }
@@ -30,4 +29,4 @@ module.exports = {
         contentBase: './dist',
         // stats: 'errors-only'
     }
-};
+});

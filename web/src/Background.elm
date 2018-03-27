@@ -49,18 +49,20 @@ onLoaded model =
 
 updateModelState : Msg -> ModelState -> ( ModelState, Cmd Msg )
 updateModelState msg state =
-    case state of
+    (case state of
         LoadingError err ->
             state |> noCmd
 
         Loaded model ->
             update msg model
                 |> (\( m, cmd ) -> ( Loaded m, cmd ))
+    )
+        |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ] ))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    (case msg of
+    case msg of
         OnStateRequest ->
             -- Since we send our state out on every update, we don't need to do anything here
             model |> noCmd
@@ -245,8 +247,6 @@ update msg model =
         NewEncryptedShares { time, groupId, shares } ->
             { model | syncData = Data.Sync.addNewShares time groupId shares model.syncData }
                 |> Api.syncToOthers
-    )
-        |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ] ))
 
 
 saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )

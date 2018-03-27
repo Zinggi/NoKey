@@ -1,4 +1,4 @@
-import Elm from '../build/apps.js';
+import Elm from '../elm/elm.js';
 
 const app = Elm.Popup.fullscreen();
 

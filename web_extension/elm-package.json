@@ -12,7 +12,10 @@
     "native-modules": true,
     "dependencies": {
         "1602/elm-feather": "2.2.0 <= v < 3.0.0",
+        "Gizra/elm-all-set": "1.0.0 <= v < 2.0.0",
+        "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "NoRedInk/elm-simple-fuzzy": "1.0.2 <= v < 2.0.0",
+        "Skinney/murmur3": "2.0.6 <= v < 3.0.0",
         "Zinggi/elm-hash-icon": "2.0.2 <= v < 3.0.0",
         "Zinggi/elm-random-pcg-extended": "2.0.0 <= v < 3.0.0",
         "billstclair/elm-crypto-string": "2.1.0 <= v < 3.0.0",

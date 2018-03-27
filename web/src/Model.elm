@@ -200,12 +200,12 @@ updatePairingDialogue f model =
 -- Encoder/Decoder
 
 
-decode : Value -> Result String Model
+decode : Value -> Result String ModelState
 decode value =
     Ok (PortUtils.fromJs value)
 
 
-encode : Model -> Value
+encode : ModelState -> Value
 encode model =
     PortUtils.toJs model
 

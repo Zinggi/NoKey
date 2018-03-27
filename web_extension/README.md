@@ -7,13 +7,13 @@
 ## Debug
 
 * install dependencies:
-    `npm install`
+    `yarn`
 
 * watch files:
-    `npm run watch`
+    `yarn watch`
 
 * build files:
-    `ǹpm run build`
+    `yarn build`
 
 https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
 

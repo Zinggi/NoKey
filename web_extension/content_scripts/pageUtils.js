@@ -208,7 +208,7 @@ const makeContainer = () => {
 
     const elmNodes = ["fillForm", "newPassword"].map((f) => {
         const iframe = document.createElement('iframe');
-        iframe.src = browser.extension.getURL("dist/"+f+".html");
+        iframe.src = browser.extension.getURL("content_scripts/"+f+".html");
         iframe.frameBorder = 0;
         iframe.style.width = "100%";
         iframe.style.height = "100%";
@@ -263,6 +263,7 @@ const onWindowLoad = () => {
                 } else if (msg.type === "fillCurrentInput") {
                     fillCurrentInput(msg.data);
                 } else if (msg.type === "onSizeChanged") {
+                    // console.log("on size change", msg);
                     adjustPopupSize(msg.data);
                 } else {
                     console.error("msg type not recognised", msg);

@@ -1,5 +1,5 @@
-import Elm from '../build/apps.js';
-import setup from '../../web/setup.js';
+import Elm from "../elm/elm.js";
+import setup from '../../web/js/setup.js';
 import setupElm from './popupHelper.js';
 
 

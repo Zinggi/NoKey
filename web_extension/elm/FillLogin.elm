@@ -6,22 +6,27 @@ import Elements
 import Loader
 import Styles
 import Background
-import Model exposing (Model, Msg(..))
+import Model exposing (Model, Msg(..), ModelState(..))
 import ExternalStateView
 import Data.RequestGroupPassword exposing (Status(..))
 import Data.Sync
 import Data exposing (..)
 
 
-view : Model -> Html Msg
+view : ModelState -> Html Msg
 view model =
-    (case model.currentSite of
-        Nothing ->
-            empty
+    (case model of
+        Loaded m ->
+            case m.currentSite of
+                Nothing ->
+                    empty
 
-        Just site ->
-            Data.Sync.mapAccountsForSite site viewStatus model.syncData
-                |> Elements.inputGroup "Choose login"
+                Just site ->
+                    Data.Sync.mapAccountsForSite site viewStatus m.syncData
+                        |> Elements.inputGroup "Choose login"
+
+        _ ->
+            empty
     )
         |> Element.layout Styles.background
 
