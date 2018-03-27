@@ -3,7 +3,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const elmSource = path.resolve(__dirname, '../../web/');
 const out = path.resolve(__dirname, '../priv/static/');
-module.exports = {
+module.exports = (env, argv) => ({
     entry: '../../web/index.js',
     output: {
         filename: 'bundle.js',
@@ -21,7 +21,7 @@ module.exports = {
                 // This is what you need in your own work
                 loader: "elm-webpack-loader",
                 options: {
-                    debug: true,
+                    debug: argv.mode === 'production' ? false : true,
                     warn: true,
                     cwd: elmSource
                 }
@@ -35,4 +35,4 @@ module.exports = {
         // stats: 'errors-only'
     },
     plugins: [new CopyWebpackPlugin([{ from: 'static' }], {})]
-};
+});
