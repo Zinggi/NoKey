@@ -1,6 +1,7 @@
 module Protocol.Data exposing (..)
 
 import Time exposing (Time)
+import Set exposing (Set)
 import Json.Encode as JE exposing (Value)
 import Http
 import Debounce exposing (Debounce)
@@ -54,7 +55,8 @@ type ServerMsg
 
 type AuthenticatedMsg
     = SyncUpdate OtherSharedData
-    | RequestShare GroupId
+    | RequestShares String (List GroupId)
+    | RejectShareRequest String
     | GrantedShareRequest GroupId SecretSharing.Share
     | GotRemoved
     | NeedsUpdate VClock
@@ -70,7 +72,7 @@ type alias State =
 
 type CollectSharesState
     = Start
-    | WaitForShares
+    | WaitForShares ( Set GroupId, Set DeviceId )
 
 
 type PairingState

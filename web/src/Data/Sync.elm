@@ -650,21 +650,20 @@ addShare onShouldAddNewShares time groupId share sync =
                 ( newSync, mayForm, Cmd.none )
 
 
-requestPasswordPressed : GroupId -> Maybe AccountId -> SyncData -> ( SyncData, Maybe FillFormData )
-requestPasswordPressed groupId mayAccount sync =
+requestPasswordPressed : List GroupId -> Maybe AccountId -> SyncData -> ( SyncData, Maybe FillFormData )
+requestPasswordPressed groupIds mayAccount sync =
     let
         newReqState =
-            Request.waitFor groupId mayAccount (getShare groupId sync) sync.groupPasswordRequestsState
+            List.foldl (\groupId -> Request.waitFor groupId mayAccount (getShare groupId sync)) sync.groupPasswordRequestsState groupIds
 
         newSync =
             { sync | groupPasswordRequestsState = newReqState }
-    in
-        case Request.getStatus groupId newReqState of
-            Request.Done (Just ( site, login )) pw ->
-                ( newSync, Just { password = pw, site = site, login = login } )
 
-            _ ->
-                ( newSync, Nothing )
+        mayFill =
+            Request.canFill mayAccount newReqState
+                |> Maybe.map (\( ( site, login ), pw ) -> { password = pw, site = site, login = login })
+    in
+        ( newSync, mayFill )
 
 
 getTasks : SyncData -> List Task

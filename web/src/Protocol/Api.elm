@@ -314,16 +314,24 @@ update model msg =
                             model |> noCmd
 
             --
-            ( Authenticated otherId time (RequestShare key), _ ) ->
+            ( Authenticated otherId time (RequestShares id keys), _ ) ->
+                -- On a share request, filter out the ones where we have a share and ask the user
+                -- to unlock those.
+                -- The ones we don't have can be immediately rejected.
                 let
+                    groupIds =
+                        Data.Sync.groupIdsWithShare keys model.syncData
+
                     ( nId, notifications ) =
-                        -- TODO: only show message if we actually have a share!
-                        -- Otherwise, reject immediately
-                        Notifications.newShareRequestWithId otherId key model.notifications
+                        Notifications.newShareRequestWithId otherId groupIds model.notifications
                 in
-                    model
-                        |> updateNotifications (always notifications)
-                        |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
+                    if List.isEmpty groupIds then
+                        model
+                            |> addCmds [ rejectShareRequest otherId id model.syncData ]
+                    else
+                        model
+                            |> updateNotifications (always notifications)
+                            |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
 
             ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
                 -- TODO: stop asking the ones that already gave us a share
@@ -435,8 +443,7 @@ update model msg =
                     ( CollectShares, _ ) ->
                         ( model
                         , Data.RequestGroupPassword.getWaiting model.syncData.groupPasswordRequestsState
-                            |> List.map (\key -> doRequestShare key model.syncData)
-                            |> Cmd.batch
+                            |> (\keys -> doRequestShare keys model.syncData)
                         )
 
                     ( ShareRequest _, _ ) ->
@@ -587,23 +594,35 @@ syncToOthers model =
 -- Shares
 
 
-requestShare : GroupId -> Model -> ( Model, Cmd Model.Msg )
-requestShare key model =
+requestShares : List GroupId -> Model -> ( Model, Cmd Model.Msg )
+requestShares keys model =
     -- TODO: keep track of who we already got a response back and only send to the ones that haven't responded yet.
-    model
-        |> startTimer CollectShares (60 * Time.second)
-        |> addCmds [ doRequestShare key model.syncData ]
+    let
+        ( id, newModel ) =
+            Model.getUniqueId model
+    in
+        model
+            |> startTimer CollectShares (60 * Time.second)
+            |> addCmds [ doRequestShare id keys model.syncData ]
 
 
 {-| TODO: have a unique request id, such that we can ignore requests accidentally sent multiple times
 -}
-doRequestShare : GroupId -> SyncData -> Cmd Model.Msg
-doRequestShare key sync =
-    sendMsgToAll sync "RequestShare" [ ( "shareId", encodeGroupId key ) ]
+doRequestShare : String -> List GroupId -> SyncData -> Cmd Model.Msg
+doRequestShare id keys sync =
+    sendMsgToAll sync
+        "RequestShare"
+        [ ( "groupIds", JE.list (List.map encodeGroupId keys) ), ( "requestId", JE.string id ) ]
+
+
+rejectShareRequest : AccountId -> String -> SyncData -> Cmd Model.Msg
+rejectShareRequest accountId reqId sync =
+    sendMsgTo sync.id accountId "RejectShareRequest" [ ( "requestId", JE.string reqId ) ]
 
 
 grantRequest : { key : GroupId, id : String } -> SyncData -> Cmd Model.Msg
 grantRequest req sync =
+    -- TODO: encrypt share first with public key of receiver
     case Data.Sync.getShare req.key sync of
         Just share ->
             sendMsgTo sync.id
@@ -665,7 +684,12 @@ authenticatedMsgDecoder id time =
                         JD.succeed GotRemoved
 
                     "RequestShare" ->
-                        JD.map RequestShare (JD.field "shareId" groupIdDecoder)
+                        JD.map2 RequestShares
+                            (JD.field "requestId" JD.string)
+                            (JD.field "groupIds" (JD.list groupIdDecoder))
+
+                    "RejectShareRequest" ->
+                        JD.map RejectShareRequest (JD.field "requestId" JD.string)
 
                     "GrantedShareRequest" ->
                         JD.map2 GrantedShareRequest

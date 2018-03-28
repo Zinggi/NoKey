@@ -180,10 +180,10 @@ update msg model =
                             )
                         ]
 
-        RequestPasswordPressed key mayFill ->
+        RequestPasswordPressed keys mayFill ->
             let
                 ( newSync, mayForm ) =
-                    Data.Sync.requestPasswordPressed key mayFill model.syncData
+                    Data.Sync.requestPasswordPressed keys mayFill model.syncData
 
                 newModel =
                     { model | syncData = newSync }
@@ -195,7 +195,7 @@ update msg model =
 
                     Nothing ->
                         newModel
-                            |> Api.requestShare key
+                            |> Api.requestShares keys
 
         GrantShareRequest id req ->
             model
@@ -291,6 +291,7 @@ subs state =
             , Api.onAuthenticatedMsg
             , Ports.onReceiveMyShares ReceiveMyShares
             , Ports.onNewEncryptedShares NewEncryptedShares
+            , Ports.onDidEncryptShares SharesReadyToSend
             ]
 
         _ ->

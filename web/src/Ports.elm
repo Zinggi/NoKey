@@ -94,3 +94,11 @@ port encryptNewShares : { time : Time, groupId : GroupId, shares : List ( Device
 
 
 port onNewEncryptedShares : ({ time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) } -> msg) -> Sub msg
+
+
+{-| used for exchanging our shares
+-}
+port encryptShares : { shares : List ( GroupId, Value ), publicKey : Value } -> Cmd msg
+
+
+port onDidEncryptShares : ({ shares : List ( GroupId, Value ) } -> msg) -> Sub msg

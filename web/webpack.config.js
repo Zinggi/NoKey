@@ -1,6 +1,6 @@
 const path = require('path');
 
-module.exports = () => ({
+module.exports = (env, argv) => ({
     entry: './index.js',
     output: {
         filename: 'bundle.js',
@@ -17,8 +17,7 @@ module.exports = () => ({
                 exclude: [/elm-stuff/, /node_modules/],
                 loader: "elm-webpack-loader",
                 options: {
-                    debug: argv.mode === 'production' ? false : true,
-                    warn: true
+                    debug: argv.mode === 'production' ? false : true
                 }
             }
         ],

@@ -352,20 +352,36 @@ const setup = (startFn, onStart) => {
         // port encryptNewShares : { time : Time, groupId : GroupId, shares : List ( DeviceId, ( Value, Value ) ) } -> Cmd msg
         // port onNewEncryptedShares : ({ time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) } -> msg) -> Sub msg
         app.ports.encryptNewShares.subscribe((msg) => {
-            console.log("should encrypt new shares:", msg);
+            // console.log("should encrypt new shares:", msg);
             const cmds = msg.shares.map((idKeyShare) => {
                 let share = idKeyShare[1][1];
                 return encrypt(idKeyShare[1][0], share.y).then((yEnc) => {
                     share.y = yEnc;
-                    return [idKeyShare[0], share ];
+                    return [idKeyShare[0], share];
                 });
             });
             Promise.all(cmds).then((shares) => {
-                console.log("new shares encrypted:", shares);
+                // console.log("new shares encrypted:", shares);
                 app.ports.onNewEncryptedShares.send({ time: msg.time, groupId: msg.groupId, shares: shares });
             });
         });
 
+        // port encryptShares : { shares : List ( GroupId, Value ), publicKey : Value } -> Cmd msg
+        // port onDidEncryptShares : ({ shares : List ( GroupId, Value ) } -> msg) -> Sub msg
+        app.ports.encryptShares.subscribe((msg) => {
+            console.log("should encrypt shares:", msg);
+            const cmds = msg.shares.map((idShare) => {
+                let share = idShare[1];
+                return encrypt(msg.publicKey, share.y).then((yEnc) => {
+                    share.y = yEnc;
+                    return [idShare[0], share];
+                });
+            });
+            Promise.all(cmds).then((shares) => {
+                console.log("new shares encrypted:", shares);
+                app.ports.onDidEncryptShares.send({ shares: shares });
+            });
+        });
 
         if (onStart) {
             onStart(app);

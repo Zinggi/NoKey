@@ -100,6 +100,28 @@ withLabel label ele =
         ]
 
 
+{-| Take a list [a,b,c] and add commas and 'and's in between.
+
+    enumeration text ["carrot", "apple", "tomato"] ->
+        List.map text ["carrot", ",", "apple", "and", "tomato"]
+
+-}
+enumeration : (a -> Element msg) -> List a -> List (Element msg)
+enumeration f xs =
+    case xs of
+        [] ->
+            []
+
+        [ x ] ->
+            [ f x ]
+
+        [ x, y ] ->
+            [ f x, text "and", f y ]
+
+        x :: other ->
+            f x :: text "," :: enumeration f other
+
+
 
 -- Elements
 

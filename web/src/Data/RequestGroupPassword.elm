@@ -10,6 +10,7 @@ module Data.RequestGroupPassword
         , togglePassword
         , getPassword
         , addShare
+        , canFill
         , waitFor
         , getWaiting
         , removeWaiting
@@ -67,6 +68,26 @@ getGroupPassword groupId state =
 getStatus : GroupId -> State -> Status
 getStatus key (State state) =
     mayInfoToStatus key (Dict.get key state.groupPws)
+
+
+canFill : Maybe AccountId -> State -> Maybe ( AccountId, Password )
+canFill mayId (State state) =
+    Maybe.andThen
+        (\id ->
+            Dict.filter (\key info -> info.fillForm == Just id) state.groupPws
+                |> Dict.toList
+                |> List.head
+                |> Maybe.andThen
+                    (\( groupId, info ) ->
+                        case mayInfoToStatus groupId (Just info) of
+                            Done (Just accountId) pw ->
+                                Just ( accountId, pw )
+
+                            _ ->
+                                Nothing
+                    )
+        )
+        mayId
 
 
 mayInfoToStatus : GroupId -> Maybe Info -> Status

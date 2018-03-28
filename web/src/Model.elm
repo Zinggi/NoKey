@@ -48,7 +48,7 @@ type Msg
     | RemoveDevice String
     | SetDeviceName String
     | InsertSite AccountId GroupId Password Time
-    | RequestPasswordPressed GroupId (Maybe AccountId)
+    | RequestPasswordPressed (List GroupId) (Maybe AccountId)
     | GrantShareRequest Notifications.Id ShareRequest
     | RejectShareRequest Notifications.Id
     | ResetDevice
@@ -69,15 +69,11 @@ type Msg
 
 
 -- Model
--- TODO: create other top level type that represents Loading | Loaded Model | Error
--- remember to store state on first loaded, e.g.
---      |> withCmds [ storeState newModel, Api.askForNewVersion newModel.syncData ]
--- This is for both showing decode errors to user and on startup we need to generate two RSA keys, which takes some time
 
 
 type ModelState
     = Loaded Model
-      -- TODO: handle in UI, e.g. show decode error, and offer state backup
+      -- TODO: handle in UI, e.g. show decode error, and offer help, e.g. state backup
     | LoadingError String
 
 
@@ -157,6 +153,15 @@ initModel initialSeed encryptionKey signingKey devType mayId maySync =
         , protocolState = Protocol.init
         , currentSite = Nothing
         }
+
+
+getUniqueId : Model -> ( String, Model )
+getUniqueId model =
+    let
+        ( uuid, newSeed ) =
+            Random.step randomUUID model.seed
+    in
+        ( uuid, { model | seed = newSeed } )
 
 
 reset : Model -> Model

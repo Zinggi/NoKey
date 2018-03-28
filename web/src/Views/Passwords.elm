@@ -26,7 +26,7 @@ import Simple.Fuzzy as Fuzzy
 type alias Config msg =
     { toMsg : Msg -> msg
     , onDeletePassword : AccountId -> msg
-    , onRequestPasswordPressed : GroupId -> Maybe AccountId -> msg
+    , onRequestPasswordPressed : List GroupId -> Maybe AccountId -> msg
     , onTogglePassword : AccountId -> msg
     }
 
@@ -214,6 +214,21 @@ pwRow config pre (( _, userName ) as accountId) status =
         ]
 
 
+unlockGroupsButton : (List GroupId -> Maybe AccountId -> msg) -> List ( GroupId, Status ) -> Element msg
+unlockGroupsButton onRequestPasswordPressed groups =
+    let
+        groupIds =
+            List.map Tuple.first groups
+    in
+        Elements.customButton (Just (onRequestPasswordPressed groupIds Nothing))
+            (row [ spacing (Styles.paddingScale 0) ] [ Elements.text "Unlock", viewGroups groups ])
+
+
+viewGroups : List ( GroupId, Status ) -> Element msg
+viewGroups groups =
+    row [] (Elements.enumeration (\( g, s ) -> viewGroup g s) groups)
+
+
 viewGroup : GroupId -> Status -> Element msg
 viewGroup groupId status =
     -- TODO: maybe show more info here, e.g. who has a key
@@ -239,8 +254,7 @@ viewGroupStatus config groupId disabled status =
             if disabled then
                 empty
             else
-                Elements.customButton (Just (config.onRequestPasswordPressed groupId Nothing))
-                    (row [ spacing (Styles.paddingScale 0) ] [ Elements.text "Unlock", viewGroup groupId status ])
+                unlockGroupsButton config.onRequestPasswordPressed [ ( groupId, status ) ]
 
         Done _ _ ->
             empty
