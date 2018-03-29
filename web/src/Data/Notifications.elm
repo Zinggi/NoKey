@@ -17,7 +17,8 @@ module Data.Notifications
         )
 
 import Dict exposing (Dict)
-import Data exposing (GroupId)
+import Set exposing (Set)
+import Data exposing (GroupId, DeviceId)
 
 
 type alias Notification =
@@ -50,8 +51,9 @@ type alias Notifications =
 
 
 type alias ShareRequest =
-    { id : String
-    , key : GroupId
+    { keys : Set GroupId
+    , deviceId : DeviceId
+    , reqIds : Set String
     }
 
 
@@ -87,6 +89,7 @@ newSiteEntry entry isNew ns =
         )
         (ExternalSiteEntry entry isNew)
         ns
+        |> Tuple.second
 
 
 insert : NotificationT -> Notifications -> Notifications
@@ -113,22 +116,29 @@ get n ns =
         |> List.head
 
 
-replaceIfElseInsert : (NotificationT -> Bool) -> NotificationT -> Notifications -> Notifications
-replaceIfElseInsert f n ns =
+updateIfOrInsert : (NotificationT -> Bool) -> (NotificationT -> NotificationT) -> NotificationT -> Notifications -> ( Int, Notifications )
+updateIfOrInsert shouldUpdate update n ns =
     let
         reducer id n_ ( acc, didReplace ) =
-            if f n_.data then
-                ( Dict.insert id { n_ | data = n } acc, True )
+            if shouldUpdate n_.data then
+                ( Dict.insert id { n_ | data = update n_.data } acc, Just id )
             else
                 ( Dict.insert id n_ acc, didReplace )
 
         ( newData, didReplace ) =
-            Dict.foldl reducer ( Dict.empty, False ) ns.data
+            Dict.foldl reducer ( Dict.empty, Nothing ) ns.data
     in
-        if didReplace then
-            { ns | data = newData }
-        else
-            insert n ns
+        case didReplace of
+            Just id ->
+                ( id, { ns | data = newData } )
+
+            Nothing ->
+                insertWithId n ns
+
+
+replaceIfElseInsert : (NotificationT -> Bool) -> NotificationT -> Notifications -> ( Int, Notifications )
+replaceIfElseInsert f n ns =
+    updateIfOrInsert f (always n) n ns
 
 
 insertNoDuplicate : NotificationT -> Notifications -> Notifications
@@ -164,14 +174,39 @@ remove id ns =
     { ns | data = Dict.remove id ns.data }
 
 
-newShareRequest : String -> GroupId -> Notifications -> Notifications
-newShareRequest id key ns =
-    insertNoDuplicate (ShareRequestT { id = id, key = key }) ns
+newShareRequest : String -> DeviceId -> List GroupId -> Notifications -> Notifications
+newShareRequest reqId id keys ns =
+    Tuple.second (newShareRequestWithId reqId id keys ns)
 
 
-newShareRequestWithId : String -> GroupId -> Notifications -> ( Id, Notifications )
-newShareRequestWithId id key ns =
-    insertNoDuplicateWithId (ShareRequestT { id = id, key = key }) ns
+newShareRequestWithId : String -> DeviceId -> List GroupId -> Notifications -> ( Id, Notifications )
+newShareRequestWithId reqId id keys ns =
+    let
+        newKeys =
+            Set.fromList keys
+
+        newEntry =
+            ShareRequestT { deviceId = id, reqIds = Set.singleton reqId, keys = newKeys }
+    in
+        updateIfOrInsert
+            (\n ->
+                case n of
+                    ShareRequestT r ->
+                        r.deviceId == id
+
+                    _ ->
+                        False
+            )
+            (\n ->
+                case n of
+                    ShareRequestT r ->
+                        ShareRequestT { r | reqIds = Set.insert reqId r.reqIds, keys = Set.union newKeys r.keys }
+
+                    _ ->
+                        newEntry
+            )
+            newEntry
+            ns
 
 
 map : (Id -> Notification -> b) -> Notifications -> List b

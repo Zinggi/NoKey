@@ -14,6 +14,7 @@ module Data.RequestGroupPassword
         , waitFor
         , getWaiting
         , removeWaiting
+        , removeWaitingGroups
         , cacheAccountPw
         , getAllShares
         , cacheGroupPw
@@ -138,6 +139,12 @@ removeWaiting : State -> State
 removeWaiting =
     updateGroupPws
         (Dict.filter (\_ info -> not (isWaiting info)))
+
+
+removeWaitingGroups : List GroupId -> State -> State
+removeWaitingGroups groups =
+    updateGroupPws
+        (Dict.filter (\groupId info -> not (isWaiting info && List.member groupId groups)))
 
 
 updateGroupPws fn (State ({ groupPws } as state)) =

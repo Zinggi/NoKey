@@ -7,7 +7,7 @@
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
     "errors": "webpack --mode development --display-error-details",
-    "dev": "webpack-dev-server --mode development --port 3000"
+    "dev": "webpack-dev-server --host 0.0.0.0 --mode development --port 3000"
   },
   "devDependencies": {
     "elm-webpack-loader": "^4.5.0",

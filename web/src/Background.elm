@@ -99,7 +99,7 @@ update msg model =
                 { model | syncData = newSync, seed = newSeed }
                     |> Api.syncToOthers
                     |> addCmds [ cmd ]
-                    |> andThenUpdateIf shouldRequestShare (Api.requestShare groupId)
+                    |> andThenUpdateIf shouldRequestShare (Api.requestShares [ groupId ])
 
         SiteNameChanged s ->
             { model
@@ -190,6 +190,7 @@ update msg model =
             in
                 case mayForm of
                     Just formData ->
+                        -- The password is already here
                         newModel
                             |> withCmds [ Ports.fillForm formData ]
 
@@ -202,12 +203,12 @@ update msg model =
                 |> updateNotifications (Notifications.remove id)
                 |> addCmds [ Api.grantRequest req model.syncData, Ports.closePopup () ]
 
-        RejectShareRequest id ->
+        RejectShareRequest id req ->
             -- TODO: inform other of reject?
             --      -> Yes, so that they stop asking
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Ports.closePopup () ]
+                |> addCmds [ Ports.closePopup (), Api.rejectShareRequest req.deviceId req.reqIds model.syncData ]
 
         ResetDevice ->
             -- TODO: require confirmation
@@ -291,7 +292,8 @@ subs state =
             , Api.onAuthenticatedMsg
             , Ports.onReceiveMyShares ReceiveMyShares
             , Ports.onNewEncryptedShares NewEncryptedShares
-            , Ports.onDidEncryptShares SharesReadyToSend
+
+            -- , TODO: Ports.onDidEncryptShares SharesReadyToSend
             ]
 
         _ ->

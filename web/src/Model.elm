@@ -50,7 +50,7 @@ type Msg
     | InsertSite AccountId GroupId Password Time
     | RequestPasswordPressed (List GroupId) (Maybe AccountId)
     | GrantShareRequest Notifications.Id ShareRequest
-    | RejectShareRequest Notifications.Id
+    | RejectShareRequest Notifications.Id ShareRequest
     | ResetDevice
     | SendOutAccountsFor String
     | AddSiteEntry { isSignUp : Bool, entry : SiteEntry }
@@ -158,8 +158,12 @@ initModel initialSeed encryptionKey signingKey devType mayId maySync =
 getUniqueId : Model -> ( String, Model )
 getUniqueId model =
     let
-        ( uuid, newSeed ) =
-            Random.step randomUUID model.seed
+        -- TODO: workaround until UUID uses extended seed
+        ( i, newSeed ) =
+            RandomE.step (RandomE.int RandomE.minInt RandomE.maxInt) model.seed
+
+        ( uuid, _ ) =
+            Random.step randomUUID (Random.initialSeed i)
     in
         ( uuid, { model | seed = newSeed } )
 

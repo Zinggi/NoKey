@@ -8,6 +8,7 @@ import RemoteData.Http
 import Task exposing (Task)
 import Time exposing (Time)
 import Dict exposing (Dict)
+import Set exposing (Set)
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -317,30 +318,32 @@ update model msg =
             ( Authenticated otherId time (RequestShares id keys), _ ) ->
                 -- On a share request, filter out the ones where we have a share and ask the user
                 -- to unlock those.
+                -- TODO: If we already have a pending request from the same device, merge the request
                 -- The ones we don't have can be immediately rejected.
                 let
                     groupIds =
                         Data.Sync.groupIdsWithShare keys model.syncData
 
                     ( nId, notifications ) =
-                        Notifications.newShareRequestWithId otherId groupIds model.notifications
+                        Notifications.newShareRequestWithId id otherId groupIds model.notifications
                 in
                     if List.isEmpty groupIds then
                         model
-                            |> addCmds [ rejectShareRequest otherId id model.syncData ]
+                            |> withCmds [ rejectShareRequest otherId (Set.singleton id) model.syncData ]
                     else
                         model
                             |> updateNotifications (always notifications)
                             |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
 
-            ( Authenticated otherId time (GrantedShareRequest key share), _ ) ->
-                -- TODO: stop asking the ones that already gave us a share
+            ( Authenticated otherId time (GrantedShareRequest ids shares), _ ) ->
                 let
                     ( newSync, mayForm, cmd ) =
-                        Data.Sync.addShare encryptNewShares time key share model.syncData
+                        Data.Sync.addShares encryptNewShares time shares model.syncData
 
                     newModel =
-                        { model | syncData = newSync }
+                        -- stop asking the ones that already gave us a share
+                        { state | collectShares = stopAskingDevice ids otherId state.collectShares }
+                            |> updateState { model | syncData = newSync }
                 in
                     case mayForm of
                         Just formData ->
@@ -353,6 +356,12 @@ update model msg =
                             newModel
                                 |> syncToOthers
                                 |> addCmds [ cmd ]
+
+            ( Authenticated otherId time (RejectShareRequest id), _ ) ->
+                -- stop asking those that reject our request
+                { state | collectShares = stopAskingDevice id otherId state.collectShares }
+                    |> updateState model
+                    |> noCmd
 
             ( Authenticated otherId time (SyncUpdate otherSync), _ ) ->
                 let
@@ -433,20 +442,29 @@ update model msg =
                         |> withCmds [ cmd ]
 
             ( Self (OnInterval id time), _ ) ->
-                case ( id, state.pairingState ) of
-                    ( Pairing, WaitForFinished _ token otherId ) ->
-                        model |> withCmds [ finishPairing otherId token sync ]
+                case id of
+                    Pairing ->
+                        case state.pairingState of
+                            WaitForFinished _ token otherId ->
+                                model |> withCmds [ finishPairing otherId token sync ]
 
-                    ( Pairing, _ ) ->
-                        model |> noCmd
+                            _ ->
+                                model |> noCmd
 
-                    ( CollectShares, _ ) ->
-                        ( model
-                        , Data.RequestGroupPassword.getWaiting model.syncData.groupPasswordRequestsState
-                            |> (\keys -> doRequestShare keys model.syncData)
-                        )
+                    CollectShares cId ->
+                        case state.collectShares of
+                            WaitForShares dict ->
+                                case Dict.get cId dict of
+                                    Just ( devs, groups ) ->
+                                        ( model, doRequestShares (Set.toList devs) cId groups model.syncData )
 
-                    ( ShareRequest _, _ ) ->
+                                    Nothing ->
+                                        model |> noCmd
+
+                            Start ->
+                                model |> noCmd
+
+                    ShareRequest _ ->
                         model |> noCmd
 
             ( Self (OnFinishTimer id time), _ ) ->
@@ -455,9 +473,24 @@ update model msg =
                         backToInit model
                             |> noCmd
 
-                    CollectShares ->
-                        { model | syncData = Data.Sync.updateGroupPasswordRequest Data.RequestGroupPassword.removeWaiting model.syncData }
-                            |> noCmd
+                    CollectShares cId ->
+                        let
+                            removeAll m =
+                                { m | syncData = Data.Sync.updateGroupPasswordRequest (Data.RequestGroupPassword.removeWaiting) m.syncData }
+                                    |> noCmd
+                        in
+                            case state.collectShares of
+                                WaitForShares dict ->
+                                    case Dict.get cId dict of
+                                        Just ( devs, groups ) ->
+                                            { model | syncData = Data.Sync.updateGroupPasswordRequest (Data.RequestGroupPassword.removeWaitingGroups groups) model.syncData }
+                                                |> noCmd
+
+                                        Nothing ->
+                                            removeAll model
+
+                                Start ->
+                                    removeAll model
 
                     ShareRequest nId ->
                         updateNotifications (Notifications.remove nId) model
@@ -594,46 +627,87 @@ syncToOthers model =
 -- Shares
 
 
+{-| Request some shares from all devices we know.
+-}
 requestShares : List GroupId -> Model -> ( Model, Cmd Model.Msg )
 requestShares keys model =
-    -- TODO: keep track of who we already got a response back and only send to the ones that haven't responded yet.
     let
         ( id, newModel ) =
             Model.getUniqueId model
+
+        devs =
+            Data.Sync.knownOtherIds model.syncData
     in
         model
-            |> startTimer CollectShares (60 * Time.second)
-            |> addCmds [ doRequestShare id keys model.syncData ]
+            |> waitForShares id keys
+            |> startTimer (CollectShares id) (60 * Time.second)
+            |> addCmds [ doRequestShares devs id keys model.syncData ]
 
 
-{-| TODO: have a unique request id, such that we can ignore requests accidentally sent multiple times
+{-| keep track of who already answered our request
 -}
-doRequestShare : String -> List GroupId -> SyncData -> Cmd Model.Msg
-doRequestShare id keys sync =
-    sendMsgToAll sync
-        "RequestShare"
+waitForShares : String -> List GroupId -> Model -> Model
+waitForShares reqId keys model =
+    let
+        devices =
+            Data.Sync.knownOtherIds model.syncData |> Set.fromList
+    in
+        updateProtocol
+            (\s ->
+                case s.collectShares of
+                    WaitForShares dict ->
+                        { s | collectShares = WaitForShares (Dict.insert reqId ( devices, keys ) dict) }
+
+                    Start ->
+                        { s | collectShares = WaitForShares (Dict.singleton reqId ( devices, keys )) }
+            )
+            model
+
+
+{-| Call this once we got a reply from someone
+-}
+stopAskingDevice : Set String -> DeviceId -> CollectSharesState -> CollectSharesState
+stopAskingDevice ids otherId collectShares =
+    case collectShares of
+        WaitForShares dict ->
+            WaitForShares <|
+                Set.foldl (\id -> Dict.update id (Maybe.map (\( devs, gs ) -> ( Set.remove otherId devs, gs ))))
+                    dict
+                    ids
+
+        Start ->
+            Start
+
+
+{-| Each request has a unique request id, this way we can easily keep track of them
+-}
+doRequestShares : List DeviceId -> String -> List GroupId -> SyncData -> Cmd Model.Msg
+doRequestShares otherIds id keys sync =
+    sendMsgToGroup sync.id
+        otherIds
+        "RequestShares"
         [ ( "groupIds", JE.list (List.map encodeGroupId keys) ), ( "requestId", JE.string id ) ]
 
 
-rejectShareRequest : AccountId -> String -> SyncData -> Cmd Model.Msg
-rejectShareRequest accountId reqId sync =
-    sendMsgTo sync.id accountId "RejectShareRequest" [ ( "requestId", JE.string reqId ) ]
+rejectShareRequest : DeviceId -> Set String -> SyncData -> Cmd Model.Msg
+rejectShareRequest deviceId reqIds sync =
+    sendMsgTo sync.id deviceId "RejectShareRequest" [ ( "requestIds", encodeSet JE.string reqIds ) ]
 
 
-grantRequest : { key : GroupId, id : String } -> SyncData -> Cmd Model.Msg
+grantRequest : Notifications.ShareRequest -> SyncData -> Cmd Model.Msg
 grantRequest req sync =
     -- TODO: encrypt share first with public key of receiver
-    case Data.Sync.getShare req.key sync of
-        Just share ->
-            sendMsgTo sync.id
-                req.id
-                "GrantedShareRequest"
-                [ ( "share", SecretSharing.encodeShare share )
-                , ( "shareId", encodeGroupId req.key )
-                ]
-
-        Nothing ->
+    case Data.Sync.getShares req.keys sync of
+        [] ->
             Cmd.none
+
+        shares ->
+            sendMsgTo sync.id
+                req.deviceId
+                "GrantedShareRequest"
+                [ ( "shares", JE.list (List.map (encodeTuple2 encodeGroupId SecretSharing.encodeShare) shares) )
+                , ( "ids", encodeSet JE.string req.reqIds )
+                ]
 
 
 
@@ -683,18 +757,20 @@ authenticatedMsgDecoder id time =
                     "GotRemoved" ->
                         JD.succeed GotRemoved
 
-                    "RequestShare" ->
+                    "RequestShares" ->
                         JD.map2 RequestShares
                             (JD.field "requestId" JD.string)
                             (JD.field "groupIds" (JD.list groupIdDecoder))
 
                     "RejectShareRequest" ->
-                        JD.map RejectShareRequest (JD.field "requestId" JD.string)
+                        JD.map RejectShareRequest (JD.field "requestIds" (decodeSet JD.string))
 
                     "GrantedShareRequest" ->
                         JD.map2 GrantedShareRequest
-                            (JD.field "shareId" groupIdDecoder)
-                            (JD.field "share" SecretSharing.shareDecoder)
+                            (JD.field "ids" (decodeSet JD.string))
+                            (JD.field "shares"
+                                (JD.list (decodeTuple2 groupIdDecoder SecretSharing.shareDecoder))
+                            )
 
                     "NeedsUpdate" ->
                         JD.map NeedsUpdate (JD.field "version" VClock.decoder)

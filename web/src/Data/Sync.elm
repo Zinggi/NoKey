@@ -128,6 +128,23 @@ getShare groupId sync =
     Dict.get groupId sync.myShares
 
 
+{-| given a list of group ids, return their corresponding share.
+-}
+getShares : Set GroupId -> SyncData -> List ( GroupId, SecretSharing.Share )
+getShares groups sync =
+    Set.foldl
+        (\groupId acc ->
+            case Dict.get groupId sync.myShares of
+                Just share ->
+                    ( groupId, share ) :: acc
+
+                Nothing ->
+                    acc
+        )
+        []
+        groups
+
+
 init : Seed -> Value -> Value -> DeviceType -> String -> SyncData
 init seed encryptionKey signingKey devType uuid =
     { shared = initShared seed encryptionKey signingKey devType uuid
@@ -602,6 +619,20 @@ mapGroups f sync =
             []
 
 
+addShares : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> List ( GroupId, SecretSharing.Share ) -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
+addShares onShouldAddNewShares time shares sync =
+    List.foldl
+        (\( groupId, share ) ( newSync, mayAcc, cmd ) ->
+            let
+                ( s, mA, c ) =
+                    addShare onShouldAddNewShares time groupId share newSync
+            in
+                ( s, Maybe.withDefault mayAcc (Maybe.map Just mA), Cmd.batch [ c, cmd ] )
+        )
+        ( sync, Nothing, Cmd.none )
+        shares
+
+
 addShare : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
 addShare onShouldAddNewShares time groupId share sync =
     -- TODO: anything else to do here?
@@ -650,6 +681,8 @@ addShare onShouldAddNewShares time groupId share sync =
                 ( newSync, mayForm, Cmd.none )
 
 
+{-| Update the group status, and in case we want to fill the password once it's ready, keep track of that
+-}
 requestPasswordPressed : List GroupId -> Maybe AccountId -> SyncData -> ( SyncData, Maybe FillFormData )
 requestPasswordPressed groupIds mayAccount sync =
     let
@@ -679,6 +712,19 @@ distributedShares sync =
 updateGroupPasswordRequest : (Request.State -> Request.State) -> SyncData -> SyncData
 updateGroupPasswordRequest f sync =
     { sync | groupPasswordRequestsState = f sync.groupPasswordRequestsState }
+
+
+groupIdsWithShare : List GroupId -> SyncData -> List GroupId
+groupIdsWithShare ids sync =
+    List.foldl
+        (\groupId acc ->
+            if Dict.member groupId sync.myShares then
+                groupId :: acc
+            else
+                acc
+        )
+        []
+        ids
 
 
 currentGroupId : Int -> SyncData -> String

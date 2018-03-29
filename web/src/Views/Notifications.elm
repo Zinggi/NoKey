@@ -3,6 +3,7 @@ module Views.Notifications exposing (view, init, Config, State)
 -- import Html exposing (..)
 -- import Html.Events exposing (..)
 
+import Set
 import Element exposing (..)
 import Elements
 import Data.Notifications as Notifications exposing (..)
@@ -14,7 +15,7 @@ type alias State =
 
 
 type alias Config msg =
-    { onRejectRequest : Id -> msg
+    { onRejectRequest : Id -> ShareRequest -> msg
     , onGrantRequest : Id -> ShareRequest -> msg
     , onDismiss : Id -> msg
     , onSaveEntry : Id -> String -> SiteEntry -> msg
@@ -43,12 +44,12 @@ viewEntry config sync maxSecurityLevel n state =
         ShareRequestT req ->
             column []
                 [ column []
-                    [ Elements.avatar [] (Data.Sync.getDevice req.id sync)
+                    [ Elements.avatar [] (Data.Sync.getDevice req.deviceId sync)
                     , Elements.p "wants to view password for"
-                    , Elements.groupIcon True req.key
+                    , row [] (Elements.enumeration (Elements.groupIcon True) (Set.toList req.keys))
                     ]
                 , row []
-                    [ Elements.button (Just (config.onRejectRequest n.id)) "Reject"
+                    [ Elements.button (Just (config.onRejectRequest n.id req)) "Reject"
                     , Elements.primaryButton (Just (config.onGrantRequest n.id req)) "Grant"
                     ]
                 ]
