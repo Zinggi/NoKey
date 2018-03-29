@@ -318,7 +318,7 @@ update model msg =
             ( Authenticated otherId time (RequestShares id keys), _ ) ->
                 -- On a share request, filter out the ones where we have a share and ask the user
                 -- to unlock those.
-                -- TODO: If we already have a pending request from the same device, merge the request
+                -- If we already have a pending request from the same device, merge the request
                 -- The ones we don't have can be immediately rejected.
                 let
                     groupIds =
@@ -336,26 +336,8 @@ update model msg =
                             |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
 
             ( Authenticated otherId time (GrantedShareRequest ids shares), _ ) ->
-                let
-                    ( newSync, mayForm, cmd ) =
-                        Data.Sync.addShares encryptNewShares time shares model.syncData
-
-                    newModel =
-                        -- stop asking the ones that already gave us a share
-                        { state | collectShares = stopAskingDevice ids otherId state.collectShares }
-                            |> updateState { model | syncData = newSync }
-                in
-                    case mayForm of
-                        Just formData ->
-                            -- if done and fillForm is set, call port to fill the form
-                            newModel
-                                |> withCmds [ Task.perform (\_ -> Model.FillForm formData) (Task.succeed ()), cmd ]
-                                |> andThenUpdate syncToOthers
-
-                        Nothing ->
-                            newModel
-                                |> syncToOthers
-                                |> addCmds [ cmd ]
+                model
+                    |> withCmds [ Ports.decryptRequestedShares { ids = Set.toList ids, shares = shares, time = time, otherId = otherId } ]
 
             ( Authenticated otherId time (RejectShareRequest id), _ ) ->
                 -- stop asking those that reject our request
@@ -498,6 +480,38 @@ update model msg =
             ( Self NoReply, _ ) ->
                 ( model, Cmd.none )
         )
+
+
+grantedShareRequest : Ports.DidDecryptRequestedSharesT -> Model -> ( Model, Cmd Model.Msg )
+grantedShareRequest { shares, time, otherId, ids } model =
+    case JD.decodeValue (JD.list (decodeTuple2 groupIdDecoder SecretSharing.shareDecoder)) shares of
+        Ok shares ->
+            let
+                state =
+                    model.protocolState
+
+                ( newSync, mayForm, cmd ) =
+                    Data.Sync.addShares encryptNewShares time shares model.syncData
+
+                newModel =
+                    -- stop asking the ones that already gave us a share
+                    { state | collectShares = stopAskingDevice (Set.fromList ids) otherId state.collectShares }
+                        |> updateState { model | syncData = newSync }
+            in
+                case mayForm of
+                    Just formData ->
+                        -- if done and fillForm is set, call port to fill the form
+                        newModel
+                            |> withCmds [ Task.perform (\_ -> Model.FillForm formData) (Task.succeed ()), cmd ]
+                            |> andThenUpdate syncToOthers
+
+                    Nothing ->
+                        newModel
+                            |> syncToOthers
+                            |> addCmds [ cmd ]
+
+        Err e ->
+            Debug.log ("Failed to decode received shares:\n" ++ e) (model |> noCmd)
 
 
 receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
@@ -702,12 +716,28 @@ grantRequest req sync =
             Cmd.none
 
         shares ->
-            sendMsgTo sync.id
-                req.deviceId
-                "GrantedShareRequest"
-                [ ( "shares", JE.list (List.map (encodeTuple2 encodeGroupId SecretSharing.encodeShare) shares) )
-                , ( "ids", encodeSet JE.string req.reqIds )
-                ]
+            case Data.Sync.getEncryptionKeyOf req.deviceId sync of
+                Just key ->
+                    Ports.encryptShares
+                        { deviceId = req.deviceId
+                        , shares = List.map (\( g, s ) -> ( g, SecretSharing.encodeShare s )) shares
+                        , publicKey = key
+                        , myId = sync.id
+                        , reqIds = encodeSet JE.string req.reqIds
+                        }
+
+                Nothing ->
+                    Cmd.none
+
+
+sendGrantedRequest : Ports.DidEncryptSharesT -> Cmd Model.Msg
+sendGrantedRequest { deviceId, myId, encryptedShares, reqIds } =
+    sendMsgTo myId
+        deviceId
+        "GrantedShareRequest"
+        [ ( "shares", encryptedShares )
+        , ( "ids", reqIds )
+        ]
 
 
 
@@ -768,9 +798,7 @@ authenticatedMsgDecoder id time =
                     "GrantedShareRequest" ->
                         JD.map2 GrantedShareRequest
                             (JD.field "ids" (decodeSet JD.string))
-                            (JD.field "shares"
-                                (JD.list (decodeTuple2 groupIdDecoder SecretSharing.shareDecoder))
-                            )
+                            (JD.field "shares" JD.value)
 
                     "NeedsUpdate" ->
                         JD.map NeedsUpdate (JD.field "version" VClock.decoder)

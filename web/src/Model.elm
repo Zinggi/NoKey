@@ -64,6 +64,8 @@ type Msg
     | ProtocolMsg Protocol.Msg
     | ReceiveMyShares (List ( GroupId, Value ))
     | NewEncryptedShares { time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) }
+    | SharesReadyToSend { deviceId : DeviceId, encryptedShares : Value, myId : DeviceId, reqIds : Value }
+    | DidDecryptRequestedShares { shares : Value, time : Time, otherId : DeviceId, ids : List String }
     | OnStateRequest
 
 

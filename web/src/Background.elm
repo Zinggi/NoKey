@@ -249,6 +249,13 @@ update msg model =
             { model | syncData = Data.Sync.addNewShares time groupId shares model.syncData }
                 |> Api.syncToOthers
 
+        SharesReadyToSend r ->
+            model
+                |> withCmds [ Api.sendGrantedRequest r ]
+
+        DidDecryptRequestedShares r ->
+            model |> Api.grantedShareRequest r
+
 
 saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )
 saveEntry groupId entry model =
@@ -292,8 +299,8 @@ subs state =
             , Api.onAuthenticatedMsg
             , Ports.onReceiveMyShares ReceiveMyShares
             , Ports.onNewEncryptedShares NewEncryptedShares
-
-            -- , TODO: Ports.onDidEncryptShares SharesReadyToSend
+            , Ports.onDidEncryptShares SharesReadyToSend
+            , Ports.onDidDecryptRequestedShares DidDecryptRequestedShares
             ]
 
         _ ->

@@ -488,6 +488,13 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                         ( newSync, seed3, False, onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers newSync) )
 
 
+getEncryptionKeyOf : DeviceId -> SyncData -> Maybe Value
+getEncryptionKeyOf devId sync =
+    knownIds sync
+        |> Dict.get devId
+        |> Maybe.map .encryptionKey
+
+
 getAssociatedKeys : Dict DeviceId SecretSharing.Share -> SyncData -> List ( DeviceId, ( Value, Value ) )
 getAssociatedKeys dict sync =
     let

@@ -58,7 +58,7 @@ type AuthenticatedMsg
     = SyncUpdate OtherSharedData
     | RequestShares String (List GroupId)
     | RejectShareRequest (Set String)
-    | GrantedShareRequest (Set String) (List ( GroupId, SecretSharing.Share ))
+    | GrantedShareRequest (Set String) Value {- (List ( GroupId, SecretSharing.Share )) -}
     | GotRemoved
     | NeedsUpdate VClock
 

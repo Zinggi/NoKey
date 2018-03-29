@@ -366,10 +366,11 @@ const setup = (startFn, onStart) => {
             });
         });
 
-        // port encryptShares : { shares : List ( GroupId, Value ), publicKey : Value } -> Cmd msg
-        // port onDidEncryptShares : ({ shares : List ( GroupId, Value ) } -> msg) -> Sub msg
+        // port encryptShares : { shares : List (GroupId, Value), publicKey : Value, deviceId : DeviceId, myId : DeviceId, reqIds : Value } -> Cmd msg
+        // port onDidEncryptShares : ({ deviceId : DeviceId, encryptedShares : Value, myId : DeviceId, reqIds : Value } -> msg) -> Sub msg
         app.ports.encryptShares.subscribe((msg) => {
             console.log("should encrypt shares:", msg);
+
             const cmds = msg.shares.map((idShare) => {
                 let share = idShare[1];
                 return encrypt(msg.publicKey, share.y).then((yEnc) => {
@@ -379,7 +380,25 @@ const setup = (startFn, onStart) => {
             });
             Promise.all(cmds).then((shares) => {
                 console.log("new shares encrypted:", shares);
-                app.ports.onDidEncryptShares.send({ shares: shares });
+                app.ports.onDidEncryptShares.send({ encryptedShares: shares, deviceId: msg.deviceId, myId: msg.myId, reqIds: msg.reqIds });
+            });
+        });
+
+        // port decryptRequestedShares : { ids : List String, shares : Value, time : Time, otherId : DeviceId } -> Cmd msg
+        // port onDidDecryptRequestedShares : ({ shares : Value, time : Time, otherId : DeviceId, ids : List String } -> msg) -> Sub msg
+        app.ports.decryptRequestedShares.subscribe((msg) => {
+            console.log("should decrypt requested shares", msg);
+
+            const cmds = msg.shares.map((idShare) => {
+                let share = idShare[1];
+                return decrypt(keys.encryptionKey.private, share.y).then((newY) => {
+                    share.y = newY;
+                    return [idShare[0], share];
+                });
+            });
+            Promise.all(cmds).then((decShares) => {
+                console.log("requested shares decrypted", decShares);
+                app.ports.onDidDecryptRequestedShares.send({ shares: decShares, time: msg.time, otherId: msg.otherId, ids: msg.ids });
             });
         });
 
@@ -390,9 +409,7 @@ const setup = (startFn, onStart) => {
 };
 
 
-// if (typeof module === 'undefined') {
-//     module = {};
-// }
+
 module.exports = {
     setup: setup,
     getRandomInts: getRandomInts,
