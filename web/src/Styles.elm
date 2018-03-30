@@ -5,7 +5,6 @@ import Element exposing (..)
 import Element.Font as Font
 import Element.Background as Background
 import Element.Border as Border
-import Html.Attributes as Attr
 
 
 scaled =

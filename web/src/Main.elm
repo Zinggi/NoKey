@@ -1,14 +1,12 @@
-module Main exposing (..)
+module Main exposing (main)
 
-import Html exposing (Html)
-
-
---
-
+import Html
 import Background
 import MainView
+import Model exposing (ModelState, Msg, Flags)
 
 
+main : Program Flags ModelState Msg
 main =
     Html.programWithFlags
         { init = Background.init

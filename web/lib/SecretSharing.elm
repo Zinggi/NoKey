@@ -4,7 +4,7 @@ import BigInt exposing (BigInt)
 import Json.Decode as JD
 import Json.Encode as JE
 import Dict exposing (Dict)
-import Random.Pcg.Extended as Random exposing (Generator, Seed)
+import Random.Pcg.Extended as Random exposing (Seed)
 import String.UTF8 as UTF8
 
 
@@ -12,8 +12,7 @@ import String.UTF8 as UTF8
 
 import FiniteField
     exposing
-        ( Field
-        , Prime
+        ( Prime
         , makeField
         , primeBiggerThan
         , secretPolynom
@@ -119,7 +118,7 @@ bigIntToStringHelp n acc =
     if BigInt.gt n (BigInt.fromInt 0) then
         case BigInt.divmod n (BigInt.fromInt 256) of
             Just ( val, digit ) ->
-                bigIntToStringHelp val ((bigIntToInt digit) :: acc)
+                bigIntToStringHelp val (bigIntToInt digit :: acc)
 
             Nothing ->
                 Debug.crash "256 shouldn't be 0 ..."
@@ -151,7 +150,7 @@ splitSecret ( level, xValues ) secret seed =
             makeField prime
     in
         ( getPolynomialPointsFor field coefficients xValues
-            |> Dict.map (\id ( x, y ) -> ({ requiredParts = level, x = x, y = y, prime = prime }))
+            |> Dict.map (\_ ( x, y ) -> { requiredParts = level, x = x, y = y, prime = prime })
         , newSeed
         )
 
@@ -165,7 +164,7 @@ createMoreShares xVals existingShares =
                     lagrangeInterpolation (makeField prime) (sharesToPoints existingShares) (BigInt.fromInt x)
             in
                 xVals
-                    |> Dict.map (\id x -> { requiredParts = requiredParts, x = x, y = poly x, prime = prime })
+                    |> Dict.map (\_ x -> { requiredParts = requiredParts, x = x, y = poly x, prime = prime })
         )
         existingShares
 
@@ -199,7 +198,7 @@ Otherwise returns an error.
 withEnoughShares : (Int -> Prime -> a) -> List Share -> Result String a
 withEnoughShares f shares =
     case shares of
-        s :: otherShares ->
+        s :: _ ->
             if List.length shares >= s.requiredParts then
                 Ok (f s.requiredParts s.prime)
             else

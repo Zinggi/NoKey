@@ -1,28 +1,25 @@
 module Model exposing (..)
 
-import Json.Encode as JE exposing (Value)
+import Json.Encode exposing (Value)
 import Json.Decode as JD
 import Time exposing (Time)
-import Dict exposing (Dict)
 
 
 --
 
-import Random.Pcg as Random exposing (Generator, Seed)
+import Random.Pcg as Random
 import Random.Pcg.Extended as RandomE
-import SecretSharing
 import PortUtils
 
 
 --
 
-import Helper exposing (..)
+import Helper exposing (withCmds)
 import Data.PasswordMeta exposing (PasswordMetaData)
-import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest, SiteEntry)
-import Data.Sync exposing (SyncData, OtherSharedData)
-import Data exposing (GroupId, AccountId, Password)
+import Data.Notifications as Notifications exposing (Notifications, ShareRequest, SiteEntry)
+import Data.Sync exposing (SyncData)
+import Data exposing (GroupId, AccountId, Password, DeviceId)
 import Data.Storage
-import Data exposing (..)
 import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
 import Views.Pairing
@@ -64,7 +61,7 @@ type Msg
     | ProtocolMsg Protocol.Msg
     | ReceiveMyShares (List ( GroupId, Value ))
     | NewEncryptedShares { time : Time, groupId : GroupId, shares : List ( DeviceId, Value ) }
-    | SharesReadyToSend { deviceId : DeviceId, encryptedShares : Value, myId : DeviceId, reqIds : Value }
+    | SharesReadyToSend { deviceId : DeviceId, encryptedShares : Value, reqIds : Value }
     | DidDecryptRequestedShares { shares : Value, time : Time, otherId : DeviceId, ids : List String }
     | OnStateRequest
 
@@ -112,10 +109,9 @@ type alias Flags =
 
 
 init : Flags -> ModelState
-init ({ initialSeed, storedState, encryptionKey, signingKey, deviceType } as flags) =
+init { initialSeed, storedState, encryptionKey, signingKey, deviceType } =
     case ( Data.Storage.decode storedState, JD.decodeValue Data.Sync.deviceTypeDecoder deviceType ) of
         ( Ok { syncData, uniqueIdentifyier }, Ok devType ) ->
-            -- TODO: here we should have the keys ready and store them
             Loaded <| initModel initialSeed encryptionKey signingKey devType (Just uniqueIdentifyier) (Just syncData)
 
         ( Err "Expecting an object with a field named `syncData` but instead got: null", Ok devType ) ->
@@ -136,9 +132,9 @@ initModel initialSeed encryptionKey signingKey devType mayId maySync =
             -- adapt the UUID package to use pcg-extended
             -- see:
             --  https://github.com/danyx23/elm-uuid/issues/10
-            Random.step randomUUID (Random.initialSeed base)
+            Random.step Helper.randomUUID (Random.initialSeed base)
 
-        ( indepSeed, seed3 ) =
+        ( indepSeed, _ ) =
             Random.step Random.independentSeed seed2
     in
         { newSiteEntry = Data.PasswordMeta.default
@@ -165,7 +161,7 @@ getUniqueId model =
             RandomE.step (RandomE.int RandomE.minInt RandomE.maxInt) model.seed
 
         ( uuid, _ ) =
-            Random.step randomUUID (Random.initialSeed i)
+            Random.step Helper.randomUUID (Random.initialSeed i)
     in
         ( uuid, { model | seed = newSeed } )
 
@@ -174,7 +170,7 @@ reset : Model -> Model
 reset model =
     let
         int32 =
-            (RandomE.int RandomE.minInt RandomE.maxInt)
+            RandomE.int RandomE.minInt RandomE.maxInt
 
         ( initSeed, _ ) =
             RandomE.step (RandomE.map2 (,) int32 (RandomE.list 8 int32)) model.seed

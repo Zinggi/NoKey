@@ -1,13 +1,13 @@
 module PasswordGenerator exposing (..)
 
-import Random.Pcg.Extended as Random exposing (Generator, Seed)
+import Random.Pcg.Extended as Random exposing (Generator)
 
 
 --
 
-import Interval exposing (Interval, IntervalList)
+import Interval
 import CharSet exposing (CharSet)
-import Helper exposing (..)
+import Helper
 
 
 type alias PasswordRequirements =
@@ -16,6 +16,7 @@ type alias PasswordRequirements =
     }
 
 
+standardRequirements : PasswordRequirements
 standardRequirements =
     { forbidden = [], atLeastOneOf = [] }
 
@@ -24,7 +25,7 @@ simpleRandomPassword : Int -> CharSet -> Generator (Result String String)
 simpleRandomPassword length allowedSymbols =
     CharSet.sampleRandom allowedSymbols
         |> Random.list length
-        |> Random.map (\res -> combineResults res |> Result.map String.fromList)
+        |> Random.map (\res -> Helper.combineResults res |> Result.map String.fromList)
 
 
 randomPassword : Int -> PasswordRequirements -> Generator (Result String String)
@@ -55,13 +56,13 @@ randomPassword length requirements =
 
         -- sample l values out of range 0 length-1
         subSet =
-            sampleSubset l (List.range 0 (length - 1))
+            Helper.sampleSubset l (List.range 0 (length - 1))
 
         -- sample l random chars
         requiredChars =
             List.map CharSet.sampleRandom atLeastOneOf
-                |> flatten
-                |> Random.map combineResults
+                |> Helper.flatten
+                |> Random.map Helper.combineResults
 
         -- generate a random password
         randomPw =
@@ -70,7 +71,7 @@ randomPassword length requirements =
         Random.map3
             (\pw indices chars ->
                 -- combine the random password and replace characters at the sampled locations with their random char
-                Result.map2 (\pws cs -> replaceIndices (List.map2 (,) indices cs) pws) pw chars
+                Result.map2 (\pws cs -> Helper.replaceIndices (List.map2 (,) indices cs) pws) pw chars
             )
             randomPw
             subSet

@@ -4,7 +4,7 @@ port module ExternalStateView exposing (Config, program, sendMsgToBackground, on
 -}
 
 import Html exposing (Html)
-import Json.Encode as JE exposing (Value)
+import Json.Encode exposing (Value)
 
 
 port sendMsgToBackground : Value -> Cmd msg

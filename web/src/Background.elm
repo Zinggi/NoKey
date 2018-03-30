@@ -1,18 +1,15 @@
 module Background exposing (..)
 
-import Dict exposing (Dict)
 import Random.Pcg.Extended as RandomE
-import SecretSharing
 
 
 --
 
-import Helper exposing (..)
+import Helper exposing (withCmds, noCmd, andThenUpdate, andThenUpdateIf, addCmds, mapModel)
 import Ports
-import Data.PasswordMeta exposing (PasswordMetaData)
-import Data.RequestGroupPassword
-import Data.Notifications as Notifications exposing (Notifications, Notification, ShareRequest, SiteEntry)
-import Data.Sync exposing (SyncData, OtherSharedData)
+import Data.PasswordMeta
+import Data.Notifications as Notifications exposing (SiteEntry)
+import Data.Sync
 import Data.Storage
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
@@ -51,6 +48,7 @@ updateModelState : Msg -> ModelState -> ( ModelState, Cmd Msg )
 updateModelState msg state =
     (case state of
         LoadingError err ->
+            -- TODO: diplay error, and help solve it, at least offer backup
             state |> noCmd
 
         Loaded model ->
@@ -90,11 +88,9 @@ update msg model =
                 ( newSync, newSeed, shouldRequestShare, cmd ) =
                     Data.Sync.insertSite encryptShares timestamp model.seed accountId groupId password model.syncData
 
-                -- TODO: here we should encrypt the shares for the others
-                -- share with others
-                -- |> addNewShares time groupId sharesForOthers
-                encryptShares time groupId shares =
-                    Ports.encryptNewShares { time = time, groupId = groupId, shares = shares }
+                -- Here we should encrypt the shares for the others
+                encryptShares time groupId_ shares =
+                    Ports.encryptNewShares { time = time, groupId = groupId_, shares = shares }
             in
                 { model | syncData = newSync, seed = newSeed }
                     |> Api.syncToOthers
@@ -129,8 +125,8 @@ update msg model =
             { model | syncData = Data.Sync.deletePassword key model.syncData }
                 |> Api.syncToOthers
 
-        ProtocolMsg msg ->
-            Api.update model msg
+        ProtocolMsg pMsg ->
+            Api.update model pMsg
 
         PairDeviceClicked ->
             { model | showPairingDialogue = not model.showPairingDialogue }
@@ -152,7 +148,7 @@ update msg model =
 
         TokenSubmitted ->
             model
-                |> withCmds [ withTimestamp DoTokenSubmitted ]
+                |> withCmds [ Helper.withTimestamp DoTokenSubmitted ]
 
         RemoveDevice uuid ->
             -- TODO: require confirmation
@@ -204,11 +200,10 @@ update msg model =
                 |> addCmds [ Api.grantRequest req model.syncData, Ports.closePopup () ]
 
         RejectShareRequest id req ->
-            -- TODO: inform other of reject?
-            --      -> Yes, so that they stop asking
+            -- inform other such that they stop asking
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Ports.closePopup (), Api.rejectShareRequest req.deviceId req.reqIds model.syncData ]
+                |> addCmds [ Ports.closePopup (), Api.rejectShareRequest req.deviceId req.reqIds ]
 
         ResetDevice ->
             -- TODO: require confirmation
@@ -263,7 +258,7 @@ saveEntry groupId entry model =
         | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry
         , expandSiteEntry = False
     }
-        |> withCmds [ withTimestamp (InsertSite ( entry.site, entry.login ) ( entry.securityLevel, groupId ) entry.password) ]
+        |> withCmds [ Helper.withTimestamp (InsertSite ( entry.site, entry.login ) ( entry.securityLevel, groupId ) entry.password) ]
 
 
 updateSeed : Model -> Model

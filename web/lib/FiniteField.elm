@@ -18,7 +18,7 @@ import Random.Pcg.Extended as Random exposing (Generator)
 
 --
 
-import Helper exposing (bigIntMax, crashOnNothing)
+import Helper exposing (bigIntMax)
 
 
 type alias Field =
@@ -37,10 +37,15 @@ type alias Prime =
     BigInt
 
 
+bigPrime : BigInt
 bigPrime =
     -- TODO: this is only good for up to 32 characters!
-    BigInt.fromString "78964309289234503966245545309514784011238902738532633290445390498470508979557"
-        |> crashOnNothing "Failed to parse something that is clearly a number..."
+    case BigInt.fromString "78964309289234503966245545309514784011238902738532633290445390498470508979557" of
+        Just n ->
+            n
+
+        Nothing ->
+            Debug.crash "Failed to parse something that is clearly a number..."
 
 
 primeBiggerThan : BigInt -> Prime
@@ -59,10 +64,12 @@ makeField p =
     }
 
 
+bigIntPowMod : BigInt -> BigInt -> BigInt -> BigInt
 bigIntPowMod b e p =
     bigIntPowModHelp b e p (BigInt.fromInt 1)
 
 
+bigIntPowModHelp : BigInt -> BigInt -> BigInt -> BigInt -> BigInt
 bigIntPowModHelp b e p acc =
     if BigInt.gt e zero then
         let
@@ -135,7 +142,7 @@ getPolynomialPoints f coeffs numPoints =
 
 getPolynomialPointsFor : Field -> List BigInt -> Dict comparable Int -> Dict comparable ( Int, BigInt )
 getPolynomialPointsFor f coeffs xVals =
-    Dict.map (\id x -> ( x, evalPolynom f coeffs (BigInt.fromInt x) )) xVals
+    Dict.map (\_ x -> ( x, evalPolynom f coeffs (BigInt.fromInt x) )) xVals
 
 
 evalPolynom : Field -> List BigInt -> BigInt -> BigInt

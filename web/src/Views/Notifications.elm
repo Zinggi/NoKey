@@ -1,8 +1,5 @@
 module Views.Notifications exposing (view, init, Config, State)
 
--- import Html exposing (..)
--- import Html.Events exposing (..)
-
 import Set
 import Element exposing (..)
 import Elements
@@ -65,10 +62,18 @@ viewEntry config sync maxSecurityLevel n state =
                     [ Elements.inputWithLabel Nothing "Site" "" entry.site
                     , Elements.inputWithLabel Nothing "Login" "" entry.login
                     , Elements.passwordEntry Nothing "Password" False entry.password
-                    , Elements.withLabel "Security Level" <| Elements.clampedNumberInput config.toMsg ( 2, 2, maxSecurityLevel ) state
+                    , Elements.withLabel "Security Level" <|
+                        Elements.clampedNumberInput config.toMsg ( 2, 2, maxSecurityLevel ) state
                     ]
                 , Elements.buttonRow []
-                    [ Elements.button (Just (config.onSaveEntry n.id (Data.Sync.currentGroupId state sync) { entry | securityLevel = min maxSecurityLevel state })) "Save"
+                    [ Elements.button
+                        (Just
+                            (config.onSaveEntry n.id
+                                (Data.Sync.currentGroupId state sync)
+                                { entry | securityLevel = min maxSecurityLevel state }
+                            )
+                        )
+                        "Save"
                     , Elements.button (Just (config.onDismiss n.id)) "Forget"
                     ]
                 ]

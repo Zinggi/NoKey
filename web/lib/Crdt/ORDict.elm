@@ -25,12 +25,12 @@ module Crdt.ORDict
         )
 
 import Dict exposing (Dict)
-import Set exposing (Set)
+import Set
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
 import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
-import Random.Pcg as Random exposing (Seed)
+import Random.Pcg exposing (Seed)
 import Crdt.ORSet as ORSet exposing (ORSet)
 import Helper exposing (removeAllExcept)
 

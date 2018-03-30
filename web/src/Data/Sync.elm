@@ -16,7 +16,7 @@ import Murmur3
 
 --
 
-import Helper exposing (decodeTuple, decodeTuple2, encodeTuple, encodeTuple2, encodeSet, decodeSet)
+import Helper exposing (decodeTuple2, encodeTuple2)
 import SecretSharing
 import AES
 import Crdt.ORDict as ORDict exposing (ORDict)
@@ -79,7 +79,7 @@ type alias SharedData =
     --          + remove a pw from the stash, once enough devices took their share
     --          + give the user a better understanding of how it works:
     --              - E.g. if the user clicks on a group in the passwords view, show which devices have a share
-    --          + TODO: automatically calculate new shares on unlock group for devices
+    --          + automatically calculate new shares on unlock group for devices
     --            that have no share yet and aren't in the to distribute list
     , distributedShares : ORDict GroupId (GSet DeviceId)
 
@@ -312,12 +312,12 @@ groupsNotFullyDistributed sync =
                         else
                             Dict.insert groupId
                                 (Set.foldl
-                                    (\devId acc ->
+                                    (\devId acc2 ->
                                         let
                                             ( name, post ) =
                                                 Dict.get devId known |> Maybe.withDefault ( "", "" )
                                         in
-                                            { id = devId, name = name, postFix = post } :: acc
+                                            { id = devId, name = name, postFix = post } :: acc2
                                     )
                                     []
                                     others
@@ -364,7 +364,7 @@ getName sync =
 gotRemoved : SyncData -> SyncData
 gotRemoved sync =
     -- clear all data
-    (init sync.seed sync.encryptionKey sync.signingKey sync.deviceType sync.id)
+    init sync.seed sync.encryptionKey sync.signingKey sync.deviceType sync.id
         -- keep version history of this device
         |> updateShared (\s -> { s | knownIds = ORDict.resetExceptOne sync.id sync.shared.knownIds })
 
@@ -423,7 +423,15 @@ type alias ShouldAddNewShares msg =
 
 {-| The caller is expected to call Api.requestShare if the third part of the tuple is True.
 -}
-insertSite : ShouldAddNewShares msg -> Time -> RandomE.Seed -> AccountId -> GroupId -> Password -> SyncData -> ( SyncData, RandomE.Seed, Bool, Cmd msg )
+insertSite :
+    ShouldAddNewShares msg
+    -> Time
+    -> RandomE.Seed
+    -> AccountId
+    -> GroupId
+    -> Password
+    -> SyncData
+    -> ( SyncData, RandomE.Seed, Bool, Cmd msg )
 insertSite onShouldAddNewShares time seed accountId groupId pw sync =
     case Request.getGroupPassword groupId sync.groupPasswordRequestsState of
         -- if have group password then
@@ -559,11 +567,10 @@ insertToStorage timestamp groupPw accountId groupId pw sync =
                         )
 
             Err str ->
-                -- TODO: probably just ignore error, don't crash!
-                Debug.crash
-                    ("Encrypting a password failed? But why???\n(groupPw, accountId, groupId, pw):\n"
-                        ++ toString ( groupPw, accountId, groupId, pw )
-                    )
+                Debug.log
+                    "Encrypting a password failed? But why???\n(err, groupPw, accountId, groupId, pw)"
+                    ( str, groupPw, accountId, groupId, pw )
+                    |> always sync
 
 
 deletePassword : AccountId -> SyncData -> SyncData
@@ -599,7 +606,7 @@ getDevice id sync =
 
 mapGroups : (GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
 mapGroups f sync =
-    (encryptedPasswords sync)
+    encryptedPasswords sync
         |> Dict.foldl
             (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
                 let
@@ -642,8 +649,8 @@ addShares onShouldAddNewShares time shares sync =
 
 addShare : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
 addShare onShouldAddNewShares time groupId share sync =
-    -- TODO: anything else to do here?
-    -- Yes: check if some of the tasks inside the stash can be completed
+    -- Add a share. Ff we can unlock a group, check which tasks can be completed, e.g.
+    -- moving passwords from stash to storage and generating more shares for those that need them.
     let
         ( newReqState, mayForm ) =
             Request.addShare groupId share sync.groupPasswordRequestsState
@@ -656,13 +663,12 @@ addShare onShouldAddNewShares time groupId share sync =
                 let
                     sync2 =
                         -- insert password from stash into storage
-                        (Dict.foldl
+                        Dict.foldl
                             (\accountId pw accSync ->
                                 insertToStorage time groupPw accountId groupId pw accSync
                             )
                             newSync
                             (Tasks.getStashFor groupId newSync.tasks)
-                        )
                             -- remove pw from stash(es)
                             |> clearStashes groupId
 
@@ -679,8 +685,8 @@ addShare onShouldAddNewShares time groupId share sync =
                                 onShouldAddNewShares time groupId (getAssociatedKeys shares sync2)
 
                             Err e ->
-                                -- TODO: don't crash here!
-                                Debug.crash ("Failed to create more shares:\n" ++ e)
+                                Debug.log "Failed to create more shares" e
+                                    |> always Cmd.none
                 in
                     ( sync2, mayForm, cmd )
 
@@ -810,8 +816,8 @@ addToMyShares newShares sync =
                             Dict.insert groupId s acc
 
                         Err e ->
-                            -- TODO: don't crash!
-                            Debug.crash ("Can't decode my decrypted share:\n" ++ e)
+                            Debug.log "Can't decode my decrypted share" e
+                                |> always acc
                 )
                 Dict.empty
                 newShares
@@ -959,7 +965,7 @@ encodeComplete s =
                 , ( "signingKey", s.signingKey )
                 , ( "deviceType", encodeDeviceType s.deviceType )
                 , ( "shared", encodeShared s.shared )
-                , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) (SecretSharing.encodeShare) s.myShares )
+                , ( "myShares", JE.dict (encodeGroupId >> JE.encode 0) SecretSharing.encodeShare s.myShares )
                 , ( "synchedWith", JE.dict identity VClock.encode s.synchedWith )
                 , ( "tasks", Tasks.encode s.tasks )
                 , ( "seed", Random.toJson s.seed )

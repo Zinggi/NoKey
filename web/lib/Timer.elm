@@ -48,16 +48,16 @@ update config (Tick currentTime) (Timer timer) =
     let
         ( msgs, newTimers ) =
             Dict.foldl
-                (\strId ( id, mayStart, total ) ( msgs, t ) ->
+                (\strId ( id, mayStart, total ) ( msgs_, t ) ->
                     case mayStart of
                         Just start ->
                             if currentTime - start < total then
-                                ( config.onInterval id currentTime :: msgs, t )
+                                ( config.onInterval id currentTime :: msgs_, t )
                             else
-                                ( config.onFinish id currentTime :: msgs, Dict.remove strId t )
+                                ( config.onFinish id currentTime :: msgs_, Dict.remove strId t )
 
                         Nothing ->
-                            ( msgs, Dict.insert strId ( id, Just currentTime, total ) t )
+                            ( msgs_, Dict.insert strId ( id, Just currentTime, total ) t )
                 )
                 ( [], timer.timers )
                 timer.timers

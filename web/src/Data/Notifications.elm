@@ -29,6 +29,7 @@ type NotificationT
     = ShareRequestT ShareRequest
       -- TODO: This notification has to persist,
       -- e.g. we never want to lose a password just because we closed the browser
+      -- But should it really? next time we might not even remember we wanted to add it
     | ExternalSiteEntry SiteEntry Bool
 
 
@@ -62,19 +63,6 @@ init =
     { data = Dict.empty, maxKey = 0 }
 
 
-filter : (Notification -> Bool) -> Notifications -> List Notification
-filter f ns =
-    Dict.foldl
-        (\id n acc ->
-            if f n then
-                n :: acc
-            else
-                acc
-        )
-        []
-        ns.data
-
-
 newSiteEntry : SiteEntry -> Bool -> Notifications -> Notifications
 newSiteEntry entry isNew ns =
     -- Only keep the most recent entry for a specific site.
@@ -102,20 +90,6 @@ insertWithId n ns =
     ( ns.maxKey, insert n ns )
 
 
-member : NotificationT -> Notifications -> Bool
-member n ns =
-    Dict.filter (\id n_ -> n_.data == n) ns.data
-        |> Dict.size
-        |> (\x -> x > 0)
-
-
-get : NotificationT -> Notifications -> Maybe Notification
-get n ns =
-    Dict.filter (\id n_ -> n_.data == n) ns.data
-        |> Dict.values
-        |> List.head
-
-
 updateIfOrInsert : (NotificationT -> Bool) -> (NotificationT -> NotificationT) -> NotificationT -> Notifications -> ( Int, Notifications )
 updateIfOrInsert shouldUpdate update n ns =
     let
@@ -139,24 +113,6 @@ updateIfOrInsert shouldUpdate update n ns =
 replaceIfElseInsert : (NotificationT -> Bool) -> NotificationT -> Notifications -> ( Int, Notifications )
 replaceIfElseInsert f n ns =
     updateIfOrInsert f (always n) n ns
-
-
-insertNoDuplicate : NotificationT -> Notifications -> Notifications
-insertNoDuplicate n ns =
-    if member n ns then
-        ns
-    else
-        insert n ns
-
-
-insertNoDuplicateWithId : NotificationT -> Notifications -> ( Int, Notifications )
-insertNoDuplicateWithId n ns =
-    case get n ns of
-        Just n_ ->
-            ( n_.id, ns )
-
-        Nothing ->
-            insertWithId n ns
 
 
 count : Notifications -> Int

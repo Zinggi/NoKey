@@ -2,7 +2,6 @@ module Data.TaskList
     exposing
         ( TaskList
         , Task(..)
-          -- , getStash
         , getTasks
         , getProgress
         , resolveWaitingTasks
@@ -123,7 +122,7 @@ getTasks request groupsNotFullyDistributed progress tasks =
                         d
 
                 insertOrUpdate it =
-                    Helper.insertOrUpdate siteName (insert Dict.empty) (insert) it
+                    Helper.insertOrUpdate siteName (insert Dict.empty) insert it
 
                 add it =
                     case reason of

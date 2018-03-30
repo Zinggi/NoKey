@@ -10,22 +10,27 @@ type alias CharSet =
     IntervalList
 
 
+ascii : CharSet
 ascii =
     [ ( 0x20, 0x7E ) ]
 
 
+uppercase : CharSet
 uppercase =
     [ ( 0x41, 0x5A ) ]
 
 
+lowercase : CharSet
 lowercase =
     [ ( 0x61, 0x7A ) ]
 
 
+numbers : CharSet
 numbers =
     [ ( 0x30, 0x39 ) ]
 
 
+specialChars : CharSet
 specialChars =
     Interval.fromTuples ascii
         |> Interval.subtract (List.concat [ numbers, uppercase, lowercase ] |> Interval.fromTuples)

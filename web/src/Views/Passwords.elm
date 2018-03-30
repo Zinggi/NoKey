@@ -1,7 +1,6 @@
 module Views.Passwords exposing (..)
 
 import Dict exposing (Dict)
-import Set exposing (Set)
 import Element exposing (..)
 import Elements
 import Styles
@@ -9,7 +8,7 @@ import Icons
 import Data.RequestGroupPassword as RequestPassword exposing (Status(..), PasswordStatus(..))
 import Data.Sync exposing (SyncData)
 import Data exposing (..)
-import Data.TaskList as Tasks exposing (Task(..))
+import Data.TaskList exposing (Task(..))
 import Simple.Fuzzy as Fuzzy
 
 
@@ -174,7 +173,7 @@ viewPw config search siteName userNames =
             List.filterMap
                 (\( userName, status ) ->
                     if Fuzzy.match search (siteName ++ userName) then
-                        Just ( siteName, userName, status )
+                        Just ( userName, status )
                     else
                         Nothing
                 )
@@ -184,18 +183,17 @@ viewPw config search siteName userNames =
             [] ->
                 empty
 
-            [ ( siteName, userName, status ) ] ->
+            [ ( userName, status ) ] ->
                 pwRow config [ Elements.h4 siteName ] ( siteName, userName ) status
 
             other ->
                 column []
                     [ Elements.h4 siteName
-                    , (List.map
-                        (\( siteName, userName, status ) ->
+                    , List.map
+                        (\( userName, status ) ->
                             pwRow config [] ( siteName, userName ) status
                         )
                         other
-                      )
                         |> column [ Styles.paddingLeft (Styles.scaled 1) ]
                     ]
 

@@ -1,6 +1,5 @@
 module Elements exposing (..)
 
-import Color
 import Html.Attributes as Attr
 import Html.Events
 import Json.Decode as JD
@@ -51,7 +50,7 @@ onKey desiredCode msg =
 inputGroup : String -> List (Element msg) -> Element msg
 inputGroup heading contents =
     column [ padding (Styles.scaled 1), spacing (Styles.paddingScale 1), alignLeft ]
-        ((el Styles.groupHeading (h4 (heading))) :: contents)
+        (el Styles.groupHeading (h4 heading) :: contents)
 
 
 container : List (Element msg) -> Element msg
@@ -66,7 +65,7 @@ miniPage title children =
 
 buttonRow : List (Attribute msg) -> List (Element msg) -> Element msg
 buttonRow attrs btns =
-    row ([ padding (Styles.paddingScale 3) ] ++ attrs) (List.intersperse spacer btns)
+    row (padding (Styles.paddingScale 3) :: attrs) (List.intersperse spacer btns)
 
 
 card : List (Attribute msg) -> List (Element msg) -> Element msg
@@ -216,7 +215,7 @@ primaryButton : Maybe msg -> String -> Element msg
 primaryButton onPress txt =
     Input.button []
         { label =
-            (el
+            el
                 (padding (Styles.paddingScale 1)
                     :: (Background.color <|
                             case onPress of
@@ -229,7 +228,6 @@ primaryButton onPress txt =
                     :: Styles.borderStyle
                 )
                 (text txt)
-            )
         , onPress = onPress
         }
 
@@ -238,7 +236,7 @@ button : Maybe msg -> String -> Element msg
 button onPress txt =
     Input.button []
         { label =
-            (el
+            el
                 (padding (Styles.paddingScale 1)
                     :: (case onPress of
                             Nothing ->
@@ -249,7 +247,6 @@ button onPress txt =
                        )
                 )
                 (text txt)
-            )
         , onPress = onPress
         }
 
@@ -257,9 +254,8 @@ button onPress txt =
 delete onPress =
     Input.button []
         { label =
-            (el ([ padding (Styles.paddingScale 1) ] ++ Styles.borderStyle)
+            el (padding (Styles.paddingScale 1) :: Styles.borderStyle)
                 (row [ spacing (Styles.paddingScale 0) ] [ Icons.delete, text "Delete" ])
-            )
         , onPress = Just onPress
         }
 
@@ -268,7 +264,7 @@ customButton : Maybe msg -> Element msg -> Element msg
 customButton onPress inner =
     Input.button []
         { label =
-            (el
+            el
                 (padding (Styles.paddingScale 1)
                     :: (case onPress of
                             Nothing ->
@@ -279,7 +275,6 @@ customButton onPress inner =
                        )
                 )
                 inner
-            )
         , onPress = onPress
         }
 
@@ -313,11 +308,10 @@ groupIcon : Bool -> GroupId -> Element msg
 groupIcon isLocked ( level, _ ) =
     row [ width shrink ]
         [ h3 (toString level)
-        , (if isLocked then
+        , if isLocked then
             Icons.locked
-           else
+          else
             Icons.unlocked
-          )
         ]
 
 
@@ -326,7 +320,7 @@ avatar attrs { id, name, postFix } =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
         , paragraph [ alignLeft, width fill, spacing (Styles.scaled -2) ]
-            (helperMayName name :: helperMayIdPart postFix :: [])
+            [ helperMayName name, helperMayIdPart postFix ]
         ]
 
 
@@ -377,7 +371,7 @@ clampedNumberInput onChange ( min, default, max ) n =
                 ]
                 { onChange = Just toNumber
                 , text = toString m
-                , label = Input.labelLeft [] (empty)
+                , label = Input.labelLeft [] empty
                 , placeholder = Nothing
                 }
     in
@@ -456,7 +450,7 @@ inputHelper fn attr onChange placeholder value =
         )
         { onChange = onChange
         , text = value
-        , label = Input.labelLeft [ padding 0 ] (empty)
+        , label = Input.labelLeft [ padding 0 ] empty
         , placeholder =
             if placeholder == "" then
                 Nothing

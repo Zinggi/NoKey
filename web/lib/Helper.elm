@@ -38,7 +38,7 @@ addCmds cmds ( a, cmd ) =
 withTimestamp : (Time -> msg) -> Cmd msg
 withTimestamp toMsg =
     Time.now
-        |> Task.perform (toMsg)
+        |> Task.perform toMsg
 
 
 mapModel : (a -> b) -> ( a, c ) -> ( b, c )
@@ -60,7 +60,7 @@ andThenUpdateIf shouldUpdate =
     if shouldUpdate then
         andThenUpdate
     else
-        (\_ m -> m)
+        \_ m -> m
 
 
 
@@ -95,19 +95,6 @@ attemptWithTimestamp toMsg task =
 
 
 -- Maybe
-
-
-{-| Use this when you know for certain that a Maybe will be Just a.
-If you were wrong, it will crash!
--}
-crashOnNothing : String -> Maybe a -> a
-crashOnNothing s ma =
-    case ma of
-        Just a ->
-            a
-
-        Nothing ->
-            Debug.crash s
 
 
 boolToMaybe : Bool -> a -> Maybe a
@@ -175,7 +162,7 @@ filterDict : Dict comparable ( Bool, a ) -> List a
 filterDict sets =
     Dict.toList sets
         |> List.filterMap
-            (\( k, ( b, s ) ) ->
+            (\( _, ( b, s ) ) ->
                 if b then
                     Just s
                 else
@@ -236,10 +223,10 @@ findNonEqualBeginning ids =
         [] ->
             []
 
-        [ id ] ->
+        [ _ ] ->
             [ "" ]
 
-        first :: rest ->
+        first :: _ ->
             findNonEqualBeginningHelper (List.length ids) (roundUpToMultiple 4 (String.length first)) ids
 
 
@@ -399,9 +386,7 @@ groupPwGenerator =
     -- 0 - 1114111 is all unicode
     -- 0 - 127 is all ascii
     -- 0 - 255 extended ascii
-    -- TODO: how to maximize characters? and how big to make it?
-    -- Right now definitely too small!!
-    RandomE.map String.fromList (RandomE.list 16 (charGenerator 0 255))
+    RandomE.map String.fromList (RandomE.list 32 (charGenerator 0 255))
 
 
 charGenerator : Int -> Int -> Generator Char

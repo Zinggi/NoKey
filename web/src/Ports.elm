@@ -98,11 +98,11 @@ port onNewEncryptedShares : ({ time : Time, groupId : GroupId, shares : List ( D
 
 {-| used for exchanging our shares
 -}
-port encryptShares : { shares : List ( GroupId, Value ), publicKey : Value, deviceId : DeviceId, myId : DeviceId, reqIds : Value } -> Cmd msg
+port encryptShares : { shares : List ( GroupId, Value ), publicKey : Value, deviceId : DeviceId, reqIds : Value } -> Cmd msg
 
 
 type alias DidEncryptSharesT =
-    { deviceId : DeviceId, encryptedShares : Value, myId : DeviceId, reqIds : Value }
+    { deviceId : DeviceId, encryptedShares : Value, reqIds : Value }
 
 
 port onDidEncryptShares : (DidEncryptSharesT -> msg) -> Sub msg

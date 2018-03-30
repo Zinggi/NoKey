@@ -366,8 +366,8 @@ const setup = (startFn, onStart) => {
             });
         });
 
-        // port encryptShares : { shares : List (GroupId, Value), publicKey : Value, deviceId : DeviceId, myId : DeviceId, reqIds : Value } -> Cmd msg
-        // port onDidEncryptShares : ({ deviceId : DeviceId, encryptedShares : Value, myId : DeviceId, reqIds : Value } -> msg) -> Sub msg
+        // port encryptShares : { shares : List (GroupId, Value), publicKey : Value, deviceId : DeviceId, reqIds : Value } -> Cmd msg
+        // port onDidEncryptShares : ({ deviceId : DeviceId, encryptedShares : Value, reqIds : Value } -> msg) -> Sub msg
         app.ports.encryptShares.subscribe((msg) => {
             console.log("should encrypt shares:", msg);
 
@@ -380,7 +380,7 @@ const setup = (startFn, onStart) => {
             });
             Promise.all(cmds).then((shares) => {
                 console.log("new shares encrypted:", shares);
-                app.ports.onDidEncryptShares.send({ encryptedShares: shares, deviceId: msg.deviceId, myId: msg.myId, reqIds: msg.reqIds });
+                app.ports.onDidEncryptShares.send({ encryptedShares: shares, deviceId: msg.deviceId, reqIds: msg.reqIds });
             });
         });
 

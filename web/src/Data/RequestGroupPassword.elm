@@ -25,7 +25,7 @@ import Dict exposing (Dict)
 import EverySet as Set exposing (EverySet)
 import AES
 import SecretSharing exposing (Share)
-import Data exposing (GroupId, AccountId, GroupPassword, FillFormData, Password, EncryptedPassword)
+import Data exposing (GroupId, AccountId, GroupPassword, Password, EncryptedPassword)
 import Helper exposing (maybeToEverySet)
 
 
@@ -251,8 +251,8 @@ tryGetAccountPassword accountId mayEncPw mayPw shouldShow state =
                                         cacheAccountPw accountId pw shouldShow state
 
                                     Err e ->
-                                        -- TODO: when does this happen? We probably shouldn't crash
-                                        Debug.crash ("Why can we not decrypt???" ++ e)
+                                        Debug.log "Why can we not decrypt???" e
+                                            |> always state
 
                             _ ->
                                 state
@@ -291,7 +291,7 @@ tryGetPassword ( level, _ ) info =
             info
 
         Nothing ->
-            if (Set.size info.shares) >= level then
+            if Set.size info.shares >= level then
                 -- expensive operation
                 { info | password = Just <| SecretSharing.joinToString (Set.toList info.shares) }
             else

@@ -3,7 +3,6 @@ module Views.Devices exposing (view)
 import Dict exposing (Dict)
 import Element exposing (..)
 import Elements
-import Styles
 import Model exposing (Msg(..))
 
 

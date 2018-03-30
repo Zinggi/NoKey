@@ -3,7 +3,6 @@ module Views.PasswordRequirements exposing (State, init, view, getNextPassword, 
 import Dict exposing (Dict)
 import Random.Pcg.Extended as Random exposing (Seed)
 import Element exposing (..)
-import Html
 
 
 --
@@ -11,9 +10,8 @@ import Html
 import PasswordGenerator as PG exposing (PasswordRequirements)
 import CharSet exposing (CharSet)
 import Interval
-import Helper exposing (..)
+import Helper
 import Elements
-import Styles
 
 
 type alias State =
@@ -52,21 +50,25 @@ update msg state =
             { state | atLeastOneOf = setSet s b state.atLeastOneOf }
 
 
+setSet : comparable -> a -> Dict comparable ( a, b ) -> Dict comparable ( a, b )
 setSet key b set =
     Dict.update key (Maybe.map (\( _, s ) -> ( b, s ))) set
 
 
+isSelected : comparable -> Dict comparable ( Bool, a ) -> Bool
 isSelected key select =
     Dict.get key select
-        |> Maybe.map (\( b, s ) -> b)
+        |> Maybe.map (\( b, _ ) -> b)
         |> Maybe.withDefault False
 
 
 getRequirements : State -> PasswordRequirements
 getRequirements state =
     -- TODO: change to allowed, to allow characters outside the ascii set if desired by user
+    -- But do we really want to? UTF-8 isn't widely accepted and the user can always modify
+    -- the generated password to his likes.
     { forbidden = getForbidden state.allowedSets state.includeCustom state.excludeCustom
-    , atLeastOneOf = CharSet.fromString state.custom :: filterDict state.atLeastOneOf
+    , atLeastOneOf = CharSet.fromString state.custom :: Helper.filterDict state.atLeastOneOf
     }
 
 
@@ -97,7 +99,7 @@ getNextPassword length reqs =
 getForbidden sets include exclude =
     Interval.unionIntervalList
         (CharSet.fromString exclude)
-        (filterDict (Dict.map (\k ( b, s ) -> ( not b, s )) sets)
+        (Helper.filterDict (Dict.map (\k ( b, s ) -> ( not b, s )) sets)
             |> Interval.union
             |> Interval.subtract (CharSet.fromString include)
         )

@@ -1,9 +1,5 @@
 module Views.Pairing exposing (State, Config, view, receivedToken, init, tokenSubmitted, pairingCompleted, getTockenClicked)
 
--- import Html exposing (Html)
--- import Html.Attributes as Attr
--- import Html.Events exposing (onSubmit, onClick, onInput)
-
 import Element exposing (..)
 import RemoteData exposing (WebData, RemoteData(..))
 import Http exposing (Error(..))

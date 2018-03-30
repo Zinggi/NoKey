@@ -3,18 +3,17 @@ module Protocol.Data exposing (..)
 import Time exposing (Time)
 import Set exposing (Set)
 import Dict exposing (Dict)
-import Json.Encode as JE exposing (Value)
+import Json.Encode exposing (Value)
 import Http
 import Debounce exposing (Debounce)
 import RemoteData exposing (WebData, RemoteData(..))
-import SecretSharing
-import Crdt.VClock as VClock exposing (VClock)
+import Crdt.VClock exposing (VClock)
 import Timer exposing (Timer)
 
 
 --
 
-import Data.Sync exposing (SyncData, OtherSharedData)
+import Data.Sync exposing (OtherSharedData)
 import Data exposing (GroupId, DeviceId)
 import Data.Notifications
 
