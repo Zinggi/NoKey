@@ -127,20 +127,16 @@ initModel initialSeed encryptionKey signingKey devType mayId maySync =
         ( base, ext ) =
             initialSeed
 
-        ( uuid, seed2 ) =
-            -- TODO: replace with pcg-extended
-            -- adapt the UUID package to use pcg-extended
-            -- see:
-            --  https://github.com/danyx23/elm-uuid/issues/10
-            Random.step Helper.randomUUID (Random.initialSeed base)
+        ( uuid, newSeed ) =
+            RandomE.step Helper.randomUUID (RandomE.initialSeed base ext)
 
         ( indepSeed, _ ) =
-            Random.step Random.independentSeed seed2
+            Random.step Random.independentSeed (Random.initialSeed base)
     in
         { newSiteEntry = Data.PasswordMeta.default
         , expandSiteEntry = False
         , requirementsState = PW.init (RandomE.initialSeed base ext)
-        , seed = RandomE.initialSeed base ext
+        , seed = newSeed
         , uniqueIdentifyier = Maybe.withDefault uuid mayId
         , syncData = Maybe.withDefault (Data.Sync.init indepSeed encryptionKey signingKey devType uuid) maySync
         , pairingDialogue = Views.Pairing.init
@@ -156,12 +152,8 @@ initModel initialSeed encryptionKey signingKey devType mayId maySync =
 getUniqueId : Model -> ( String, Model )
 getUniqueId model =
     let
-        -- TODO: workaround until UUID uses extended seed
-        ( i, newSeed ) =
-            RandomE.step (RandomE.int RandomE.minInt RandomE.maxInt) model.seed
-
-        ( uuid, _ ) =
-            Random.step Helper.randomUUID (Random.initialSeed i)
+        ( uuid, newSeed ) =
+            RandomE.step Helper.randomUUID model.seed
     in
         ( uuid, { model | seed = newSeed } )
 

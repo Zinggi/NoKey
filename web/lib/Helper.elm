@@ -376,9 +376,9 @@ coreToPcg seedC =
     RandomP.initialSeed (Random.step (Random.int Random.minInt Random.maxInt) seedC |> Tuple.first)
 
 
-randomUUID : RandomP.Generator String
+randomUUID : RandomE.Generator String
 randomUUID =
-    RandomP.map Uuid.toString Uuid.uuidGenerator
+    Uuid.stringGenerator
 
 
 groupPwGenerator : Generator String
