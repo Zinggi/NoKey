@@ -6,8 +6,7 @@
   "scripts": {
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
-    "errors": "webpack --mode development --display-error-details",
-    "dev": "webpack-dev-server --mode development --port 3000"
+    "errors": "webpack --mode development --display-error-details"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^4.5.1",
