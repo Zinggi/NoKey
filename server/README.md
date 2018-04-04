@@ -14,13 +14,14 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
   * Only get prod dependencies `mix deps.get --only prod`
   * generate a secret `mix phx.gen.secret` and keep it somewhere save
 
-  * Possibly increment version in `mix.exs`
   * Compile `MIX_ENV=prod mix compile`
   * Build elm and assets:
     + (first time) `cd ../web/`, `elm-github-install`, `cd ../server`
     + `cd assets`, `yarn build`, `cd ..`
   * Digest assets `MIX_ENV=prod mix phx.digest`
   * (optional) test if it works: `PORT=4001 MIX_ENV=prod mix phx.server`
+    + If there is an error, maybe cleaning elm-stuff helps?
+  * Possibly increment version in `mix.exs`
   * Build release:
     
     - if first time:
