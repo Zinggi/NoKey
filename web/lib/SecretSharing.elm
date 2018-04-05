@@ -99,11 +99,26 @@ stringToBigInt s =
             (BigInt.fromInt 0)
 
 
+bytesToBigInt : List Int -> BigInt
+bytesToBigInt s =
+    List.foldl
+        (\elm acc ->
+            BigInt.add (BigInt.mul acc (BigInt.fromInt 256)) (BigInt.fromInt elm)
+        )
+        (BigInt.fromInt 0)
+        s
+
+
 bigIntToString : BigInt -> String
 bigIntToString n =
     bigIntToStringHelp n []
         |> UTF8.toString
         |> Result.withDefault ""
+
+
+bigIntToBytes : BigInt -> List Int
+bigIntToBytes n =
+    bigIntToStringHelp n []
 
 
 bigIntToInt : BigInt -> Int
@@ -131,10 +146,24 @@ splitString config secret =
     splitSecret config (stringToBigInt secret)
 
 
+{-| Same as splitString, but expects a list of bytes (0-255).
+Not longer than 32!
+-}
+splitBytes : ( Int, Dict comparable Int ) -> List Int -> Seed -> ( Dict comparable Share, Seed )
+splitBytes config secret =
+    splitSecret config (bytesToBigInt secret)
+
+
 joinToString : List Share -> Result String String
 joinToString shares =
     joinSecret shares
         |> Result.map bigIntToString
+
+
+joinToBytes : List Share -> Result String (List Int)
+joinToBytes shares =
+    joinSecret shares
+        |> Result.map bigIntToBytes
 
 
 splitSecret : ( Int, Dict comparable Int ) -> Secret -> Seed -> ( Dict comparable Share, Seed )

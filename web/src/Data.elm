@@ -74,4 +74,4 @@ encryptedPasswordDecoder =
 
 
 type alias GroupPassword =
-    String
+    List Int

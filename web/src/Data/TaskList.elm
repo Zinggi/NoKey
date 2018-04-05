@@ -60,7 +60,7 @@ encode : TaskList -> Value
 encode tasks =
     JE.object
         [ ( "stash", JE.dict (encodeAccountId >> JE.encode 0) (encodeTuple3 encodeGroupId encodeReason JE.string) tasks.stash )
-        , ( "groupPws", JE.dict (encodeGroupId >> JE.encode 0) JE.string tasks.groupPws )
+        , ( "groupPws", JE.dict (encodeGroupId >> JE.encode 0) (List.map JE.int >> JE.list) tasks.groupPws )
         ]
 
 
@@ -68,7 +68,7 @@ decoder : Decoder TaskList
 decoder =
     JD.map2 (\stash groupPws -> { stash = stash, groupPws = groupPws, visiblePws = Set.empty })
         (JD.field "stash" <| JD.dict2 accountIdDecoder (decodeTuple3 groupIdDecoder reasonDecoder JD.string))
-        (JD.field "groupPws" <| JD.dict2 groupIdDecoder JD.string)
+        (JD.field "groupPws" <| JD.dict2 groupIdDecoder (JD.list JD.int))
 
 
 type

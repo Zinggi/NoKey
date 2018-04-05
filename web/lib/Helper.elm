@@ -381,12 +381,11 @@ randomUUID =
     Uuid.stringGenerator
 
 
-groupPwGenerator : Generator String
+groupPwGenerator : Generator (List Int)
 groupPwGenerator =
-    -- 0 - 1114111 is all unicode
-    -- 0 - 127 is all ascii
-    -- 0 - 255 extended ascii
-    RandomE.map String.fromList (RandomE.list 32 (charGenerator 0 255))
+    -- It can't be 32, because my secret sharing implementation uses a hardcoded prime that is
+    -- a bit smaller than 32 bytes, but with 31 it's fine
+    RandomE.list 31 (RandomE.int 0 255)
 
 
 charGenerator : Int -> Int -> Generator Char

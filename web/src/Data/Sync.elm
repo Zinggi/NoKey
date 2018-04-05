@@ -465,7 +465,7 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
 
                         -- generate shares/keys
                         ( shares, seed3 ) =
-                            SecretSharing.splitString ( level, getXValues sync ) groupPw seed2
+                            SecretSharing.splitBytes ( level, getXValues sync ) groupPw seed2
 
                         -- take out our share
                         ( myShares, sharesForOthers, newDistributedShares ) =
@@ -707,7 +707,11 @@ requestPasswordPressed groupIds mayAccount sync =
 
         mayFill =
             Request.canFill mayAccount newReqState
-                |> Maybe.map (\( ( site, login ), pw ) -> { password = pw, site = site, login = login })
+                |> Maybe.andThen
+                    (\( ( site, login ) as accountId, _ ) ->
+                        getPassword accountId newSync
+                            |> Maybe.map (\pw -> { password = pw, site = site, login = login })
+                    )
     in
         ( newSync, mayFill )
 

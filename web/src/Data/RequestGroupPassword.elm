@@ -34,7 +34,7 @@ type State
 
 
 type alias Info =
-    { fillForm : Maybe AccountId, shares : EverySet Share, password : Maybe (Result String String) }
+    { fillForm : Maybe AccountId, shares : EverySet Share, password : Maybe (Result String GroupPassword) }
 
 
 type Status
@@ -71,7 +71,7 @@ getStatus key (State state) =
     mayInfoToStatus key (Dict.get key state.groupPws)
 
 
-canFill : Maybe AccountId -> State -> Maybe ( AccountId, Password )
+canFill : Maybe AccountId -> State -> Maybe ( AccountId, GroupPassword )
 canFill mayId (State state) =
     Maybe.andThen
         (\id ->
@@ -293,6 +293,6 @@ tryGetPassword ( level, _ ) info =
         Nothing ->
             if Set.size info.shares >= level then
                 -- expensive operation
-                { info | password = Just <| SecretSharing.joinToString (Set.toList info.shares) }
+                { info | password = Just <| SecretSharing.joinToBytes (Set.toList info.shares) }
             else
                 info
