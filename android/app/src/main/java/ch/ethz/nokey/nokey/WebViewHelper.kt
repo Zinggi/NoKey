@@ -19,6 +19,10 @@ import android.net.Uri
 import android.os.Handler
 import android.content.pm.ApplicationInfo
 import android.util.Log
+import android.net.http.SslError
+import android.webkit.SslErrorHandler
+
+
 
 
 class WebViewHelper(private val activity: MainActivity, private val uiManager: UIManager) {
@@ -134,6 +138,16 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
                     if (view.url == url) {
                         handleLoadError(error.errorCode)
                     }
+                }
+            }
+
+            // TODO! comment out from release
+            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+                if (Build.FINGERPRINT.contains("generic")) {
+                    // Ignore SSL certificate errors in emulator
+                    handler.proceed()
+                } else {
+                    super.onReceivedSslError(view, handler, error)
                 }
             }
         }

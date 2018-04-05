@@ -269,9 +269,12 @@ const setup = (startFn, onStart) => {
 
         // TODO: add android
         let deviceType = "Browser";
-        if (runsInsideExtension()) {
+        if (typeof window.Android !== 'undefined') {
+            deviceType = "Android";
+        } else if (runsInsideExtension()) {
             deviceType = "WebExtension";
         }
+        console.log("device type:", deviceType);
 
         const flags = {
             initialSeed: [rands[0], rands.slice(1)],

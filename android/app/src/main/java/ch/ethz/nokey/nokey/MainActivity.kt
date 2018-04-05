@@ -8,8 +8,13 @@ class MainActivity : Activity() {
     private lateinit var webViewHelper: WebViewHelper
     private lateinit var uiManager: UIManager
 
-    // TODO: change to "file:///android_asset/..."
-    val appUrl = "https://virt35.ethz.ch/webApp"
+    // TODO: Is it possible to change to "file:///android_asset/..."
+    // and later, once online use that?
+    // TODO! change before release
+    // val appUrl = "https://virt35.ethz.ch/webApp"
+    // for this to work run the dev server with yarn dev_ssl.
+    // 10.0.3.2 is from genymotion and forwards to localhost
+    val appUrl = "https://10.0.3.2:3001/main.html"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

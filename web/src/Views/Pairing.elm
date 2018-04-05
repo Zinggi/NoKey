@@ -113,7 +113,7 @@ view config doShow diag =
 
                     ( Success t, _ ) ->
                         inp True
-                            [ column [] [ Elements.p "Scan the QR code or type the words shown below." ]
+                            [ column [] [ Elements.p "Scan the QR code or type the words shown below it" ]
                             , column []
                                 [ QRCode.encode t
                                     |> Result.map (QRCode.toSvg >> html)
