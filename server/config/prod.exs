@@ -23,7 +23,14 @@ config :no_pass, NoPassWeb.Endpoint,
   root: '.',
   version: Application.spec(:myapp, :vsn),
   # get this from env
-  secret_key_base: "${SECRET_KEY_BASE}"
+  secret_key_base: "${SECRET_KEY_BASE}",
+  force_ssl: [hsts: true],
+  http: [port: 80],
+  https: [:inet6, port: 443,
+    keyfile: "/etc/letsencrypt/live/virt35.ethz.ch/privkey.pem",
+    certfile: "/etc/letsencrypt/live/virt35.ethz.ch/cert.pem",
+    cacertfile: "/etc/letsencrypt/live/virt35.ethz.ch/chain.pem"
+  ]
 
 
 # Do not print debug messages in production

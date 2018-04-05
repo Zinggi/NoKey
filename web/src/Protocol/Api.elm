@@ -87,12 +87,12 @@ endPointUrl pre path =
 
 apiUrl : String -> String
 apiUrl path =
-    endPointUrl "http://" ("/api" ++ path)
+    endPointUrl "https://" ("/api" ++ path)
 
 
 socketUrl : String
 socketUrl =
-    endPointUrl "ws://" "/socket/websocket"
+    endPointUrl "wss://" "/socket/websocket"
 
 
 
