@@ -29,7 +29,7 @@ init flags =
     in
         case newState of
             Loaded model ->
-                newState |> withCmds [ onLoaded model ]
+                newState |> withCmds [ onLoaded model, setTitle model.syncData ]
 
             _ ->
                 newState |> noCmd
@@ -53,9 +53,13 @@ updateModelState msg state =
 
         Loaded model ->
             update msg model
-                |> (\( m, cmd ) -> ( Loaded m, cmd ))
+                |> (\( m, cmd ) -> ( Loaded m, Cmd.batch [ cmd, setTitle m.syncData ] ))
     )
-        |> (\( newModel, cmds ) -> ( newModel, Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ] ))
+        |> (\( newModel, cmds ) ->
+                ( newModel
+                , Cmd.batch [ cmds, Ports.sendOutNewState (Model.encode newModel) ]
+                )
+           )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -167,14 +171,6 @@ update msg model =
             in
                 { model | syncData = newSync }
                     |> Api.syncToOthers
-                    |> addCmds
-                        [ Ports.setTitle
-                            (if newName == "" then
-                                "NoKey"
-                             else
-                                "NoKey (" ++ newName ++ ")"
-                            )
-                        ]
 
         RequestPasswordPressed keys mayFill ->
             let
@@ -279,6 +275,24 @@ resetStorage model =
 storeState : Model -> Cmd Msg
 storeState model =
     Ports.storeState (Data.Storage.encode model)
+
+
+setTitle : Data.Sync.SyncData -> Cmd Msg
+setTitle sync =
+    let
+        ( name, post ) =
+            Data.Sync.getName sync
+    in
+        Ports.setTitle
+            (if name == "" && post == "" then
+                "NoKey"
+             else if name == "" && post /= "" then
+                "NoKey (" ++ post ++ ")"
+             else if name /= "" && post == "" then
+                "NoKey (" ++ name ++ ")"
+             else
+                "NoKey (" ++ name ++ " (" ++ post ++ "))"
+            )
 
 
 
