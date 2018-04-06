@@ -9,6 +9,9 @@
     "errors": "webpack --mode development --display-error-details"
   },
   "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.4",
+    "babel-preset-env": "^1.6.1",
     "copy-webpack-plugin": "^4.5.1",
     "elm-webpack-loader": "^4.5.0",
     "file-loader": "^1.1.11",
