@@ -27,20 +27,15 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
     - if first time:
         + `MIX_ENV=prod mix release --env=prod`
         + (optional) test it: `REPLACE_OS_VARS=true PORT=4001 SECRET_KEY_BASE="<SECRET>" ERLANG_COOKIE="<SECRET>" _build/prod/rel/no_pass/bin/no_pass console`
-        + TODO: since I build on the server anyway, I don't need to copy to server
-        + `sudo REPLACE_OS_VARS=true PORT=80 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' _build/prod/rel/no_pass/bin/no_pass start`
-        <!-- + Copy to server: `scp _build/prod/rel/no_pass/releases/0.0.1/no_pass.tar.gz tikstudent@virt35.ethz.ch:~/nokey/builds/` -->
-        <!--     * (optional) to test locally: `cp _build/prod/rel/no_pass/releases/0.0.1/no_pass.tar.gz ~/Downloads/passwordManager/builds/` -->
-        <!-- + (on server) unzip `tar xvf no_pass.tar.gz` -->
-        <!-- + start `sudo REPLACE_OS_VARS=true PORT=80 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' ./bin/no_pass start` -->
+        + Copy release: `cp _build/prod/rel/no_pass/releases/0.0.1/no_pass.tar.gz ~/nokey/builds/`
+        + unzip `tar xvf no_pass.tar.gz`
+        + start `sudo REPLACE_OS_VARS=true PORT=80 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' ./bin/no_pass start`
     
     - else:
         + create upgrade: `MIX_ENV=prod mix release --env=prod --upgrade`
-        + TODO: since it's the same server, should now be:
-        + `<SAME_ENVS_USED_TO_START> _build/prod/rel/no_pass/bin/no_pass upgrade <0.0.2>`
+        + create folder: `mkdir ~/nokey/builds/releases/<0.0.2>`
+        + copy: `cp _build/prod/rel/no_pass/releases/<0.0.2>/no_pass.tar.gz ~/nokey/builds/releases/<0.0.2>/`
+        + `cd ~/nokey/builds/`
+        + `<SAME_ENVS_USED_TO_START> ~/nokey/builds/bin/no_pass upgrade <0.0.2>`
             (HINT: use ctrl+r to search your start command in the history)
-        <!-- + create folder on server: `mkdir ~/nokey/builds/releases/<0.0.2>` -->
-        <!-- + copy to server: `scp _build/prod/rel/no_pass/releases/<0.0.2>/no_pass.tar.gz ~/nokey/builds/releases/<0.0.2>/` -->
-        <!-- + `cd ~/nokey/builds/` -->
-        <!-- + `<SAME_ENVS_USED_TO_START> ~/nokey/builds/bin/no_pass upgrade <0.0.2>` -->
 
