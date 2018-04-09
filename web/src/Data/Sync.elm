@@ -981,6 +981,12 @@ encodeComplete s =
         ]
 
 
+appVersion : String
+appVersion =
+    -- TODO: change if dataVersion above changes
+    "0.0.1"
+
+
 completeDecoder : Decoder SyncData
 completeDecoder =
     JD.field "dataVersion" JD.int

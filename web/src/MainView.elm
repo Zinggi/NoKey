@@ -61,6 +61,8 @@ view state =
                                 , lazy (Views.Passwords.view passwordsConfig model.passwordsView) model.syncData
                                 , Elements.line
                                 , Elements.button (Just ResetDevice) "Reset Device"
+                                , Elements.line
+                                , Elements.text ("Version: " ++ Data.Sync.appVersion)
                                 ]
                             )
                         ]
