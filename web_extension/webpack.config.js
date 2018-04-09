@@ -1,5 +1,6 @@
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const CleanWebpackPlugin = require('clean-webpack-plugin');
 
 module.exports = (env, argv) => ({
     entry: {
@@ -25,7 +26,7 @@ module.exports = (env, argv) => ({
                 loader: "elm-webpack-loader",
                 options: {
                     debug: false,
-                    warn: true,
+                    warn: false,
                     files: [
                         path.resolve(__dirname, "elm/MainBackground.elm"),
                         path.resolve(__dirname, "elm/FillLogin.elm"),
@@ -34,16 +35,26 @@ module.exports = (env, argv) => ({
                     ]
 
                 }
+            },
+            {
+                test: /\.js$/,
+                exclude: [/node_modules/],
+                use: {
+                    loader: "babel-loader"
+                }
             }
         ],
         noParse: [/.elm$/]
     },
-    plugins: [new CopyWebpackPlugin([
-        { from: './manifest.json' },
-        { from: './icons', to: 'icons/' },
-        { from: './popup/main.html', to: 'popup/' },
-        { from: './content_scripts/*.html' }
-    ], {})],
+    plugins: [
+        new CopyWebpackPlugin([
+            { from: './manifest.json' },
+            { from: './icons', to: 'icons/' },
+            { from: './popup/main.html', to: 'popup/' },
+            { from: './content_scripts/*.html' }
+        ], {}),
+        new CleanWebpackPlugin(['addon'])
+    ],
     optimization: {
         splitChunks: {
             cacheGroups: {

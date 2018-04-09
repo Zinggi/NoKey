@@ -45,19 +45,19 @@ viewStatus groupId (( siteName, userName ) as accountId) status =
                     [ Element.html <| Loader.loaderWithOptions { loaderOptions | color = Styles.black }
                     , Elements.text <| toString n ++ "/" ++ toString m
                     ]
-                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed groupId (Just accountId))) "Retry")
+                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed [ groupId ] (Just accountId))) "Retry")
                 ]
 
         Error error ->
             labled userName
                 [ el [ width fill ] (Elements.text ("Error:\n" ++ error))
-                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed groupId (Just accountId))) "retry")
+                , el [ alignRight ] (Elements.button (Just (RequestPasswordPressed [ groupId ] (Just accountId))) "retry")
                 ]
 
         NotRequested ->
             -- We aren't waiting on any shares yet
             labled userName
-                [ el [ alignRight ] (Elements.button (Just (RequestPasswordPressed groupId (Just accountId))) "Request")
+                [ el [ alignRight ] (Elements.button (Just (RequestPasswordPressed [ groupId ] (Just accountId))) "Request")
                 ]
 
 

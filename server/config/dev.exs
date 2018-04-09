@@ -15,8 +15,8 @@ config :no_pass, NoPassWeb.Endpoint,
   http: [port: 4000, ip: (if onlyLocal, do: {127,0,0,1}, else: {0,0,0,0})],
   debug_errors: true,
   code_reloader: true,
-  check_origin: false,
-  watchers: [yarn: ["watch" , cd: Path.expand("../assets", __DIR__)]]
+  check_origin: false
+  # watchers: [yarn: ["watch" , cd: Path.expand("../assets", __DIR__)]]
 
 # ## SSL Support
 #

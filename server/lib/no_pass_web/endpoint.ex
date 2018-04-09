@@ -9,7 +9,10 @@ defmodule NoPassWeb.Endpoint do
   # when deploying your static files in production.
   plug Plug.Static,
     at: "/", from: :no_pass, gzip: true,
-    only: ~w(css fonts images js favicon.ico robots.txt bundle.js .well-known)
+    only: ["main.html", "fonts", "images", "favicon.ico", "robots.txt", "bundle.js",
+    ".well-known", "android-chrome-192x192.png", "android-chrome-512x512.png",
+    "apple-touch-icon.png", "favicon-16x16.png", "favicon-32x32.png",
+    "safari-pinned-tab.svg", "service-worker.js", "site.webmanifest"]
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

@@ -2,6 +2,7 @@
     "name": "NoKey",
     "short_name": "NoKey",
     "description": "A distributed password manager without a master password.",
+    "start_url": "/main.html?utm_source=homescreen",
     "icons": [
         {
             "src": "/android-chrome-192x192.png",
@@ -18,7 +19,7 @@
     "background_color": "#fff1de",
     "display": "standalone",
     "TODO: prefer_related_applications": true,
-    "TODO:TODO:  related_applications": [
+    "TODO: related_applications": [
         {
             "platform": "play",
             "url": "https://play.google.com/store/apps/details?id=com.example.app1",

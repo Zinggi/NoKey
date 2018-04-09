@@ -2,7 +2,7 @@
   "manifest_version": 2,
 
   "name": "NoKey",
-  "version": "0.1.4",
+  "version": "0.1.5",
 
   "applications": {
     "gecko": {
