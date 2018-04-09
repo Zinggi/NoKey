@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="height: 100%;">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,10 +17,12 @@
     <meta name="application-name" content="NoKey">
     <meta name="theme-color" content="#fff1de">
 </head>
-<body style="background-color: rgba(255,241,222,1);">
+<body style="background-color: rgba(255,241,222,1); height: 100%; margin: 0;">
+    <div id="splash" style="display: flex; height: 100%; justify-content: space-evenly; align-items: center; flex-direction: column;">
+        <img src="imgs/logo.svg" alt="logo" style="width: 75%; color: transparent;">
+        <img src="imgs/loading.svg" alt="loading icon" style="color: transparent;">
+    </div>
     <script async src="bundle.js"></script>
-    <!-- TODO: start loading animation here, stop shortly before staring elm. -->
-    <!-- possibly usefull, script supports: onload="myInit()" -->
     <noscript>
         <!-- Let people know that they need JS -->
         <h2>JavaScript disabled</h2>

@@ -9,5 +9,7 @@ registerServiceWorker();
 
 setup(Elm.Main.fullscreen, (app) => {
     // window.elmApp = app;
+    const el = document.getElementById('splash');
+    el.parentNode.removeChild(el);
 });
 
