@@ -12,6 +12,7 @@ import Styles
 import HashIcon
 import Icons
 import Data exposing (..)
+import Route exposing (Page(..))
 
 
 -- attributes
@@ -58,9 +59,9 @@ container contents =
     column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 1) ] contents
 
 
-miniPage : String -> List (Element msg) -> Element msg
-miniPage title children =
-    column [ spacing (Styles.paddingScale 1) ] (h2 title :: children)
+miniPage : List (Element msg) -> Element msg
+miniPage children =
+    column [ spacing (Styles.paddingScale 1) ] children
 
 
 buttonRow : List (Attribute msg) -> List (Element msg) -> Element msg
@@ -209,6 +210,45 @@ h4 txt =
 b : String -> Element msg
 b txt =
     el [ Font.bold ] (text txt)
+
+
+pageButton : msg -> Bool -> Page -> Element msg
+pageButton onPress isActive page =
+    Input.button [ width fill ]
+        { onPress = Just onPress
+        , label =
+            column
+                (if isActive then
+                    [ Font.color Styles.accentColor
+
+                    {- TODO: make this a button -}
+                    ]
+                 else
+                    []
+                )
+                [ el [ centerX ] (pageToIcon page)
+                , el [ centerX ] (Route.pageToTitle page |> h4)
+                ]
+        }
+
+
+pageToIcon : Page -> Element msg
+pageToIcon page =
+    case page of
+        Home ->
+            Icons.dashBoard
+
+        Passwords ->
+            Icons.passwords
+
+        Devices ->
+            Icons.devices
+
+        Options ->
+            Icons.options
+
+        _ ->
+            empty
 
 
 primaryButton : Maybe msg -> String -> Element msg

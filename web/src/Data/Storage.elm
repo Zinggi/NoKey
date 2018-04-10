@@ -3,24 +3,27 @@ module Data.Storage exposing (State, decode, encode)
 import Json.Decode as JD exposing (Decoder)
 import Json.Encode as JE exposing (Value)
 import Data.Sync as Sync exposing (SyncData)
+import Json.Decode.Pipeline as JD exposing (required, optional, decode)
 
 
 type alias State a =
-    { a | syncData : SyncData, uniqueIdentifyier : String }
+    { a | syncData : SyncData, uniqueIdentifyier : String, isFirstTimeUser : Bool }
 
 
 stateDecoder : Decoder (State {})
 stateDecoder =
-    JD.map2 (\sync id -> { syncData = sync, uniqueIdentifyier = id })
-        (JD.field "syncData" Sync.completeDecoder)
-        (JD.field "uuid" JD.string)
+    JD.decode (\sync id ftu -> { syncData = sync, uniqueIdentifyier = id, isFirstTimeUser = ftu })
+        |> required "syncData" Sync.completeDecoder
+        |> required "uuid" JD.string
+        |> optional "isFirstTimeUser" JD.bool False
 
 
 encode : State a -> Value
-encode { syncData, uniqueIdentifyier } =
+encode { syncData, uniqueIdentifyier, isFirstTimeUser } =
     JE.object
         [ ( "syncData", Sync.encodeComplete syncData )
         , ( "uuid", JE.string uniqueIdentifyier )
+        , ( "isFirstTimeUser", JE.bool isFirstTimeUser )
         ]
 
 

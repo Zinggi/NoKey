@@ -1,12 +1,14 @@
 module Background exposing (..)
 
 import Random.Pcg.Extended as RandomE
+import Navigation exposing (Location)
 
 
 --
 
 import Helper exposing (withCmds, noCmd, andThenUpdate, andThenUpdateIf, addCmds, mapModel)
 import Ports
+import Route exposing (Page(..))
 import Data.PasswordMeta
 import Data.Notifications as Notifications exposing (SiteEntry)
 import Data.Sync
@@ -21,11 +23,11 @@ import Model exposing (..)
 -- Init
 
 
-init : Flags -> ( ModelState, Cmd Msg )
-init flags =
+init : Flags -> Location -> ( ModelState, Cmd Msg )
+init flags location =
     let
         newState =
-            Model.init flags
+            Model.init flags location
     in
         case newState of
             Loaded model ->
@@ -38,6 +40,15 @@ init flags =
 onLoaded : Model -> Cmd Msg
 onLoaded model =
     Cmd.batch [ storeState model, Api.askForNewVersion model.syncData ]
+
+
+
+-- Routing
+
+
+locationToMsg : Location -> Msg
+locationToMsg location =
+    Route.fromLocation location |> SetPage
 
 
 
@@ -65,6 +76,24 @@ updateModelState msg state =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SetPage page ->
+            { model | currentPage = page } |> noCmd
+
+        NavigateTo page ->
+            let
+                navFn =
+                    case ( model.currentPage, page ) of
+                        ( Home, _ ) ->
+                            Route.newUrl
+
+                        ( _, Pairing ) ->
+                            Route.newUrl
+
+                        _ ->
+                            Route.modifyUrl
+            in
+                model |> withCmds [ navFn page ]
+
         OnStateRequest ->
             -- Since we send our state out on every update, we don't need to do anything here
             model |> noCmd
@@ -131,10 +160,6 @@ update msg model =
 
         ProtocolMsg pMsg ->
             Api.update model pMsg
-
-        PairDeviceClicked ->
-            { model | showPairingDialogue = not model.showPairingDialogue }
-                |> noCmd
 
         GetTokenClicked ->
             model

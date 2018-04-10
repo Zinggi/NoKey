@@ -3,6 +3,7 @@ module Model exposing (..)
 import Json.Encode exposing (Value)
 import Json.Decode as JD
 import Time exposing (Time)
+import Navigation exposing (Location)
 
 
 --
@@ -26,6 +27,7 @@ import Views.Pairing
 import Views.Notifications
 import Views.Passwords
 import Ports
+import Route exposing (Page)
 
 
 -- Msg
@@ -37,7 +39,6 @@ type Msg
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
     | UserNameChanged String
-    | PairDeviceClicked
     | GetTokenClicked
     | UpdatePairing Views.Pairing.State
     | TokenSubmitted
@@ -64,6 +65,8 @@ type Msg
     | SharesReadyToSend { deviceId : DeviceId, encryptedShares : Value, reqIds : Value }
     | DidDecryptRequestedShares { shares : Value, time : Time, otherId : DeviceId, ids : List String }
     | OnStateRequest
+    | NavigateTo Page
+    | SetPage Page
 
 
 
@@ -81,18 +84,19 @@ type alias Model =
     , expandSiteEntry : Bool
     , requirementsState : PW.State
     , pairingDialogue : Views.Pairing.State
-    , showPairingDialogue : Bool
     , seed : RandomE.Seed
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
     , passwordsView : Views.Passwords.State
     , protocolState : Protocol.State
+    , currentPage : Page
 
     -- Keep the current site, to provide site specific actions
     , currentSite : Maybe String
 
     -- These ones should be serialized:
     , uniqueIdentifyier : String
+    , isFirstTimeUser : Bool
 
     -- CRDT for synchronisation
     , syncData : SyncData
@@ -108,21 +112,25 @@ type alias Flags =
     }
 
 
-init : Flags -> ModelState
-init { initialSeed, storedState, encryptionKey, signingKey, deviceType } =
+init : Flags -> Location -> ModelState
+init { initialSeed, storedState, encryptionKey, signingKey, deviceType } location =
     case ( Data.Storage.decode storedState, JD.decodeValue Data.Sync.deviceTypeDecoder deviceType ) of
-        ( Ok { syncData, uniqueIdentifyier }, Ok devType ) ->
-            Loaded <| initModel initialSeed encryptionKey signingKey devType (Just uniqueIdentifyier) (Just syncData)
+        ( Ok { syncData, uniqueIdentifyier, isFirstTimeUser }, Ok devType ) ->
+            Loaded <| initModel isFirstTimeUser (Just location) initialSeed encryptionKey signingKey devType (Just uniqueIdentifyier) (Just syncData)
 
         ( Err "Expecting an object with a field named `syncData` but instead got: null", Ok devType ) ->
             -- This happens when we reset or when used the first time. It's ok.
-            Loaded <| initModel initialSeed encryptionKey signingKey devType Nothing Nothing
+            Loaded <| initModel True (Just location) initialSeed encryptionKey signingKey devType Nothing Nothing
+
+        ( Err "Expecting an object with a field named `uuid` but instead got: null", Ok devType ) ->
+            -- This happens when we reset or when used the first time. It's ok.
+            Loaded <| initModel True (Just location) initialSeed encryptionKey signingKey devType Nothing Nothing
 
         ( err, devType ) ->
             LoadingError ("couldn't decode state or deviceType:\n\n" ++ toString err ++ "\n\nDevice type:" ++ toString devType)
 
 
-initModel initialSeed encryptionKey signingKey devType mayId maySync =
+initModel isFirstTimeUser location initialSeed encryptionKey signingKey devType mayId maySync =
     let
         ( base, ext ) =
             initialSeed
@@ -140,12 +148,13 @@ initModel initialSeed encryptionKey signingKey devType mayId maySync =
         , uniqueIdentifyier = Maybe.withDefault uuid mayId
         , syncData = Maybe.withDefault (Data.Sync.init indepSeed encryptionKey signingKey devType uuid) maySync
         , pairingDialogue = Views.Pairing.init
-        , showPairingDialogue = True
         , notifications = Notifications.init
         , notificationsView = Views.Notifications.init
         , passwordsView = Views.Passwords.init
         , protocolState = Protocol.init
         , currentSite = Nothing
+        , isFirstTimeUser = isFirstTimeUser
+        , currentPage = Maybe.map Route.fromLocation location |> Maybe.withDefault Route.Home
         }
 
 
@@ -167,7 +176,7 @@ reset model =
         ( initSeed, _ ) =
             RandomE.step (RandomE.map2 (,) int32 (RandomE.list 8 int32)) model.seed
     in
-        initModel initSeed model.syncData.encryptionKey model.syncData.signingKey model.syncData.deviceType Nothing Nothing
+        initModel model.isFirstTimeUser Nothing initSeed model.syncData.encryptionKey model.syncData.signingKey model.syncData.deviceType Nothing Nothing
 
 
 updateNotifications : (Notifications -> Notifications) -> Model -> ( Model, Cmd Msg )

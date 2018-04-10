@@ -21,7 +21,7 @@ module.exports = (config) => {
                     exclude: [/elm-stuff/, /node_modules/],
                     loader: "elm-webpack-loader",
                     options: {
-                        debug: argv.mode !== 'production',
+                        debug: false, // argv.mode !== 'production',
                         cwd: config.basePath
                     }
                 },
@@ -47,7 +47,11 @@ module.exports = (config) => {
                 dontCacheBustUrlsMatching: /\.\w{8}\./,
                 filename: 'service-worker.js',
                 minify: argv.mode === 'production',
-                // navigateFallback: '/webApp/main.html',
+                // For client site routing, fall back to the root if URL not in cache:
+                // navigateFallback: '/main.html',
+                // Here we could restrict the fallback to only matching URLs.
+                // We should probably do this, as without that, every wrong URL will just load main.html!
+                // navigateFallbackWhitelist: [/^\/articles/],
                 staticFileGlobsIgnorePatterns: [/\.map$/, /asset-manifest\.json$/],
                 runtimeCaching: [{
                     urlPattern: /^https:\/\/fonts.googleapis.com\/.*/,

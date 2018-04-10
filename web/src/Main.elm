@@ -1,6 +1,6 @@
 module Main exposing (main)
 
-import Html
+import Navigation
 import Background
 import MainView
 import Model exposing (ModelState, Msg, Flags)
@@ -8,7 +8,7 @@ import Model exposing (ModelState, Msg, Flags)
 
 main : Program Flags ModelState Msg
 main =
-    Html.programWithFlags
+    Navigation.programWithFlags Background.locationToMsg
         { init = Background.init
         , subscriptions = Background.subs
         , view = MainView.view

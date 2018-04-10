@@ -24,6 +24,8 @@
         "elm-lang/core": "5.1.1 <= v < 6.0.0",
         "elm-lang/html": "2.0.0 <= v < 3.0.0",
         "elm-lang/http": "1.0.0 <= v < 2.0.0",
+        "elm-lang/navigation": "2.1.0 <= v < 3.0.0",
+        "evancz/url-parser": "2.0.1 <= v < 3.0.0",
         "gilbertkennen/bigint": "1.0.1 <= v < 2.0.0",
         "jinjor/elm-debounce": "2.1.2 <= v < 3.0.0",
         "jpagex/elm-loader": "1.0.0 <= v < 2.0.0",

@@ -39,6 +39,7 @@ module.exports = () => {
                         switch (installingWorker.state) {
                             case 'installed':
                                 if (navigator.serviceWorker.controller) {
+                                    // TODO: display update notification to user
                                     // At this point, the old content will have been purged and the fresh content will
                                     // have been added to the cache.
                                     // It's the perfect time to display a "New content is available; please refresh."
@@ -52,12 +53,14 @@ module.exports = () => {
                                 break;
 
                             case 'redundant':
+                                // TODO: what does that mean? Do I need to do something here???
                                 console.error('The installing service worker became redundant.');
                                 break;
                         }
                     };
                 };
             }).catch(function(e) {
+                // TODO: what to do here?
                 console.error('Error during service worker registration:', e);
             });
         });

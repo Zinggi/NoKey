@@ -51,13 +51,45 @@ init =
     { search = "" }
 
 
+
+-- TODO: integrate here!
+-- newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> String -> Int -> Element Msg
+-- newSiteForm requirementsState expandSiteEntry entry currentGroupId maxSecurityLevel =
+--     column []
+--         [ column []
+--             [ Elements.inputWithLabel (Just SiteNameChanged) "New Site: " "example.com" entry.siteName
+--             ]
+--         , if not expandSiteEntry then
+--             empty
+--           else
+--             column []
+--                 [ Elements.inputWithLabel (Just UserNameChanged) "Login name" "" entry.userName
+--                 , Elements.text "Security Level: "
+--                 , Elements.clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
+--                 , Views.PasswordGenerator.view (AddPassword currentGroupId) NewPasswordRequirements requirementsState
+--                 ]
+--         ]
+
+
 view : Config msg -> State -> SyncData -> Element msg
 view config state sync =
-    Elements.miniPage "Passwords"
-        [ tasks config state.search (Data.Sync.getTasks sync)
-        , search config state.search
-        , passwords config state.search sync
-        ]
+    -- TODO: display add button here!
+    -- , if numberOfKnownDevices >= 2 then
+    --     newSiteForm model.requirementsState
+    --         model.expandSiteEntry
+    --         model.newSiteEntry
+    --         (Data.Sync.currentGroupId model.newSiteEntry.securityLevel model.syncData)
+    --         numberOfKnownDevices
+    --   else
+    --     text "pair a device to save your first password"
+    if Dict.size (Data.Sync.knownIds sync) <= 1 then
+        Elements.p "pair a device to save your first password"
+    else
+        Elements.miniPage
+            [ tasks config state.search (Data.Sync.getTasks sync)
+            , search config state.search
+            , passwords config state.search sync
+            ]
 
 
 search : Config msg -> String -> Element msg

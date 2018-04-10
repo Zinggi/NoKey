@@ -6,6 +6,26 @@ import FeatherIcons
 import Loader
 
 
+dashBoard =
+    -- TODO: maybe .home is better
+    FeatherIcons.grid |> toElement
+
+
+passwords =
+    -- TODO: make better icon
+    FeatherIcons.lock |> toElement
+
+
+devices =
+    -- TODO: make better icon, .smartphone, .tablet
+    FeatherIcons.monitor |> toElement
+
+
+options =
+    -- ,.sliders , .menu, .list, .alignJustify
+    FeatherIcons.settings |> toElement
+
+
 locked =
     FeatherIcons.lock |> toElement
 
