@@ -67,6 +67,8 @@ type Msg
     | OnStateRequest
     | NavigateTo Page
     | SetPage Page
+    | DoneWithTutorial
+    | NavigateBack
 
 
 
@@ -81,7 +83,6 @@ type ModelState
 
 type alias Model =
     { newSiteEntry : PasswordMetaData
-    , expandSiteEntry : Bool
     , requirementsState : PW.State
     , pairingDialogue : Views.Pairing.State
     , seed : RandomE.Seed
@@ -142,7 +143,6 @@ initModel isFirstTimeUser location initialSeed encryptionKey signingKey devType 
             Random.step Random.independentSeed (Random.initialSeed base)
     in
         { newSiteEntry = Data.PasswordMeta.default
-        , expandSiteEntry = False
         , requirementsState = PW.init (RandomE.initialSeed base ext)
         , seed = newSeed
         , uniqueIdentifyier = Maybe.withDefault uuid mayId

@@ -82,7 +82,6 @@ background =
     [ Background.color backgroundColor
     , Font.color textColor
     , normalFont
-    , padding (paddingScale 3)
     ]
 
 

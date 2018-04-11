@@ -209,16 +209,16 @@ const importKeys = (keys) => {
 };
 
 // retrive state and keys or if no keys are stored yet, generate new ones
-const getState = (onGot) => {
+const getState = (onGot, onError) => {
     if (runsInsideExtension()) {
         browser.storage.local.get({state: null, keys: null})
             .then((state) => {
                 return genOrRestoreKeys(state.keys).then((keys) => {
                     onGot(state.state, keys);
                 });
-            }).catch(() => {
+            }).catch((err) => {
+                if (onError) onError(err);
                 // TODO: pipe that to elm
-                console.error("couldn't get storage!");
             });
     } else {
         let state = window.localStorage.getItem("state");
@@ -230,9 +230,10 @@ const getState = (onGot) => {
         }
         genOrRestoreKeys(keys).then((myKeys) => {
             onGot(state, myKeys);
+        }).catch((err) => {
+            if (onError) onError(err);
         });
     }
-
 };
 
 // reset storage, and store the newly provided state.
@@ -259,7 +260,7 @@ const getRandomInts = (n) => {
 };
 
 
-const setup = (startFn, onStart) => {
+const setup = (startFn, onStart, onError) => {
     getState((state, keys) => {
         // console.log("stored state: ", state);
 
@@ -408,7 +409,7 @@ const setup = (startFn, onStart) => {
         if (onStart) {
             onStart(app);
         }
-    });
+    }, onError);
 };
 
 

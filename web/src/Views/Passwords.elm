@@ -27,6 +27,7 @@ type alias Config msg =
     , onDeletePassword : AccountId -> msg
     , onRequestPasswordPressed : List GroupId -> Maybe AccountId -> msg
     , onTogglePassword : AccountId -> msg
+    , onAddNewPassword : msg
     }
 
 
@@ -52,49 +53,34 @@ init =
 
 
 
--- TODO: integrate here!
--- newSiteForm : Views.PasswordGenerator.State -> Bool -> PasswordMetaData -> String -> Int -> Element Msg
--- newSiteForm requirementsState expandSiteEntry entry currentGroupId maxSecurityLevel =
---     column []
---         [ column []
---             [ Elements.inputWithLabel (Just SiteNameChanged) "New Site: " "example.com" entry.siteName
---             ]
---         , if not expandSiteEntry then
---             empty
---           else
---             column []
---                 [ Elements.inputWithLabel (Just UserNameChanged) "Login name" "" entry.userName
---                 , Elements.text "Security Level: "
---                 , Elements.clampedNumberInput SecurityLevelChanged ( 2, 2, maxSecurityLevel ) entry.securityLevel
---                 , Views.PasswordGenerator.view (AddPassword currentGroupId) NewPasswordRequirements requirementsState
---                 ]
---         ]
 
 
-view : Config msg -> State -> SyncData -> Element msg
-view config state sync =
-    -- TODO: display add button here!
-    -- , if numberOfKnownDevices >= 2 then
-    --     newSiteForm model.requirementsState
-    --         model.expandSiteEntry
-    --         model.newSiteEntry
-    --         (Data.Sync.currentGroupId model.newSiteEntry.securityLevel model.syncData)
-    --         numberOfKnownDevices
-    --   else
-    --     text "pair a device to save your first password"
-    if Dict.size (Data.Sync.knownIds sync) <= 1 then
-        Elements.p "pair a device to save your first password"
-    else
+
+view : Config msg -> { m | syncData : SyncData, passwordsView : State } -> Element msg
+view config ({ syncData, passwordsView } as model) =
+    let
+        hasPasswords =
+            Data.Sync.mapGroups (\_ _ _ _ -> 1) syncData |> (not << List.isEmpty)
+    in
         Elements.miniPage
-            [ tasks config state.search (Data.Sync.getTasks sync)
-            , search config state.search
-            , passwords config state.search sync
+            [ tasks config passwordsView.search (Data.Sync.getTasks syncData)
+            , search config hasPasswords passwordsView.search
+            , passwords config passwordsView.search syncData
+            , addNewButton config
             ]
 
 
-search : Config msg -> String -> Element msg
-search config searchValue =
-    Elements.search (config.toMsg << UpdateSearch) searchValue
+search : Config msg -> Bool -> String -> Element msg
+search config hasPasswords searchValue =
+    if hasPasswords then
+        Elements.search (config.toMsg << UpdateSearch) searchValue
+    else
+        empty
+
+
+addNewButton : Config msg -> Element msg
+addNewButton config =
+    Elements.primaryButton (Just config.onAddNewPassword) "Add new"
 
 
 tasks : Config msg -> String -> List Task -> Element msg

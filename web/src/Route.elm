@@ -1,4 +1,4 @@
-module Route exposing (Page(..), fromLocation, modifyUrl, newUrl, href, pageToTitle)
+module Route exposing (Page(..), fromLocation, modifyUrl, newUrl, href, pageToTitle, hasBackButton)
 
 import Html exposing (Attribute)
 import Html.Attributes as Attr
@@ -12,6 +12,8 @@ type Page
     | Devices
     | Options
     | Pairing
+    | NewPassword
+    | Tutorial
 
 
 route : Parser (Page -> a) a
@@ -22,6 +24,8 @@ route =
         , Url.map Devices (s "devices")
         , Url.map Options (s "options")
         , Url.map Pairing (s "pairing")
+        , Url.map Tutorial (s "tutorial")
+        , Url.map NewPassword (s "newpassword")
         ]
 
 
@@ -33,17 +37,8 @@ pageToString page =
                 Home ->
                     ""
 
-                Passwords ->
-                    "passwords"
-
-                Devices ->
-                    "devices"
-
-                Options ->
-                    "options"
-
-                Pairing ->
-                    "pairing"
+                other ->
+                    String.toLower (toString other)
     in
         "#/" ++ end
 
@@ -52,23 +47,33 @@ pageToString page =
 -- PUBLIC HELPERS --
 
 
+hasBackButton : Page -> Bool
+hasBackButton page =
+    case page of
+        Tutorial ->
+            True
+
+        Pairing ->
+            True
+
+        NewPassword ->
+            True
+
+        _ ->
+            False
+
+
 pageToTitle : Page -> String
 pageToTitle page =
     case page of
         Home ->
             "Dashboard"
 
-        Passwords ->
-            "Passwords"
+        NewPassword ->
+            "New Password"
 
-        Devices ->
-            "Devices"
-
-        Options ->
-            "Options"
-
-        Pairing ->
-            "Pairing"
+        other ->
+            toString other
 
 
 href : Page -> Attribute msg

@@ -8,10 +8,16 @@ const registerServiceWorker = require('./js/service-worker-registration.js');
 registerServiceWorker();
 
 setup(Elm.Main.fullscreen, (app) => {
-    // remove splash screen
-    const el = document.getElementById('splash');
-    el.parentNode.removeChild(el);
+        // remove splash screen
+        const el = document.getElementById('splash');
+        el.parentNode.removeChild(el);
+        // window.elmApp = app;
+    }, (err) => {
+        console.error(err);
+        document.body.innerHtml = '';
+        const txt = document.createTextNode(err.toString());
+        document.body.appendChild(txt);
+    }
+);
 
-    // window.elmApp = app;
-});
 

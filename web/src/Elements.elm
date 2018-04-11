@@ -72,9 +72,11 @@ buttonRow attrs btns =
 card : List (Attribute msg) -> List (Element msg) -> Element msg
 card attr children =
     column
-        ([ Background.color Styles.white
-         , padding (Styles.scaled 1)
+        ([ -- Background.color Styles.white
+           padding (Styles.scaled 1)
          , Border.shadow { offset = ( 1, 1 ), blur = 3, size = 0, color = Styles.shadowColor }
+         , height shrink
+         , spacing (Styles.paddingScale 1)
 
          -- 1px 1px 3px 0px ;
          ]
@@ -220,15 +222,24 @@ pageButton onPress isActive page =
             column
                 (if isActive then
                     [ Font.color Styles.accentColor
-
-                    {- TODO: make this a button -}
                     ]
                  else
                     []
                 )
                 [ el [ centerX ] (pageToIcon page)
-                , el [ centerX ] (Route.pageToTitle page |> h4)
+                , if isActive then
+                    el [ centerX ] (Route.pageToTitle page |> h4)
+                  else
+                    empty
                 ]
+        }
+
+
+backButton : msg -> Element msg
+backButton msg =
+    Input.button [ width shrink ]
+        { onPress = Just msg
+        , label = row [] [ Icons.back, text "Back" ]
         }
 
 
@@ -415,7 +426,10 @@ clampedNumberInput onChange ( min, default, max ) n =
                 , placeholder = Nothing
                 }
     in
-        row [ alignLeft ] [ inp 8 "range", inp 4 "number" ]
+        row [ alignLeft ]
+            [ inp 8 "range"
+            , inp 4 "number"
+            ]
 
 
 line : Element msg

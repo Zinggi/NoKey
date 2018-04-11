@@ -38,6 +38,10 @@ delete =
     FeatherIcons.trash2 |> toElement
 
 
+back =
+    FeatherIcons.chevronLeft |> toElement
+
+
 loading =
     el [] (Element.html <| Loader.loaderWithOptions { loaderOptions | color = Styles.black })
 

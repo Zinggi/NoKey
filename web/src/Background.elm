@@ -79,20 +79,49 @@ update msg model =
         SetPage page ->
             { model | currentPage = page } |> noCmd
 
+        DoneWithTutorial ->
+            let
+                newModel =
+                    { model | isFirstTimeUser = False }
+
+                ret =
+                    newModel |> withCmds [ storeState newModel ]
+            in
+                case model.currentPage of
+                    Tutorial ->
+                        ret
+                            |> addCmds [ Navigation.back 1 ]
+
+                    _ ->
+                        ret
+
         NavigateTo page ->
             let
-                navFn =
+                doNothing model =
+                    ( model, Cmd.none )
+
+                ( navFn, cmd, updateFn ) =
                     case ( model.currentPage, page ) of
-                        ( Home, _ ) ->
-                            Route.newUrl
-
                         ( _, Pairing ) ->
-                            Route.newUrl
+                            ( Route.newUrl, Cmd.none, getToken )
 
-                        _ ->
-                            Route.modifyUrl
+                        ( Home, _ ) ->
+                            ( Route.newUrl, Cmd.none, doNothing )
+
+                        ( from, destination ) ->
+                            if Route.hasBackButton destination then
+                                ( Route.newUrl, Cmd.none, doNothing )
+                            else if Route.hasBackButton from then
+                                ( Route.modifyUrl, Navigation.back 1, doNothing )
+                            else
+                                ( Route.modifyUrl, Cmd.none, doNothing )
             in
-                model |> withCmds [ navFn page ]
+                model
+                    |> withCmds [ cmd, navFn page ]
+                    |> andThenUpdate updateFn
+
+        NavigateBack ->
+            model |> withCmds [ Navigation.back 1 ]
 
         OnStateRequest ->
             -- Since we send our state out on every update, we don't need to do anything here
@@ -105,6 +134,7 @@ update msg model =
             in
                 saveEntry groupId { login = userName, site = siteName, password = pw, securityLevel = securityLevel } model
                     |> mapModel updateSeed
+                    |> addCmds [ Navigation.back 1 ]
 
         SaveEntry id groupId entry ->
             saveEntry groupId entry model
@@ -133,7 +163,6 @@ update msg model =
         SiteNameChanged s ->
             { model
                 | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry
-                , expandSiteEntry = not <| String.isEmpty s
             }
                 |> noCmd
 
@@ -162,9 +191,7 @@ update msg model =
             Api.update model pMsg
 
         GetTokenClicked ->
-            model
-                |> updatePairingDialogue Views.Pairing.getTockenClicked
-                |> Api.initPairing model.uniqueIdentifyier
+            getToken model
 
         UpdatePairing s ->
             { model | pairingDialogue = s }
@@ -273,12 +300,16 @@ update msg model =
             model |> Api.grantedShareRequest r
 
 
+getToken : Model -> ( Model, Cmd Msg )
+getToken model =
+    model
+        |> updatePairingDialogue Views.Pairing.getTockenClicked
+        |> Api.initPairing model.uniqueIdentifyier
+
+
 saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )
 saveEntry groupId entry model =
-    { model
-        | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry
-        , expandSiteEntry = False
-    }
+    { model | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry }
         |> withCmds [ Helper.withTimestamp (InsertSite ( entry.site, entry.login ) ( entry.securityLevel, groupId ) entry.password) ]
 
 

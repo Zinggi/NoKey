@@ -9,6 +9,7 @@ import Task
 import Time exposing (Time)
 import Dict exposing (Dict)
 import Set exposing (Set)
+import Navigation
 
 
 -- https://github.com/saschatimme/elm-phoenix
@@ -550,7 +551,12 @@ receiveFinishPairing token time otherToken otherId otherSync model =
                     |> (\m -> { m | syncData = mergedSync })
         in
             newModel
-                |> withCmds [ finishPairing otherId token mergedSync, Ports.storeState (Data.Storage.encode newModel), cmd ]
+                |> withCmds
+                    [ finishPairing otherId token mergedSync
+                    , Ports.storeState (Data.Storage.encode newModel)
+                    , cmd
+                    , Navigation.back 1
+                    ]
                 |> andThenUpdate syncToOthers
     else
         ( model, Cmd.none )
