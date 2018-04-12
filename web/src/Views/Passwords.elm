@@ -220,7 +220,7 @@ viewSiteHeader siteName userNames =
     let
         names =
             Dict.keys userNames
-                |> Helper.intersperseLastOneDifferent identity ", " " and .....................sdhskahdkasjdhksahdksahdskahd. "
+                |> Helper.intersperseLastOneDifferent identity ", " " and "
                 |> String.join ""
     in
         row [ clipX, padding (Styles.paddingScale 2), spacing (Styles.paddingScale 2) ]

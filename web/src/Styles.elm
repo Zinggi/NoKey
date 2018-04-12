@@ -87,6 +87,7 @@ borderStyle =
 
 
 cardShadow depth =
+    -- Source: https://css-tricks.com/snippets/sass/material-shadows-mixin/
     let
         get l =
             Array.get (depth - 1) (Array.fromList l) |> Maybe.withDefault 0
