@@ -60,7 +60,8 @@ needsPairingHint { syncData } =
 
 
 viewTutorial =
-    Elements.card []
+    Elements.card 1
+        []
         [ Elements.h3 "Welcome!"
         , Elements.p "It seems like this is the first time you're using NoKey. Do you want to view a short tutorial?"
         , row []
@@ -71,7 +72,8 @@ viewTutorial =
 
 
 viewPairingHint =
-    Elements.card []
+    Elements.card 1
+        []
         [ Elements.text "Pair your first device to get started"
         , Elements.button (Just (NavigateTo Pairing)) "Pair a device"
         ]

@@ -64,7 +64,7 @@ viewModel model =
             [ row
                 [ centerX, width (fillBetween { min = Just 320, max = Just 1024 }), height fill ]
                 -- TODO: display notification on top of other as popup, (card with high elevation)
-                [ column [ width fill, height fill ]
+                [ column [ width fill, height fill, scrollbars ]
                     (if Notifications.count model.notifications > 0 then
                         [ Views.Notifications.view notificationsConfig
                             model.syncData
@@ -78,7 +78,7 @@ viewModel model =
                             -- TODO: I cant get this to work, maybe it's this:
                             -- https://github.com/mdgriffith/stylish-elephants/issues/30
                             [ viewPage model.currentPage model ]
-                        , buttomNavigation model.currentPage
+                        , bottomNavigation model.currentPage
                         ]
                     )
                 ]
@@ -111,11 +111,11 @@ viewTitle page =
             title
 
 
-buttomNavigation : Page -> Element Msg
-buttomNavigation page =
+bottomNavigation : Page -> Element Msg
+bottomNavigation page =
     [ Home, Devices, Passwords, Options ]
         |> List.map (\p -> Elements.pageButton (NavigateTo p) (page == p) p)
-        |> row [ padding (Styles.paddingScale 1), alignBottom ]
+        |> row ([ padding (Styles.paddingScale 1), alignBottom ] ++ Styles.cardShadow 3)
 
 
 viewPage : Page -> Model -> Element Msg

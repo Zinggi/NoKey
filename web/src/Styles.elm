@@ -1,6 +1,8 @@
 module Styles exposing (..)
 
+import Array
 import Color
+import Html.Attributes as Attr
 import Element exposing (..)
 import Element.Font as Font
 import Element.Background as Background
@@ -29,6 +31,14 @@ shadowColor =
 
 backgroundColor =
     Color.rgb 255 241 222
+
+
+altBackgroundColor =
+    Color.rgb 255 252 247
+
+
+alt2BackgroundColor =
+    Color.rgb 231 225 218
 
 
 disabledColor =
@@ -69,6 +79,36 @@ borderStyle =
     , mouseOver [ Border.color black ]
     , Border.rounded 4
     ]
+
+
+
+-- cardShadow =
+--     Border.shadow { offset = ( 1, 1 ), blur = 3, size = 0, color = shadowColor }
+
+
+cardShadow depth =
+    let
+        get l =
+            Array.get (depth - 1) (Array.fromList l) |> Maybe.withDefault 0
+
+        ( off1, alpha1 ) =
+            ( get [ 1.5, 3, 10, 14, 19 ]
+            , get [ 0.12, 0.16, 0.19, 0.25, 0.3 ]
+            )
+
+        blur1 =
+            off1 * 4
+
+        ( off2, blur2, alpha2 ) =
+            ( get [ 1.5, 3, 6, 10, 15 ]
+            , get [ 1, 3, 3, 5, 6 ]
+            , get [ 0.24, 0.23, 0.23, 0.22, 0.22 ]
+            )
+    in
+        [ Border.shadow { offset = ( 0, off1 ), blur = blur1, size = 0, color = Color.rgba 0 0 0 alpha1 }
+        , Border.shadow { offset = ( 0, off2 ), blur = blur2, size = 0, color = Color.rgba 0 0 0 alpha2 }
+        , htmlAttribute (Attr.style [ ( "z-index", toString depth ) ])
+        ]
 
 
 disabledBorder =

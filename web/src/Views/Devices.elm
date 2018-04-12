@@ -3,13 +3,14 @@ module Views.Devices exposing (view)
 import Dict exposing (Dict)
 import Element exposing (..)
 import Elements
+import Styles
 import Model exposing (Msg(..))
 import Route exposing (Page(..))
 
 
 view : String -> Dict String ( String, String ) -> Element Msg
 view myId knownIds =
-    Elements.miniPage
+    column [ spacing (Styles.paddingScale 1) ]
         (Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             :: devicesMap (viewDeviceEntry myId) knownIds
             -- TODO: add pairing link here, e.g. via floating add button

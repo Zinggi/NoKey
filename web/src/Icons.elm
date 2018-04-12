@@ -42,6 +42,14 @@ back =
     FeatherIcons.chevronLeft |> toElement
 
 
+arrowUp =
+    FeatherIcons.chevronsUp |> toElement
+
+
+arrowDown =
+    FeatherIcons.chevronsDown |> toElement
+
+
 loading =
     el [] (Element.html <| Loader.loaderWithOptions { loaderOptions | color = Styles.black })
 

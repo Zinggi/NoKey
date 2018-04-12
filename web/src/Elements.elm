@@ -13,6 +13,7 @@ import HashIcon
 import Icons
 import Data exposing (..)
 import Route exposing (Page(..))
+import Helper
 
 
 -- attributes
@@ -59,28 +60,23 @@ container contents =
     column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 1) ] contents
 
 
-miniPage : List (Element msg) -> Element msg
-miniPage children =
-    column [ spacing (Styles.paddingScale 1) ] children
-
-
 buttonRow : List (Attribute msg) -> List (Element msg) -> Element msg
 buttonRow attrs btns =
     row (padding (Styles.paddingScale 3) :: attrs) (List.intersperse spacer btns)
 
 
-card : List (Attribute msg) -> List (Element msg) -> Element msg
-card attr children =
+card : Int -> List (Attribute msg) -> List (Element msg) -> Element msg
+card depth attr children =
     column
         ([ -- Background.color Styles.white
-           padding (Styles.scaled 1)
-         , Border.shadow { offset = ( 1, 1 ), blur = 3, size = 0, color = Styles.shadowColor }
-         , height shrink
+           height shrink
          , spacing (Styles.paddingScale 1)
+         , padding (Styles.scaled 1)
 
          -- 1px 1px 3px 0px ;
          ]
             ++ attr
+            ++ Styles.cardShadow depth
         )
         children
 
@@ -110,22 +106,78 @@ withLabel label ele =
 -}
 enumeration : (a -> Element msg) -> List a -> List (Element msg)
 enumeration f xs =
-    case xs of
-        [] ->
-            []
+    Helper.intersperseLastOneDifferent f (text ",") (text "and") xs
 
-        [ x ] ->
-            [ f x ]
 
-        [ x, y ] ->
-            [ f x, text "and", f y ]
+stripedList : List (Attribute msg) -> List (Attribute msg) -> List (Element msg) -> Element msg
+stripedList attrCo attrCh children =
+    column attrCo
+        (List.indexedMap
+            (\i ->
+                el
+                    (Background.color
+                        (if i % 2 == 0 then
+                            Styles.altBackgroundColor
+                         else
+                            Styles.alt2BackgroundColor
+                        )
+                        :: attrCh
+                    )
+            )
+            children
+        )
 
-        x :: other ->
-            f x :: text "," :: enumeration f other
+
+expandable : msg -> Bool -> List (Attribute msg) -> Element msg -> Element msg -> Element msg
+expandable onExpand isExpanded attrs header content =
+    let
+        title isExpanded =
+            Input.button attrs
+                { label =
+                    row
+                        (attrs
+                            ++ if isExpanded then
+                                Styles.cardShadow 2
+                               else
+                                []
+                        )
+                        [ header
+                        , if isExpanded then
+                            Icons.arrowUp
+                          else
+                            Icons.arrowDown
+                        ]
+                , onPress = Just onExpand
+                }
+    in
+        if isExpanded then
+            column attrs [ title isExpanded, content ]
+        else
+            title isExpanded
 
 
 
 -- Elements
+
+
+siteLogo : String -> Element msg
+siteLogo siteName =
+    let
+        letter =
+            String.left 1 siteName
+                |> String.toUpper
+    in
+        -- TODO: maybe use a service to get nice logos.
+        -- For now just use the first letter on a nice background
+        el
+            [ Border.rounded 20
+            , width (px 28)
+            , height (px 28)
+            , Background.color Styles.foregroundColor
+            , Font.size 24
+            , Font.center
+            ]
+            (Element.text letter)
 
 
 hashIcon : String -> Element msg

@@ -1,7 +1,9 @@
 module Views.Passwords exposing (..)
 
 import Dict exposing (Dict)
+import Set exposing (Set)
 import Element exposing (..)
+import Element.Background as Background
 import Elements
 import Styles
 import Icons
@@ -10,6 +12,7 @@ import Data.Sync exposing (SyncData)
 import Data exposing (..)
 import Data.TaskList exposing (Task(..))
 import Simple.Fuzzy as Fuzzy
+import Helper
 
 
 {-
@@ -33,27 +36,28 @@ type alias Config msg =
 
 type alias State =
     { search : String
+    , expandedSites : Set String
     }
 
 
 type Msg
     = UpdateSearch String
+    | ToggleSite String
 
 
 update : Msg -> State -> State
 update msg state =
     case msg of
         UpdateSearch s ->
-            { search = s }
+            { state | search = s }
+
+        ToggleSite s ->
+            { state | expandedSites = Helper.addOrRemoveFromSet s state.expandedSites }
 
 
 init : State
 init =
-    { search = "" }
-
-
-
-
+    { search = "", expandedSites = Set.empty }
 
 
 view : Config msg -> { m | syncData : SyncData, passwordsView : State } -> Element msg
@@ -62,46 +66,48 @@ view config ({ syncData, passwordsView } as model) =
         hasPasswords =
             Data.Sync.mapGroups (\_ _ _ _ -> 1) syncData |> (not << List.isEmpty)
     in
-        Elements.miniPage
-            [ tasks config passwordsView.search (Data.Sync.getTasks syncData)
+        column [ inFront (addNewButton config), spacing (Styles.paddingScale 1) ]
+            [ tasks config passwordsView (Data.Sync.getTasks syncData)
             , search config hasPasswords passwordsView.search
-            , passwords config passwordsView.search syncData
-            , addNewButton config
+            , passwords config passwordsView syncData
             ]
+
+
+addNewButton : Config msg -> Element msg
+addNewButton config =
+    el [ alignBottom, alignRight ] (Elements.primaryButton (Just config.onAddNewPassword) "Add new")
 
 
 search : Config msg -> Bool -> String -> Element msg
 search config hasPasswords searchValue =
     if hasPasswords then
+        -- TODO: not really a search, more like a filter ->
+        -- add clear filter!
         Elements.search (config.toMsg << UpdateSearch) searchValue
     else
         empty
 
 
-addNewButton : Config msg -> Element msg
-addNewButton config =
-    Elements.primaryButton (Just config.onAddNewPassword) "Add new"
-
-
-tasks : Config msg -> String -> List Task -> Element msg
-tasks config search ts =
+tasks : Config msg -> State -> List Task -> Element msg
+tasks config state ts =
     if List.isEmpty ts then
         empty
     else
         Elements.container
             [ Elements.h3 "Tasks"
-            , List.map (viewTask config search) ts |> column [ Styles.paddingLeft (Styles.scaled 1), spacing (Styles.paddingScale 0) ]
+            , List.map (viewTask config state) ts |> column [ Styles.paddingLeft (Styles.scaled 1), spacing (Styles.paddingScale 0) ]
             ]
 
 
-viewTask : Config msg -> String -> Task -> Element msg
-viewTask config search task =
+viewTask : Config msg -> State -> Task -> Element msg
+viewTask config state task =
     case task of
         MoveFromStashToGroup { accounts, group, status } ->
-            Elements.card []
+            Elements.card 1
+                []
                 [ row [ spacing (Styles.paddingScale 1) ]
                     [ viewGroupStatus config group False status, Elements.text "to save" ]
-                , viewSitesList config search accounts
+                , viewSitesList config state accounts
                 , row [] [ Elements.p "into", viewGroup group status ]
                 ]
 
@@ -110,14 +116,16 @@ viewTask config search task =
                 ( level, _ ) =
                     group
             in
-                Elements.card []
+                Elements.card 1
+                    []
                     [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString level ++ ") keys are distributed to save")
-                    , viewSitesList config search accounts
+                    , viewSitesList config state accounts
                     , row [] [ Elements.p "into", viewGroup group status ]
                     ]
 
         CreateMoreShares { for, group, status } ->
-            Elements.card []
+            Elements.card 1
+                []
                 [ row [ spacing (Styles.paddingScale 1) ]
                     [ viewGroupStatus config group False status
                     , Elements.text "to create keys for:"
@@ -126,9 +134,9 @@ viewTask config search task =
                 ]
 
 
-passwords : Config msg -> String -> SyncData -> Element msg
-passwords config search sync =
-    Elements.container (Data.Sync.mapGroups (viewSites config search) sync)
+passwords : Config msg -> State -> SyncData -> Element msg
+passwords config state sync =
+    Elements.container (Data.Sync.mapGroups (viewSites config state) sync)
 
 
 
@@ -157,23 +165,23 @@ passwords config search sync =
 --                 |> column []
 
 
-viewSites : Config msg -> String -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSites config search groupId shares groupStatus accounts =
+viewSites : Config msg -> State -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSites config state groupId shares groupStatus accounts =
     [ viewGroupHeader config groupId (shares < Tuple.first groupId) groupStatus
-    , viewSitesList config search accounts
+    , viewSitesList config state accounts
     ]
-        |> column (Styles.grayedOutIf (shares < Tuple.first groupId))
+        |> column (spacing (Styles.paddingScale 2) :: height shrink :: Styles.grayedOutIf (shares < Tuple.first groupId))
 
 
-viewSitesList : Config msg -> String -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSitesList config search accounts =
+viewSitesList : Config msg -> State -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSitesList config state accounts =
     Dict.foldl
         (\siteName userNames acc ->
-            viewPw config search siteName userNames :: acc
+            viewPw config state siteName userNames :: acc
         )
         []
         accounts
-        |> column [ Styles.paddingLeft (Styles.scaled 1) ]
+        |> Elements.stripedList (Styles.cardShadow 1) [ width fill ]
 
 
 viewGroupHeader : Config msg -> GroupId -> Bool -> Status -> Element msg
@@ -184,36 +192,80 @@ viewGroupHeader config groupId disabled groupStatus =
         ]
 
 
-viewPw : Config msg -> String -> String -> Dict String PasswordStatus -> Element msg
-viewPw config search siteName userNames =
+viewPw : Config msg -> State -> String -> Dict String PasswordStatus -> Element msg
+viewPw config state siteName userNames =
     let
         filterd =
             List.filterMap
                 (\( userName, status ) ->
-                    if Fuzzy.match search (siteName ++ userName) then
+                    if Fuzzy.match state.search (siteName ++ userName) then
                         Just ( userName, status )
                     else
                         Nothing
                 )
                 (Dict.toList userNames)
     in
-        case filterd of
-            [] ->
-                empty
+        if List.isEmpty filterd then
+            empty
+        else
+            Elements.expandable (config.toMsg (ToggleSite siteName))
+                (Set.member siteName state.expandedSites)
+                [ width fill ]
+                (viewSiteHeader siteName userNames)
+                (viewSiteData config siteName userNames)
 
-            [ ( userName, status ) ] ->
-                pwRow config [ Elements.h4 siteName ] ( siteName, userName ) status
 
-            other ->
-                column []
-                    [ Elements.h4 siteName
-                    , List.map
-                        (\( userName, status ) ->
-                            pwRow config [] ( siteName, userName ) status
-                        )
-                        other
-                        |> column [ Styles.paddingLeft (Styles.scaled 1) ]
-                    ]
+viewSiteHeader : String -> Dict String a -> Element msg
+viewSiteHeader siteName userNames =
+    let
+        names =
+            Dict.keys userNames
+                |> Helper.intersperseLastOneDifferent identity ", " " and .....................sdhskahdkasjdhksahdksahdskahd. "
+                |> String.join ""
+    in
+        row [ clipX, padding (Styles.paddingScale 2), spacing (Styles.paddingScale 2) ]
+            [ el [ alignLeft ] (Elements.siteLogo siteName)
+            , column [] [ Elements.h3 siteName, Elements.text names ]
+            ]
+
+
+viewSiteData : Config msg -> String -> Dict String PasswordStatus -> Element msg
+viewSiteData config siteName userNames =
+    -- TODO!!!!
+    column [ Background.color Styles.backgroundColor, padding (Styles.paddingScale 2) ]
+        (Dict.toList userNames
+            |> List.map
+                (\( login, status ) ->
+                    row []
+                        [ column []
+                            [ Elements.b login
+                            , viewStatus config ( siteName, login ) status
+                            ]
+                        , if RequestPassword.isUnlocked status then
+                            el [ alignRight ] (Elements.delete (config.onDeletePassword ( siteName, login )))
+                          else
+                            empty
+                        ]
+                )
+        )
+
+
+
+-- case filterd of
+--     [] ->
+--         empty
+--     [ ( userName, status ) ] ->
+--         pwRow config [ Elements.h4 siteName ] ( siteName, userName ) status
+--     other ->
+--         column []
+--             [ Elements.h4 siteName
+--             , List.map
+--                 (\( userName, status ) ->
+--                     pwRow config [] ( siteName, userName ) status
+--                 )
+--                 other
+--                 |> column [ Styles.paddingLeft (Styles.scaled 1) ]
+--             ]
 
 
 pwRow : Config msg -> List (Element msg) -> AccountId -> PasswordStatus -> Element msg

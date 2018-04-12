@@ -120,6 +120,14 @@ combineResults =
 -- Set
 
 
+addOrRemoveFromSet : comparable -> Set comparable -> Set comparable
+addOrRemoveFromSet it set =
+    if Set.member it set then
+        Set.remove it set
+    else
+        Set.insert it set
+
+
 maybeToSet : Maybe comparable -> Set comparable
 maybeToSet ma =
     case ma of
@@ -269,6 +277,27 @@ mergeLists a b =
 
         ( aas, [] ) ->
             aas
+
+
+{-|
+
+    intersperseLastOneDifferent identity "," "and" ["a", "b", "c"]
+        -> ["a", ",", "b", "and", "c"]
+-}
+intersperseLastOneDifferent : (a -> b) -> b -> b -> List a -> List b
+intersperseLastOneDifferent f mid end xs =
+    case xs of
+        [] ->
+            []
+
+        [ x ] ->
+            [ f x ]
+
+        [ x, y ] ->
+            [ f x, end, f y ]
+
+        x :: other ->
+            f x :: mid :: intersperseLastOneDifferent f mid end other
 
 
 
