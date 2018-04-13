@@ -14,7 +14,7 @@ view myId knownIds =
         (Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             :: devicesMap (viewDeviceEntry myId) knownIds
             -- TODO: add pairing link here, e.g. via floating add button
-            ++ [ Elements.button (Just (NavigateTo Pairing)) "Pair new device" ]
+            ++ [ Elements.primaryButton (Just (NavigateTo Pairing)) "Pair new device" ]
         )
 
 

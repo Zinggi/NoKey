@@ -12,7 +12,7 @@ module.exports = (config) => {
         },
         module: {
             rules: [{
-                    test: /\.html$/,
+                    test: /\.html$|\.css$/,
                     exclude: /node_modules/,
                     loader: 'file-loader?name=[name].[ext]'
                 },

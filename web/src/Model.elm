@@ -4,6 +4,7 @@ import Json.Encode exposing (Value)
 import Json.Decode as JD
 import Time exposing (Time)
 import Navigation exposing (Location)
+import Toasty
 
 
 --
@@ -69,6 +70,8 @@ type Msg
     | SetPage Page
     | DoneWithTutorial
     | NavigateBack
+    | ToastyMsg (Toasty.Msg String)
+    | ShowToast String
 
 
 
@@ -81,6 +84,10 @@ type ModelState
     | LoadingError String
 
 
+type alias Toast =
+    Toasty.Stack String
+
+
 type alias Model =
     { newSiteEntry : PasswordMetaData
     , requirementsState : PW.State
@@ -91,6 +98,7 @@ type alias Model =
     , passwordsView : Views.Passwords.State
     , protocolState : Protocol.State
     , currentPage : Page
+    , toasties : Toast
 
     -- Keep the current site, to provide site specific actions
     , currentSite : Maybe String
@@ -155,6 +163,7 @@ initModel isFirstTimeUser location initialSeed encryptionKey signingKey devType 
         , currentSite = Nothing
         , isFirstTimeUser = isFirstTimeUser
         , currentPage = Maybe.map Route.fromLocation location |> Maybe.withDefault Route.Home
+        , toasties = Toasty.initialState
         }
 
 

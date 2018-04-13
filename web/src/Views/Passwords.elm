@@ -31,6 +31,7 @@ type alias Config msg =
     , onRequestPasswordPressed : List GroupId -> Maybe AccountId -> msg
     , onTogglePassword : AccountId -> msg
     , onAddNewPassword : msg
+    , onCopyToClipboard : msg
     }
 
 
@@ -83,7 +84,7 @@ search config hasPasswords searchValue =
     if hasPasswords then
         -- TODO: not really a search, more like a filter ->
         -- add clear filter!
-        Elements.search (config.toMsg << UpdateSearch) searchValue
+        el [ padding (Styles.paddingScale 1), width fill ] (Elements.search (config.toMsg << UpdateSearch) searchValue)
     else
         empty
 
@@ -95,43 +96,44 @@ tasks config state ts =
     else
         Elements.container
             [ Elements.h3 "Tasks"
-            , List.map (viewTask config state) ts |> column [ Styles.paddingLeft (Styles.scaled 1), spacing (Styles.paddingScale 0) ]
+            , List.map (viewTask config state) ts |> column [ spacing (Styles.paddingScale 0) ]
             ]
 
 
 viewTask : Config msg -> State -> Task -> Element msg
 viewTask config state task =
-    case task of
-        MoveFromStashToGroup { accounts, group, status } ->
-            Elements.card 1
-                []
-                [ row [ spacing (Styles.paddingScale 1) ]
-                    [ viewGroupStatus config group False status, Elements.text "to save" ]
-                , viewSitesList config state accounts
-                , row [] [ Elements.p "into", viewGroup group status ]
-                ]
-
-        WaitForKeysDistributed { accounts, group, status, progress } ->
-            let
-                ( level, _ ) =
-                    group
-            in
-                Elements.card 1
-                    []
-                    [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString level ++ ") keys are distributed to save")
-                    , viewSitesList config state accounts
+    let
+        card =
+            Elements.card 1 []
+    in
+        case task of
+            MoveFromStashToGroup { accounts, group, status } ->
+                card
+                    [ row [ spacing (Styles.paddingScale 1) ]
+                        [ viewGroupStatus config group False status, Elements.text "to save" ]
+                    , viewSitesListSimple config state accounts
                     , row [] [ Elements.p "into", viewGroup group status ]
                     ]
 
-        CreateMoreShares { for, group, status } ->
-            Elements.card 1
-                []
-                [ row [ spacing (Styles.paddingScale 1) ]
-                    [ viewGroupStatus config group False status
-                    , Elements.text "to create keys for:"
+            WaitForKeysDistributed { accounts, group, status, progress } ->
+                let
+                    ( level, _ ) =
+                        group
+                in
+                    card
+                        [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString level ++ ") keys are distributed to save")
+                        , viewSitesListSimple config state accounts
+                        , row [] [ Elements.p "into", viewGroup group status ]
+                        ]
+
+            CreateMoreShares { for, group, status } ->
+                card
+                    [ row [ spacing (Styles.paddingScale 1) ]
+                        [ viewGroupStatus config group False status
+                        , Elements.text "to create keys for:"
+                        ]
+                    , column [ Styles.paddingLeft (Styles.scaled 1) ] (List.map (Elements.avatar []) for)
                     ]
-                , column [ Styles.paddingLeft (Styles.scaled 1) ] (List.map (Elements.avatar []) for)
-                ]
 
 
 passwords : Config msg -> State -> SyncData -> Element msg
@@ -139,45 +141,30 @@ passwords config state sync =
     Elements.container (Data.Sync.mapGroups (viewSites config state) sync)
 
 
-
--- {- I decided the tasks are enough to see what's in the stash.
---  - There is no need to show the stash seperately
---  -}
--- stash : Config msg -> String -> SyncData -> Element msg
--- stash config search sync =
---     let
---         stash =
---             (Tasks.getStash sync.tasks)
---     in
---         if Dict.isEmpty stash then
---             empty
---         else
---             [ Elements.h3 "Local stash"
---             , (Dict.foldl
---                 (\siteName userNames acc ->
---                     viewPw config search siteName userNames :: acc
---                 )
---                 []
---                 stash
---                 |> column [ Styles.paddingLeft (Styles.scaled 1) ]
---               )
---             ]
---                 |> column []
-
-
 viewSites : Config msg -> State -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
 viewSites config state groupId shares groupStatus accounts =
     [ viewGroupHeader config groupId (shares < Tuple.first groupId) groupStatus
-    , viewSitesList config state accounts
+    , viewSitesList config groupId (shares < Tuple.first groupId) groupStatus state accounts
     ]
         |> column (spacing (Styles.paddingScale 2) :: height shrink :: Styles.grayedOutIf (shares < Tuple.first groupId))
 
 
-viewSitesList : Config msg -> State -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSitesList config state accounts =
+viewSitesList : Config msg -> GroupId -> Bool -> Status -> State -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSitesList config groupId disabled groupStatus state accounts =
     Dict.foldl
         (\siteName userNames acc ->
-            viewPw config state siteName userNames :: acc
+            viewPw config groupId disabled groupStatus state siteName userNames :: acc
+        )
+        []
+        accounts
+        |> Elements.stripedList (Styles.cardShadow 1) [ width fill ]
+
+
+viewSitesListSimple : Config msg -> State -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSitesListSimple config state accounts =
+    Dict.foldl
+        (\siteName userNames acc ->
+            viewSiteHeader siteName userNames :: acc
         )
         []
         accounts
@@ -192,8 +179,8 @@ viewGroupHeader config groupId disabled groupStatus =
         ]
 
 
-viewPw : Config msg -> State -> String -> Dict String PasswordStatus -> Element msg
-viewPw config state siteName userNames =
+viewPw : Config msg -> GroupId -> Bool -> Status -> State -> String -> Dict String PasswordStatus -> Element msg
+viewPw config groupId disabled groupStatus state siteName userNames =
     let
         filterd =
             List.filterMap
@@ -212,13 +199,17 @@ viewPw config state siteName userNames =
                 (Set.member siteName state.expandedSites)
                 [ width fill ]
                 (viewSiteHeader siteName userNames)
-                (viewSiteData config siteName userNames)
+                (viewSiteData config siteName userNames groupId disabled groupStatus)
 
 
 viewSiteHeader : String -> Dict String a -> Element msg
 viewSiteHeader siteName userNames =
     let
         names =
+            -- TODO: use
+            -- white-space: nowrap;
+            -- overflow: hidden;
+            -- text-overflow:"... (Dict.size userNames)";
             Dict.keys userNames
                 |> Helper.intersperseLastOneDifferent identity ", " " and "
                 |> String.join ""
@@ -229,22 +220,21 @@ viewSiteHeader siteName userNames =
             ]
 
 
-viewSiteData : Config msg -> String -> Dict String PasswordStatus -> Element msg
-viewSiteData config siteName userNames =
-    -- TODO!!!!
-    column [ Background.color Styles.backgroundColor, padding (Styles.paddingScale 2) ]
+viewSiteData : Config msg -> String -> Dict String PasswordStatus -> GroupId -> Bool -> Status -> Element msg
+viewSiteData config siteName userNames groupId disabled groupStatus =
+    column [ padding (Styles.paddingScale 2) ]
         (Dict.toList userNames
             |> List.map
                 (\( login, status ) ->
                     row []
-                        [ column []
+                        [ column [ spacing (Styles.paddingScale 1) ]
                             [ Elements.b login
                             , viewStatus config ( siteName, login ) status
                             ]
                         , if RequestPassword.isUnlocked status then
-                            el [ alignRight ] (Elements.delete (config.onDeletePassword ( siteName, login )))
+                            el [ alignRight, centerY ] (Elements.delete (config.onDeletePassword ( siteName, login )))
                           else
-                            empty
+                            viewGroupStatus config groupId disabled groupStatus
                         ]
                 )
         )
@@ -333,12 +323,22 @@ viewGroupStatus config groupId disabled status =
 
 viewStatus : Config msg -> AccountId -> PasswordStatus -> Element msg
 viewStatus config accountId status =
-    case status of
-        Unlocked pw ->
-            row [] [ Elements.password [] Nothing True pw, Elements.button (Just (config.onTogglePassword accountId)) "Hide" ]
+    let
+        entry showPw pw =
+            column [ spacing (Styles.paddingScale 1) ]
+                [ Elements.password [] Nothing showPw pw
+                , row [ spacing (Styles.paddingScale 0) ]
+                    [ Elements.button (Just (config.onTogglePassword accountId)) "Hide"
+                    , Elements.copyToClipboard config.onCopyToClipboard pw
+                    ]
+                ]
+    in
+        case status of
+            Unlocked pw ->
+                entry True pw
 
-        UnlockedButHidden ->
-            row [] [ Elements.password [] Nothing False "*****", Elements.button (Just (config.onTogglePassword accountId)) "Show" ]
+            UnlockedButHidden ->
+                entry False "*****"
 
-        _ ->
-            Elements.password [] Nothing False "*****"
+            _ ->
+                Elements.password [] Nothing False "*****"

@@ -1,10 +1,11 @@
-module MainView exposing (view)
+module MainView exposing (view, toastyConfig)
 
 import Html exposing (Html)
 import Html.Attributes as HtmlAttr
 import Element exposing (..)
 import Element.Lazy exposing (lazy)
 import Dict
+import Toasty
 
 
 --
@@ -50,7 +51,11 @@ view state =
                     }
                 ]
             }
-            Styles.background
+            (Styles.background ++ [ heightHack ])
+
+
+heightHack =
+    htmlAttribute (HtmlAttr.style [ ( "height", "100%" ) ])
 
 
 viewModel : Model -> Element Msg
@@ -59,10 +64,13 @@ viewModel model =
         numberOfKnownDevices =
             Data.Sync.knownIds model.syncData |> Dict.size
     in
-        column [ unselectable ]
+        -- TODO: hack:
+        -- I set the height here to get scroll behaviour to work, see
+        -- https://github.com/mdgriffith/stylish-elephants/issues/30
+        column [ unselectable, heightHack ]
             -- the nesting seems to be nececairy to get the correct centering + max width behaviour
             [ row
-                [ centerX, width (fillBetween { min = Just 320, max = Just 1024 }), height fill ]
+                [ centerX, width (fillBetween { min = Just 320, max = Just 1024 }), height fill, heightHack ]
                 -- TODO: display notification on top of other as popup, (card with high elevation)
                 [ column [ width fill, height fill, scrollbars ]
                     (if Notifications.count model.notifications > 0 then
@@ -73,10 +81,8 @@ viewModel model =
                             model.notificationsView
                         ]
                      else
-                        [ viewTitle model.currentPage
+                        [ viewTitle model.currentPage model.toasties
                         , column [ height fill, padding (Styles.paddingScale 3), scrollbars ]
-                            -- TODO: I cant get this to work, maybe it's this:
-                            -- https://github.com/mdgriffith/stylish-elephants/issues/30
                             [ viewPage model.currentPage model ]
                         , bottomNavigation model.currentPage
                         ]
@@ -99,16 +105,84 @@ unselectable =
         )
 
 
-viewTitle : Page -> Element Msg
-viewTitle page =
+viewTitle : Page -> Model.Toast -> Element Msg
+viewTitle page toasties =
     let
         title =
             el [ padding (Styles.paddingScale 3) ] (Elements.h2 (Route.pageToTitle page))
+
+        toast =
+            Toasty.view toastyConfig renderToast ToastyMsg toasties
+
+        renderToast txt =
+            Html.div
+                [ HtmlAttr.style
+                    [ ( "padding", "1em" )
+                    , ( "border-radius", "4px" )
+                    , ( "cursor", "pointer" )
+                    , ( "box-shadow", "0 5px 5px -5px rgba(0, 0, 0, 0.5)" )
+                    , ( "color", "white" )
+                    , ( "background", "#1998C2" )
+                    , ( "font-size", "13px" )
+                    ]
+                ]
+                [ Html.text txt ]
     in
         if Route.hasBackButton page then
-            row [] [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] empty ]
+            row [ below (html toast) ] [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] empty ]
         else
-            title
+            el [ below (html toast) ] title
+
+
+toastyConfig : Toasty.Config msg
+toastyConfig =
+    Toasty.config
+        |> Toasty.transitionOutDuration 1000
+        |> Toasty.delay 5000
+        |> Toasty.containerAttrs toastContainerAttrs
+        |> Toasty.itemAttrs toastItemAttrs
+        |> Toasty.transitionInAttrs transitionInAttrs
+        |> Toasty.transitionOutAttrs transitionOutAttrs
+
+
+toastContainerAttrs : List (Html.Attribute msg)
+toastContainerAttrs =
+    [ HtmlAttr.style
+        [ ( "position", "fixed" )
+        , ( "top", "50px" )
+        , ( "right", "0" )
+        , ( "width", "200px" )
+        , ( "list-style-type", "none" )
+        , ( "padding", "0" )
+        , ( "margin", "0" )
+        ]
+    ]
+
+
+toastItemAttrs : List (Html.Attribute msg)
+toastItemAttrs =
+    [ HtmlAttr.style
+        [ ( "margin", "1em 1em 0 1em" )
+        , ( "max-height", "100px" )
+        , ( "transition", "max-height 0.6s, margin-top 0.6s" )
+        ]
+    ]
+
+
+transitionInAttrs : List (Html.Attribute msg)
+transitionInAttrs =
+    [ HtmlAttr.class "animated fast fadeInRight"
+    ]
+
+
+transitionOutAttrs : List (Html.Attribute msg)
+transitionOutAttrs =
+    [ HtmlAttr.class "animated fadeOutRightBig"
+    , HtmlAttr.style
+        [ ( "max-height", "0" )
+        , ( "margin-top", "0" )
+        ]
+    ]
 
 
 bottomNavigation : Page -> Element Msg
@@ -122,7 +196,7 @@ viewPage : Page -> Model -> Element Msg
 viewPage page model =
     case page of
         Home ->
-            Views.Dashboard.view model
+            Views.Dashboard.view passwordsConfig model
 
         Passwords ->
             case Views.Dashboard.needsPairingHint model of
@@ -162,6 +236,7 @@ passwordsConfig =
     , onRequestPasswordPressed = RequestPasswordPressed
     , onTogglePassword = TogglePassword
     , onAddNewPassword = NavigateTo NewPassword
+    , onCopyToClipboard = ShowToast "Copied to clipboard"
     }
 
 

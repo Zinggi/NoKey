@@ -8,10 +8,11 @@ import Model exposing (Msg(..), Model)
 import Data.Sync
 import Route exposing (Page(..))
 import Styles
+import Views.Passwords
 
 
-view : Model -> Element Msg
-view model =
+view : Views.Passwords.Config Msg -> Model -> Element Msg
+view passwordsConfig model =
     let
         h =
             hints model
@@ -25,10 +26,11 @@ view model =
         -- + tasks from passwords
         -- + Shortcut for group status & to unlock a group
         column [ spacing (Styles.scaled 1) ]
-            [ Maybe.withDefault empty h.tutorial
-            , Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
-            , Maybe.withDefault empty h.needsPairing
+            [ Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             , viewSummery model
+            , Maybe.withDefault empty h.tutorial
+            , Maybe.withDefault empty h.needsPairing
+            , Views.Passwords.tasks passwordsConfig model.passwordsView (Data.Sync.getTasks model.syncData)
             ]
 
 

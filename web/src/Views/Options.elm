@@ -13,9 +13,11 @@ view model =
     column [ spacing (Styles.paddingScale 1) ]
         [ Elements.button (Just (NavigateTo Tutorial)) "Show Tutorial"
         , Elements.line
-        , Elements.button (Just ResetDevice) "Reset Device"
 
         -- TODO: should show confirm first
+        , Elements.button (Just ResetDevice) "Reset Device"
+        , Elements.line
+        , Elements.button (Just (ShowToast "Test toast!")) "Show toast"
         , Elements.line
         , Elements.text ("Version: " ++ Data.Sync.appVersion)
         ]

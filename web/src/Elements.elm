@@ -70,6 +70,7 @@ card depth attr children =
     column
         ([ -- Background.color Styles.white
            height shrink
+         , Background.color Styles.altBackgroundColor
          , spacing (Styles.paddingScale 1)
          , padding (Styles.scaled 1)
 
@@ -181,8 +182,8 @@ siteLogo siteName =
 
 
 hashIcon : String -> Element msg
-hashIcon =
-    html << HashIcon.iconFromStringWithBrands 48 2.5
+hashIcon txt =
+    el [ width (px 48) ] (html <| HashIcon.iconFromStringWithBrands 48 2.5 txt)
 
 
 checkBox : (Bool -> msg) -> Bool -> String -> Bool -> Element msg
@@ -219,6 +220,45 @@ checkBox onChange isDisabled label checked =
         , checked = checked
         , label = Input.labelRight [] (text label)
         }
+
+
+copyToClipboard : msg -> String -> Element msg
+copyToClipboard msg txt =
+    Input.button [ htmlAttribute (Attr.attribute "onClick" (copyToClipboardHack ++ ";copyToClipboard(" ++ toString txt ++ ");")) ]
+        { label =
+            el
+                (padding (Styles.paddingScale 1)
+                    :: Styles.borderStyle
+                )
+                (text "Copy to clipboard")
+        , onPress = Just msg
+        }
+
+
+copyToClipboardHack =
+    """
+function copyToClipboard(text) {
+    if (window.clipboardData && window.clipboardData.setData) {
+        // IE specific code path to prevent textarea being shown while dialog is visible.
+        return clipboardData.setData("Text", text);
+
+    } else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
+        var textarea = document.createElement("textarea");
+        textarea.textContent = text;
+        textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in MS Edge.
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            return document.execCommand("copy");  // Security exception may be thrown by some browsers.
+        } catch (ex) {
+            console.warn("Copy to clipboard failed.", ex);
+            return false;
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+}
+"""
 
 
 box : List (Attribute msg)
@@ -279,7 +319,7 @@ pageButton onPress isActive page =
                     []
                 )
                 [ el [ centerX ] (pageToIcon page)
-                , if isActive then
+                , if True || isActive then
                     el [ centerX ] (Route.pageToTitle page |> h4)
                   else
                     empty
@@ -445,8 +485,10 @@ myAvatar : (String -> msg) -> String -> ( String, String ) -> List (Attribute ms
 myAvatar onSetDeviceName id ( name, idPart ) attrs =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
-        , textInput (Just onSetDeviceName) "Name your device.." name
-        , helperMayIdPart idPart
+        , row []
+            [ textInput (Just onSetDeviceName) "Name your device.." name
+            , helperMayIdPart idPart
+            ]
         ]
 
 
@@ -537,7 +579,19 @@ table headers data =
 
 password attr onChange shouldShow value =
     Input.currentPassword
-        (attr ++ [ padding 0, width shrink ])
+        (attr
+            ++ [ padding 0
+               , width shrink
+               , htmlAttribute
+                    (Attr.size
+                        (if shouldShow then
+                            String.length value
+                         else
+                            5
+                        )
+                    )
+               ]
+        )
         { onChange = onChange
         , text = value
         , label = Input.labelLeft [ padding 0 ] empty
@@ -552,6 +606,7 @@ inputHelper fn attr onChange placeholder value =
         (attr
             ++ [ padding 0
                , htmlAttribute (Attr.disabled (onChange == Nothing))
+               , htmlAttribute (Attr.size (max 15 (String.length value)))
                ]
         )
         { onChange = onChange

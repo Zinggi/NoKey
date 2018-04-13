@@ -63,6 +63,7 @@ const base64toArrayBuffer = (str) => {
 //--------------------------------------------------------------------------------
 const crypto = window.crypto || window.msCrypto;
 
+
 // returns a promise with two keys, [encryptionKey, signKey]
 // call this if we haven't stored a key yet
 // TODO: if there is an error anywhere, pass error along to elm inside flag to display error message
@@ -261,9 +262,12 @@ const getRandomInts = (n) => {
 
 
 const setup = (startFn, onStart, onError) => {
+    if (crypto === undefined) {
+        throw Error("window.crypto not available");
+    } else if (crypto && crypto.subtle === undefined) {
+        throw Error("window.crypto.subtle not available");
+    }
     getState((state, keys) => {
-        // console.log("stored state: ", state);
-
         // 1 + 8 32bit ints give us a generator of period (2^32)^9bits, which corresponds to (2^8)^36bit,
         // e.g. more than enough for 32 character passwords.
         const rands = getRandomInts(9);

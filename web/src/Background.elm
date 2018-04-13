@@ -2,6 +2,7 @@ module Background exposing (..)
 
 import Random.Pcg.Extended as RandomE
 import Navigation exposing (Location)
+import Toasty
 
 
 --
@@ -17,6 +18,7 @@ import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
 import Views.Passwords
+import MainView
 import Model exposing (..)
 
 
@@ -298,6 +300,13 @@ update msg model =
 
         DidDecryptRequestedShares r ->
             model |> Api.grantedShareRequest r
+
+        ToastyMsg subMsg ->
+            Toasty.update MainView.toastyConfig ToastyMsg subMsg model
+
+        ShowToast txt ->
+            ( model, Cmd.none )
+                |> Toasty.addToast MainView.toastyConfig ToastyMsg txt
 
 
 getToken : Model -> ( Model, Cmd Msg )
