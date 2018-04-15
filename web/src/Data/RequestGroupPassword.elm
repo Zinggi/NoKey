@@ -19,10 +19,13 @@ module Data.RequestGroupPassword
         , getAllShares
         , cacheGroupPw
         , getGroupPassword
+        , lockGroups
         )
 
 import Dict exposing (Dict)
+import Dict.Extra as Dict
 import EverySet as Set exposing (EverySet)
+import Set as SetStd
 import AES
 import SecretSharing exposing (Share)
 import Data exposing (GroupId, AccountId, GroupPassword, Password, EncryptedPassword)
@@ -64,6 +67,17 @@ getGroupPassword groupId state =
 
         _ ->
             Nothing
+
+
+{-| forget about all shares we already collected
+-}
+lockGroups : Dict GroupId (List AccountId) -> State -> State
+lockGroups groupIds (State state) =
+    State
+        { state
+            | groupPws = Dict.removeMany (Dict.keys groupIds |> SetStd.fromList) state.groupPws
+            , pws = Dict.removeMany (Dict.values groupIds |> List.concat |> SetStd.fromList) state.pws
+        }
 
 
 getStatus : GroupId -> State -> Status

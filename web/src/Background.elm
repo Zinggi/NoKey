@@ -3,6 +3,8 @@ module Background exposing (..)
 import Random.Pcg.Extended as RandomE
 import Navigation exposing (Location)
 import Toasty
+import Time
+import Timer
 
 
 --
@@ -243,6 +245,11 @@ update msg model =
                     Nothing ->
                         newModel
                             |> Api.requestShares keys
+                            -- TODO: add time to options
+                            |> addCmds [ Timer.setTimeOut (LockGroups keys) (10 * Time.minute) ]
+
+        LockGroups groups ->
+            { model | syncData = Data.Sync.lockGroups groups model.syncData } |> noCmd
 
         GrantShareRequest id req ->
             model

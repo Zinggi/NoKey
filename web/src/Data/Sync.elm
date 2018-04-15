@@ -54,6 +54,24 @@ clearStashes groupId sync =
     { sync | tasks = Tasks.clearStash groupId sync.tasks }
 
 
+lockGroups : List GroupId -> SyncData -> SyncData
+lockGroups groupIds sync =
+    let
+        accs =
+            accounts sync
+                |> Helper.dictGroupValues
+
+        groupsAccs =
+            List.foldl
+                (\groupId acc ->
+                    Dict.insert groupId (Dict.get groupId accs |> Maybe.withDefault []) acc
+                )
+                Dict.empty
+                groupIds
+    in
+        { sync | groupPasswordRequestsState = Request.lockGroups groupsAccs sync.groupPasswordRequestsState }
+
+
 {-| the data we receive on a sync update
 -}
 type alias OtherSharedData =

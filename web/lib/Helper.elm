@@ -152,6 +152,16 @@ maybeToEverySet ma =
 -- Dict
 
 
+dictGroupValues : Dict comparable1 comparable2 -> Dict comparable2 (List comparable1)
+dictGroupValues dict =
+    Dict.foldl
+        (\key val acc ->
+            insertOrUpdate val [ key ] ((::) key) acc
+        )
+        Dict.empty
+        dict
+
+
 insertOrUpdate : comparable -> a -> (a -> a) -> Dict comparable a -> Dict comparable a
 insertOrUpdate key insert update dict =
     Dict.update key

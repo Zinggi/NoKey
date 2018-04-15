@@ -235,6 +235,7 @@ passwordsConfig =
     , onDeletePassword = DeletePassword
     , onRequestPasswordPressed = RequestPasswordPressed
     , onTogglePassword = TogglePassword
+    , onLockGroupsPressed = LockGroups
     , onAddNewPassword = NavigateTo NewPassword
     , onCopyToClipboard = ShowToast "Copied to clipboard"
     }

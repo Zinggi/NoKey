@@ -222,9 +222,9 @@ checkBox onChange isDisabled label checked =
         }
 
 
-copyToClipboard : msg -> String -> Element msg
+copyToClipboard : msg -> (() -> String) -> Element msg
 copyToClipboard msg txt =
-    Input.button [ htmlAttribute (Attr.attribute "onClick" (copyToClipboardHack ++ ";copyToClipboard(" ++ toString txt ++ ");")) ]
+    Input.button [ htmlAttribute (Attr.attribute "onClick" (copyToClipboardHack ++ ";copyToClipboard(" ++ toString (txt ()) ++ ");")) ]
         { label =
             el
                 (padding (Styles.paddingScale 1)

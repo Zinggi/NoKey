@@ -1,4 +1,4 @@
-module Timer exposing (Timer, init, Msg, Config, startTimer, update)
+module Timer exposing (Timer, init, Msg, Config, startTimer, update, setTimeOut)
 
 import Time exposing (Time)
 import Dict exposing (Dict)
@@ -31,6 +31,12 @@ type alias Config id msg =
 init : Timer id
 init =
     Timer { timers = Dict.empty, isActive = False }
+
+
+setTimeOut : msg -> Time -> Cmd msg
+setTimeOut msg time =
+    Process.sleep time
+        |> Task.perform (\_ -> msg)
 
 
 startTimer : Config id msg -> id -> Time -> Timer id -> ( Timer id, Cmd msg )

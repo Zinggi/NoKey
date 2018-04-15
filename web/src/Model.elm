@@ -48,6 +48,7 @@ type Msg
     | SetDeviceName String
     | InsertSite AccountId GroupId Password Time
     | RequestPasswordPressed (List GroupId) (Maybe AccountId)
+    | LockGroups (List GroupId)
     | GrantShareRequest Notifications.Id ShareRequest
     | RejectShareRequest Notifications.Id ShareRequest
     | ResetDevice
