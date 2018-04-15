@@ -649,7 +649,7 @@ addShares onShouldAddNewShares time shares sync =
 
 addShare : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
 addShare onShouldAddNewShares time groupId share sync =
-    -- Add a share. Ff we can unlock a group, check which tasks can be completed, e.g.
+    -- Add a share. If we can unlock a group, check which tasks can be completed, e.g.
     -- moving passwords from stash to storage and generating more shares for those that need them.
     let
         ( newReqState, mayForm ) =
@@ -678,17 +678,33 @@ addShare onShouldAddNewShares time groupId share sync =
                             (getXValuesFor (devicesNeedingSharesFor groupId sync2) sync2)
                             (Request.getAllShares groupId newReqState)
 
-                    cmd =
+                    -- take out our share
+                    ( myShares, sharesForOthers, newDistributedShares ) =
                         case newShares of
                             Ok shares ->
-                                -- Call encryptShares port here
-                                onShouldAddNewShares time groupId (getAssociatedKeys shares sync2)
+                                case Dict.get sync.id shares of
+                                    Just share ->
+                                        ( Dict.insert groupId share sync.myShares
+                                        , Dict.remove sync.id shares
+                                        , addIdToDistributedShares sync.id groupId sync.shared.distributedShares
+                                        )
+
+                                    Nothing ->
+                                        ( sync.myShares, shares, sync.shared.distributedShares )
 
                             Err e ->
                                 Debug.log "Failed to create more shares" e
-                                    |> always Cmd.none
+                                    |> always ( sync.myShares, Dict.empty, sync.shared.distributedShares )
+
+                    -- Call encryptShares port here
+                    cmd =
+                        onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers sync2)
                 in
-                    ( sync2, mayForm, cmd )
+                    ( { sync2 | myShares = myShares }
+                        |> updateShared (\s -> { s | distributedShares = newDistributedShares })
+                    , mayForm
+                    , cmd
+                    )
 
             Nothing ->
                 ( newSync, mayForm, Cmd.none )

@@ -51,11 +51,11 @@ view state =
                     }
                 ]
             }
-            (Styles.background ++ [ heightHack ])
+            Styles.background
 
 
 heightHack =
-    htmlAttribute (HtmlAttr.style [ ( "height", "100%" ) ])
+    htmlAttribute (HtmlAttr.style [ ( "max-height", "100vh" ) ])
 
 
 viewModel : Model -> Element Msg
@@ -67,7 +67,7 @@ viewModel model =
         -- TODO: hack:
         -- I set the height here to get scroll behaviour to work, see
         -- https://github.com/mdgriffith/stylish-elephants/issues/30
-        column [ unselectable, heightHack ]
+        column [ unselectable ]
             -- the nesting seems to be nececairy to get the correct centering + max width behaviour
             [ row
                 [ centerX, width (fillBetween { min = Just 320, max = Just 1024 }), height fill, heightHack ]

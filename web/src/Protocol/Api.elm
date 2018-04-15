@@ -564,11 +564,14 @@ receiveFinishPairing token time otherToken otherId otherSync model =
 
 encryptNewShares : Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg
 encryptNewShares time groupId shares =
-    Ports.encryptNewShares
-        { time = time
-        , groupId = groupId
-        , shares = shares
-        }
+    if List.isEmpty shares then
+        Cmd.none
+    else
+        Ports.encryptNewShares
+            { time = time
+            , groupId = groupId
+            , shares = shares
+            }
 
 
 decryptMyShares : Dict GroupId Value -> Cmd Model.Msg
