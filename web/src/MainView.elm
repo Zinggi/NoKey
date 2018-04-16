@@ -46,8 +46,6 @@ view state =
                     { borderColor = Just Styles.accentColor
                     , backgroundColor = Nothing
                     , shadow = Nothing
-
-                    {- Just { color = Styles.accentColor, offset = ( 0, 0 ), blur = 2, size = 0 } -}
                     }
                 ]
             }
@@ -189,7 +187,26 @@ bottomNavigation : Page -> Element Msg
 bottomNavigation page =
     [ Home, Devices, Passwords, Options ]
         |> List.map (\p -> Elements.pageButton (NavigateTo p) (page == p) p)
-        |> row ([ padding (Styles.paddingScale 1), alignBottom ] ++ Styles.cardShadow 3)
+        |> row
+            ([ padding (Styles.paddingScale 1)
+             , alignBottom
+             , above (el [ alignRight, padding (Styles.paddingScale 3) ] (viewActionButton page))
+             ]
+                ++ Styles.cardShadow 3
+            )
+
+
+viewActionButton : Page -> Element Msg
+viewActionButton page =
+    case page of
+        Passwords ->
+            Views.Passwords.actionButton passwordsConfig
+
+        Devices ->
+            Views.Devices.actionButton
+
+        _ ->
+            empty
 
 
 viewPage : Page -> Model -> Element Msg

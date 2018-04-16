@@ -104,24 +104,24 @@ update msg model =
                 doNothing model =
                     ( model, Cmd.none )
 
-                ( navFn, cmd, updateFn ) =
+                ( navFn, updateFn ) =
                     case ( model.currentPage, page ) of
                         ( _, Pairing ) ->
-                            ( Route.newUrl, Cmd.none, getToken )
+                            ( Route.newUrl, getToken )
 
                         ( Home, _ ) ->
-                            ( Route.newUrl, Cmd.none, doNothing )
+                            ( Route.newUrl, doNothing )
 
                         ( from, destination ) ->
                             if Route.hasBackButton destination then
-                                ( Route.newUrl, Cmd.none, doNothing )
+                                ( Route.newUrl, doNothing )
                             else if Route.hasBackButton from then
-                                ( Route.modifyUrl, Navigation.back 1, doNothing )
+                                ( Route.modifyUrl, doNothing )
                             else
-                                ( Route.modifyUrl, Cmd.none, doNothing )
+                                ( Route.modifyUrl, doNothing )
             in
                 model
-                    |> withCmds [ cmd, navFn page ]
+                    |> withCmds [ navFn page ]
                     |> andThenUpdate updateFn
 
         NavigateBack ->
@@ -246,6 +246,8 @@ update msg model =
                         newModel
                             |> Api.requestShares keys
                             -- TODO: add time to options
+                            -- TODO: this can behave unexpected:
+                            -- Lock group 2, wait 9 min, unlock group 2 and it will close in 1 min!
                             |> addCmds [ Timer.setTimeOut (LockGroups keys) (10 * Time.minute) ]
 
         LockGroups groups ->

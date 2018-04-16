@@ -12,6 +12,7 @@ import CharSet exposing (CharSet)
 import Interval
 import Helper
 import Elements
+import Styles
 
 
 type alias State =
@@ -121,8 +122,8 @@ view toMsg state =
 allowedChars state =
     Elements.inputGroup "Allowed Characters"
         [ toggleSets SetAllowed [] state.allowedSets
-        , Elements.inputWithLabel (Just SetIncludeCustom) "Include custom" "" state.includeCustom
-        , Elements.inputWithLabel (Just SetExcludeCustom) "Exclude custom" "" state.excludeCustom
+        , Elements.inputText (Just SetIncludeCustom) { label = "Include custom", placeholder = "" } state.includeCustom
+        , Elements.inputText (Just SetExcludeCustom) { label = "Exclude custom", placeholder = "" } state.excludeCustom
         ]
 
 
@@ -140,12 +141,12 @@ atLeastOneOf state =
                 state.allowedSets
             )
             state.atLeastOneOf
-        , Elements.inputWithLabel (Just SetCustom) "Custom" "" state.custom
+        , Elements.inputText (Just SetCustom) { label = "Custom", placeholder = "" } state.custom
         ]
 
 
 toggleSets toMsg disabled set =
-    row [] (List.map (\l -> setBox toMsg (List.member l disabled) l set) [ "A-Z", "a-z", "0-9", "!\"#$%…" ])
+    row [ width shrink, spacing (Styles.paddingScale 1) ] (List.map (\l -> setBox toMsg (List.member l disabled) l set) [ "A-Z", "a-z", "0-9", "!\"#$%…" ])
 
 
 setBox toMsg isDisabled label set =

@@ -1,4 +1,4 @@
-module Views.Devices exposing (view)
+module Views.Devices exposing (view, actionButton)
 
 import Dict exposing (Dict)
 import Element exposing (..)
@@ -13,9 +13,12 @@ view myId knownIds =
     column [ spacing (Styles.paddingScale 1) ]
         (Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             :: devicesMap (viewDeviceEntry myId) knownIds
-            -- TODO: add pairing link here, e.g. via floating add button
-            ++ [ Elements.primaryButton (Just (NavigateTo Pairing)) "Pair new device" ]
         )
+
+
+actionButton : Element Msg
+actionButton =
+    Elements.floatingButton (NavigateTo Pairing) "Pair new device"
 
 
 {-| TODO: fix input lag on input fields. Workaround:

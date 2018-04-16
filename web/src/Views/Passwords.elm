@@ -1,4 +1,4 @@
-module Views.Passwords exposing (..)
+module Views.Passwords exposing (Config, State, Msg, init, update, tasks, view, actionButton)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -68,16 +68,18 @@ view config ({ syncData, passwordsView } as model) =
         hasPasswords =
             Data.Sync.mapGroups (\_ _ _ _ -> 1) syncData |> (not << List.isEmpty)
     in
-        column [ inFront (addNewButton config), spacing (Styles.paddingScale 1) ]
+        column [ spacing (Styles.paddingScale 1) ]
             [ tasks config passwordsView (Data.Sync.getTasks syncData)
             , search config hasPasswords passwordsView.search
             , passwords config passwordsView syncData
+            , -- This is here such that we can scroll below the action button
+              el [ height (px 30) ] empty
             ]
 
 
-addNewButton : Config msg -> Element msg
-addNewButton config =
-    el [ alignBottom, alignRight ] (Elements.primaryButton (Just config.onAddNewPassword) "Add new")
+actionButton : Config msg -> Element msg
+actionButton config =
+    Elements.floatingButton config.onAddNewPassword "Add new"
 
 
 search : Config msg -> Bool -> String -> Element msg

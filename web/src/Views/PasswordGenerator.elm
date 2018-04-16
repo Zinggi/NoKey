@@ -23,6 +23,7 @@ type alias State =
     , length : Int
     , requirements : PwReq.State
     , seed : Seed
+    , pw : String
     }
 
 
@@ -30,6 +31,7 @@ type Msg
     = PwReq PwReq.State
     | SetIsOpen Bool
     | UpdateLength Int
+    | SetPw String
     | NextPw
     | Reset
 
@@ -47,6 +49,9 @@ update msg state =
         SetIsOpen b ->
             { state | showMore = b }
 
+        SetPw pw ->
+            { state | pw = pw }
+
         NextPw ->
             nextPassword state
 
@@ -56,12 +61,15 @@ update msg state =
 
 init : Seed -> State
 init seed =
-    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first }
+    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first, pw = "" }
 
 
 nextPassword : State -> State
 nextPassword state =
-    { state | seed = PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.second }
+    { state
+        | seed = PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.second
+        , pw = ""
+    }
 
 
 
@@ -71,39 +79,39 @@ nextPassword state =
 view : (String -> msg) -> (State -> msg) -> State -> Element msg
 view onAcceptPw toMsg state =
     let
-        ( isOk, pw, error ) =
+        ( isOk, pass, error ) =
             case PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.first of
                 Ok p ->
                     ( True, p, "" )
 
                 Err e ->
                     ( False, "", e )
+
+        pw =
+            if String.isEmpty state.pw then
+                pass
+            else
+                state.pw
     in
-        Elements.container
-            [ row []
-                [ el [ alignLeft ] <|
+        column []
+            [ if isOk then
+                Elements.inputText (Just SetPw) { label = "Password", placeholder = "" } pw
+                    |> Element.map (\msg -> update msg state |> toMsg)
+              else
+                Elements.p error
+            , column []
+                [ Elements.clampedNumberInput UpdateLength "Length" ( 6, 16, 32 ) state.length
+                    |> Element.map (\msg -> update msg state |> toMsg)
+                , row [ spacing (Styles.scaled 1) ] <|
                     if isOk then
-                        Elements.wrapInBorder (Elements.h3 pw)
+                        [ Elements.button (Just NextPw) "Next"
+                            |> Element.map (\msg -> update msg state |> toMsg)
+                        , Elements.primaryButton (Just (onAcceptPw pw)) "Ok"
+                        ]
                     else
-                        Elements.text error
-                ]
-            , Elements.inputGroup "Length"
-                [ row []
-                    [ Elements.clampedNumberInput UpdateLength ( 6, 16, 32 ) state.length
-                        |> Element.map (\msg -> update msg state |> toMsg)
-                    , el [ alignRight ]
-                        (row [ spacing (Styles.scaled 1) ] <|
-                            if isOk then
-                                [ Elements.button (Just NextPw) "Next"
-                                    |> Element.map (\msg -> update msg state |> toMsg)
-                                , Elements.button (Just (onAcceptPw pw)) "Ok"
-                                ]
-                            else
-                                [ Elements.button (Just Reset) "Reset"
-                                    |> Element.map (\msg -> update msg state |> toMsg)
-                                ]
-                        )
-                    ]
+                        [ Elements.primaryButton (Just Reset) "Reset"
+                            |> Element.map (\msg -> update msg state |> toMsg)
+                        ]
                 ]
             , Elements.toggleMoreButton SetIsOpen "show more" "show less" state.showMore
                 |> Element.map (\msg -> update msg state |> toMsg)

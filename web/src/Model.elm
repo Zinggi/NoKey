@@ -17,10 +17,10 @@ import PortUtils
 --
 
 import Helper exposing (withCmds)
+import Data exposing (GroupId, AccountId, Password, DeviceId, Settings)
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications exposing (Notifications, ShareRequest, SiteEntry)
 import Data.Sync exposing (SyncData)
-import Data exposing (GroupId, AccountId, Password, DeviceId)
 import Data.Storage
 import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
@@ -107,6 +107,7 @@ type alias Model =
     -- These ones should be serialized:
     , uniqueIdentifyier : String
     , isFirstTimeUser : Bool
+    , settings : Settings
 
     -- CRDT for synchronisation
     , syncData : SyncData
@@ -125,22 +126,22 @@ type alias Flags =
 init : Flags -> Location -> ModelState
 init { initialSeed, storedState, encryptionKey, signingKey, deviceType } location =
     case ( Data.Storage.decode storedState, JD.decodeValue Data.Sync.deviceTypeDecoder deviceType ) of
-        ( Ok { syncData, uniqueIdentifyier, isFirstTimeUser }, Ok devType ) ->
-            Loaded <| initModel isFirstTimeUser (Just location) initialSeed encryptionKey signingKey devType (Just uniqueIdentifyier) (Just syncData)
+        ( Ok state, Ok devType ) ->
+            Loaded <| initModel (Just state) (Just location) initialSeed encryptionKey signingKey devType
 
         ( Err "Expecting an object with a field named `syncData` but instead got: null", Ok devType ) ->
             -- This happens when we reset or when used the first time. It's ok.
-            Loaded <| initModel True (Just location) initialSeed encryptionKey signingKey devType Nothing Nothing
+            Loaded <| initModel Nothing (Just location) initialSeed encryptionKey signingKey devType
 
         ( Err "Expecting an object with a field named `uuid` but instead got: null", Ok devType ) ->
             -- This happens when we reset or when used the first time. It's ok.
-            Loaded <| initModel True (Just location) initialSeed encryptionKey signingKey devType Nothing Nothing
+            Loaded <| initModel Nothing (Just location) initialSeed encryptionKey signingKey devType
 
         ( err, devType ) ->
             LoadingError ("couldn't decode state or deviceType:\n\n" ++ toString err ++ "\n\nDevice type:" ++ toString devType)
 
 
-initModel isFirstTimeUser location initialSeed encryptionKey signingKey devType mayId maySync =
+initModel mayState location initialSeed encryptionKey signingKey devType =
     let
         ( base, ext ) =
             initialSeed
@@ -150,12 +151,21 @@ initModel isFirstTimeUser location initialSeed encryptionKey signingKey devType 
 
         ( indepSeed, _ ) =
             Random.step Random.independentSeed (Random.initialSeed base)
+
+        { syncData, uniqueIdentifyier, isFirstTimeUser, settings } =
+            mayState
+                |> Maybe.withDefault
+                    { syncData = Data.Sync.init indepSeed encryptionKey signingKey devType uuid
+                    , uniqueIdentifyier = uuid
+                    , isFirstTimeUser = True
+                    , settings = Data.defaultSettings
+                    }
     in
         { newSiteEntry = Data.PasswordMeta.default
         , requirementsState = PW.init (RandomE.initialSeed base ext)
         , seed = newSeed
-        , uniqueIdentifyier = Maybe.withDefault uuid mayId
-        , syncData = Maybe.withDefault (Data.Sync.init indepSeed encryptionKey signingKey devType uuid) maySync
+        , uniqueIdentifyier = uniqueIdentifyier
+        , syncData = syncData
         , pairingDialogue = Views.Pairing.init
         , notifications = Notifications.init
         , notificationsView = Views.Notifications.init
@@ -165,6 +175,7 @@ initModel isFirstTimeUser location initialSeed encryptionKey signingKey devType 
         , isFirstTimeUser = isFirstTimeUser
         , currentPage = Maybe.map Route.fromLocation location |> Maybe.withDefault Route.Home
         , toasties = Toasty.initialState
+        , settings = settings
         }
 
 
@@ -186,7 +197,7 @@ reset model =
         ( initSeed, _ ) =
             RandomE.step (RandomE.map2 (,) int32 (RandomE.list 8 int32)) model.seed
     in
-        initModel model.isFirstTimeUser Nothing initSeed model.syncData.encryptionKey model.syncData.signingKey model.syncData.deviceType Nothing Nothing
+        initModel Nothing Nothing initSeed model.syncData.encryptionKey model.syncData.signingKey model.syncData.deviceType
 
 
 updateNotifications : (Notifications -> Notifications) -> Model -> ( Model, Cmd Msg )

@@ -86,3 +86,41 @@
   -webkit-animation-name: fadeOutRightBig;
   animation-name: fadeOutRightBig;
 }
+
+
+
+/*
+ * Style sliders
+ */
+input[type='number'] {
+    width: auto;
+}
+input[type='range'] {
+    -webkit-appearance: none !important;
+    -moz-appearance: none;
+    background: rgb(200, 200, 200);
+    height: 8px;
+    border-radius: 4px;
+    width: auto;
+}
+input[type='range']::-moz-range-track {
+    -moz-appearance: none;
+    background: rgb(200, 200, 200);
+    height: 8px;
+    border-radius: 4px;
+}
+input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    background: rgb(25, 152, 194);
+    height: 14px;
+    width: 14px;
+    border-radius: 7px;
+}
+input[type='range']::-moz-range-thumb {
+    -moz-appearance: none !important;
+    background: rgb(25, 152, 194);
+    height: 14px;
+    width: 14px;
+    border-radius: 7px;
+}
+

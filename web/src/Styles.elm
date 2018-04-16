@@ -53,6 +53,10 @@ black =
     Color.rgb 0 0 0
 
 
+transparent =
+    Color.rgba 0 0 0 0
+
+
 thinLineColor =
     Color.rgba 0 0 0 0.25
 

@@ -72,6 +72,9 @@ pageToTitle page =
         NewPassword ->
             "New Password"
 
+        Options ->
+            "Settings"
+
         other ->
             toString other
 

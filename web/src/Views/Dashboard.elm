@@ -25,7 +25,7 @@ view passwordsConfig model =
     in
         -- + tasks from passwords
         -- + Shortcut for group status & to unlock a group
-        column [ spacing (Styles.scaled 1) ]
+        column [ spacing (Styles.scaled 1), height shrink ]
             [ Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             , viewSummery model
             , Maybe.withDefault empty h.tutorial

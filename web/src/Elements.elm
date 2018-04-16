@@ -1,7 +1,8 @@
 module Elements exposing (..)
 
 import Html.Attributes as Attr
-import Html.Events
+import Html.Events as Events
+import Html
 import Json.Decode as JD
 import Element exposing (..)
 import Element.Input as Input
@@ -17,6 +18,11 @@ import Helper
 
 
 -- attributes
+
+
+hackInLineStyle : String -> String -> Attribute msg
+hackInLineStyle prop val =
+    htmlAttribute (Attr.style [ ( prop, val ) ])
 
 
 onEnter : msg -> Attribute msg
@@ -38,7 +44,7 @@ onKey desiredCode msg =
                 |> JD.andThen decode
     in
         htmlAttribute <|
-            Html.Events.onWithOptions "keyup"
+            Events.onWithOptions "keyup"
                 { stopPropagation = False
                 , preventDefault = True
                 }
@@ -51,7 +57,7 @@ onKey desiredCode msg =
 
 inputGroup : String -> List (Element msg) -> Element msg
 inputGroup heading contents =
-    column [ padding (Styles.scaled 1), spacing (Styles.paddingScale 1), alignLeft ]
+    column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 1), alignLeft ]
         (el Styles.groupHeading (h4 heading) :: contents)
 
 
@@ -88,7 +94,13 @@ card depth attr children =
 
 wrapInBorder : Element msg -> Element msg
 wrapInBorder ele =
-    el [ Border.width 1, Border.rounded 4, padding (Styles.paddingScale 1) ] ele
+    el
+        [ Border.color Styles.thinLineColor
+        , width fill
+        , Border.widthEach { bottom = 2, left = 0, right = 0, top = 0 }
+        , padding (Styles.paddingScale 1)
+        ]
+        ele
 
 
 withLabel : String -> Element msg -> Element msg
@@ -211,7 +223,7 @@ checkBox onChange isDisabled label checked =
                                 |> Background.color
                           ]
                         , if checked then
-                            [ inFront (el (paddingXY (Styles.paddingScale -6) (Styles.paddingScale 2) :: box) (text "✔")) ]
+                            [ inFront (el (paddingXY 2 0 :: box) (text "✔")) ]
                           else
                             []
                         ]
@@ -220,6 +232,11 @@ checkBox onChange isDisabled label checked =
         , checked = checked
         , label = Input.labelRight [] (text label)
         }
+
+
+floatingButton : msg -> String -> Element msg
+floatingButton msg txt =
+    customPrimaryButton (Styles.cardShadow 3) (Just msg) txt
 
 
 copyToClipboard : msg -> (() -> String) -> Element msg
@@ -355,7 +372,12 @@ pageToIcon page =
 
 
 primaryButton : Maybe msg -> String -> Element msg
-primaryButton onPress txt =
+primaryButton =
+    customPrimaryButton []
+
+
+customPrimaryButton : List (Attribute msg) -> Maybe msg -> String -> Element msg
+customPrimaryButton attrs onPress txt =
     Input.button []
         { label =
             el
@@ -369,6 +391,7 @@ primaryButton onPress txt =
                                     Styles.accentColor
                        )
                     :: Styles.borderStyle
+                    ++ attrs
                 )
                 (text txt)
         , onPress = onPress
@@ -424,7 +447,7 @@ customButton onPress inner =
 
 toggleMoreButton : (Bool -> msg) -> String -> String -> Bool -> Element msg
 toggleMoreButton onOpen labelClosed labelOpen isOpen =
-    Input.checkbox []
+    Input.checkbox [ padding (Styles.paddingScale 1) ]
         { onChange = Just onOpen
         , icon =
             Just <|
@@ -486,14 +509,14 @@ myAvatar onSetDeviceName id ( name, idPart ) attrs =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
         , row []
-            [ textInput (Just onSetDeviceName) "Name your device.." name
+            [ inputText (Just onSetDeviceName) { placeholder = "Name your device..", label = "" } name
             , helperMayIdPart idPart
             ]
         ]
 
 
-clampedNumberInput : (Int -> msg) -> ( Int, Int, Int ) -> Int -> Element msg
-clampedNumberInput onChange ( min, default, max ) n =
+clampedNumberInput : (Int -> msg) -> String -> ( Int, Int, Int ) -> Int -> Element msg
+clampedNumberInput onChange label ( min, default, max ) n =
     let
         m =
             clamp min max n
@@ -501,28 +524,39 @@ clampedNumberInput onChange ( min, default, max ) n =
         toNumber s =
             String.toInt s |> Result.map (clamp min max) |> Result.withDefault default |> onChange
 
-        inp length t =
+        inp att t =
             Input.text
-                [ htmlAttribute (Attr.type_ t)
-                , htmlAttribute (Attr.min (toString min))
-                , htmlAttribute (Attr.max (toString max))
-                , htmlAttribute (Attr.style [ ( "background", "none" ), ( "border", "none" ) ])
-                , alignLeft
-                , width (px (Styles.scaled length))
-                , height (px (Styles.scaled 2))
-                , padding 0
-                , Font.size (Styles.scaled 1)
-                , htmlAttribute (Attr.disabled (min == max))
-                ]
-                { onChange = Just toNumber
-                , text = toString m
-                , label = Input.labelLeft [] empty
+                ([ Background.color Styles.transparent
+                 , padding 0
+                 , htmlAttribute (Attr.type_ t)
+                 , htmlAttribute (Attr.min (toString min))
+                 , htmlAttribute (Attr.max (toString max))
+                 , htmlAttribute (Attr.value (toString m))
+                 , Font.size (Styles.scaled 1)
+                 , htmlAttribute (Attr.disabled (min == max))
+                 ]
+                    ++ att
+                )
+                { label = Input.labelAbove [] empty
+                , onChange = Just toNumber
                 , placeholder = Nothing
+                , text = toString m
                 }
     in
-        row [ alignLeft ]
-            [ inp 8 "range"
-            , inp 4 "number"
+        column [ height shrink ]
+            [ el
+                [ Font.size (Styles.scaled 1)
+                , Font.bold
+                ]
+                (text label)
+            , row
+                [ padding (Styles.paddingScale 2)
+                , spacing (Styles.paddingScale 1)
+                , width (fillBetween { min = Nothing, max = Just 500 })
+                ]
+                [ inp [ width fill ] "range"
+                , inp [ width (px (14 + 14 * String.length (toString m))) ] "number"
+                ]
             ]
 
 
@@ -617,4 +651,31 @@ inputHelper fn attr onChange placeholder value =
                 Nothing
             else
                 Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
+        }
+
+
+inputText : Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
+inputText onMsg { placeholder, label } txt =
+    Input.text
+        [ Background.color Styles.transparent
+        , Border.widthEach { bottom = 2, left = 0, right = 0, top = 0 }
+        , Border.rounded 0
+        , padding 0
+        , width fill
+        , hackInLineStyle "max-width" "500px"
+        , hackInLineStyle "min-width" "0px"
+        ]
+        { label =
+            Input.labelAbove
+                [ Font.size (Styles.scaled 1)
+                , Font.bold
+                ]
+                (if String.isEmpty label then
+                    empty
+                 else
+                    text label
+                )
+        , onChange = onMsg
+        , placeholder = Just (Input.placeholder [] (text placeholder))
+        , text = txt
         }

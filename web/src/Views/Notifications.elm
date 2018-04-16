@@ -62,8 +62,7 @@ viewEntry config sync maxSecurityLevel n state =
                     [ Elements.inputWithLabel Nothing "Site" "" entry.site
                     , Elements.inputWithLabel Nothing "Login" "" entry.login
                     , Elements.passwordEntry Nothing "Password" False entry.password
-                    , Elements.withLabel "Security Level" <|
-                        Elements.clampedNumberInput config.toMsg ( 2, 2, maxSecurityLevel ) state
+                    , Elements.clampedNumberInput config.toMsg "Security Level" ( 2, 2, maxSecurityLevel ) state
                     ]
                 , Elements.buttonRow []
                     [ Elements.button
