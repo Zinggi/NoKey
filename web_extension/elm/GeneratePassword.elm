@@ -2,7 +2,7 @@ port module GeneratePassword exposing (main)
 
 import Html
 import Views.PasswordGenerator as PW
-import Element
+import Element exposing (padding)
 import Random.Pcg.Extended as RandomE
 import Styles
 
@@ -35,7 +35,7 @@ update msg model =
 
 view model =
     PW.view OnAcceptPw Pw model
-        |> Element.layout Styles.background
+        |> Element.layout (padding (Styles.paddingScale 3) :: Styles.background)
 
 
 main =

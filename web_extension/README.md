@@ -11,6 +11,7 @@
 
 * watch files:
     `yarn watch`
+    `web-ext run -s addon/`
 
 * build files:
     `yarn build`

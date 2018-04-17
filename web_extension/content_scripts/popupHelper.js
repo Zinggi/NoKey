@@ -1,6 +1,6 @@
 
 const sendSize = (id) => () => {
-    const firstDiv = document.body.children[2];
+    const firstDiv = document.body.getElementsByTagName('div')[0];
     if (!firstDiv) return;
 
     // console.log(firstDiv);

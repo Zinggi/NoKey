@@ -54,7 +54,7 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
         const addIcon = isSignUp || (accounts.length !== 0);
 
         if (addIcon) {
-            const iconPath = browser.extension.getURL('icons/library.svg');
+            const iconPath = browser.extension.getURL('icons/logo.svg');
             input.style.backgroundRepeat = "no-repeat";
             input.style.backgroundAttachment = "scroll";
             input.style.backgroundSize = "16px 16px";

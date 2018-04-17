@@ -2,7 +2,9 @@
   "manifest_version": 2,
 
   "name": "NoKey",
+  "description": "A distributed password manager without a master passwords",
   "version": "0.1.5",
+  "author": "Florian Zinggeler",
 
   "applications": {
     "gecko": {
@@ -10,11 +12,12 @@
     }
   },
 
-  "description": "A distributed password manager without a master passwords",
 
   "icons": {
-    "48": "icons/library.svg",
-    "96": "icons/library.svg"
+    "16": "icons/logo-16.png",
+    "32": "icons/logo-32.png",
+    "64": "icons/logo-64.png",
+    "128": "icons/logo-128.png"
   },
 
   "permissions": [
@@ -22,25 +25,30 @@
   ],
 
   "browser_action": {
-    "default_icon": "icons/library.svg",
+    "default_icon": {
+        "16": "icons/logo-16.png",
+        "32": "icons/logo-32.png",
+        "64": "icons/logo-64.png",
+        "128": "icons/logo-128.png"
+    },
     "default_title": "NoKey",
     "default_popup": "popup/main.html"
   },
 
   "web_accessible_resources": [
-      "icons/library.svg",
+      "icons/logo.svg",
       "content_scripts/newPassword.html",
       "content_scripts/fillForm.html"
   ],
 
   "background": {
-    "scripts": ["commons/bundle.js", "background/bundle.js"]
+    "scripts": ["dist/webextensionPolyfill.js", "commons/bundle.js", "background/bundle.js"]
   },
 
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content/bundle.js"],
+      "js": ["dist/webextensionPolyfill.js", "content/bundle.js"],
       "run_at": "document_end"
     }
   ],

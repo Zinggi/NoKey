@@ -28,7 +28,7 @@ view model =
         _ ->
             empty
     )
-        |> Element.layout Styles.background
+        |> Element.layout (padding (Styles.paddingScale 3) :: Styles.background)
 
 
 viewStatus : GroupId -> AccountId -> Status -> Element Msg

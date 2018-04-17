@@ -3,6 +3,7 @@ import Elm from "./elm/elm.js";
 // console.log("(background) start background.js");
 
 const sendMsgToAll = (msg, ports) => {
+    console.log("send msg:", msg, "to:", ports);
     for (let key in ports) {
         if (ports[key]) {
             ports[key].postMessage(msg);
@@ -11,7 +12,8 @@ const sendMsgToAll = (msg, ports) => {
 };
 
 
-setup(Elm.MainBackground.worker, (app) => {
+console.log(Elm.MainBackground);
+setup(Elm.MainBackground.fullscreen, (app) => {
     // console.log("(background) started", app);
 
     // ports are stored in this object
