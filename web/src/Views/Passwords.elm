@@ -209,33 +209,29 @@ viewSiteHeader : String -> Dict String a -> Element msg
 viewSiteHeader siteName userNames =
     let
         names =
-            -- TODO: use
-            -- white-space: nowrap;
-            -- overflow: hidden;
-            -- text-overflow:"... (Dict.size userNames)";
             Dict.keys userNames
                 |> Helper.intersperseLastOneDifferent identity ", " " and "
                 |> String.join ""
     in
-        row [ clipX, padding (Styles.paddingScale 2), spacing (Styles.paddingScale 2) ]
+        row [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 2), clipX ]
             [ el [ alignLeft ] (Elements.siteLogo siteName)
-            , column [] [ Elements.h3 siteName, Elements.text names ]
+            , column [ width fill, clipX ] [ Elements.h3 siteName, Elements.textWithCustomOverflow ("... (" ++ toString (Dict.size userNames) ++ ")") names ]
             ]
 
 
 viewSiteData : Config msg -> SyncData -> String -> Dict String PasswordStatus -> GroupId -> Bool -> Status -> Element msg
 viewSiteData config sync siteName userNames groupId disabled groupStatus =
-    column [ padding (Styles.paddingScale 2) ]
+    column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 2) ]
         (Dict.toList userNames
             |> List.map
                 (\( login, status ) ->
-                    row []
+                    column [ spacing (Styles.paddingScale 1) ]
                         [ column [ spacing (Styles.paddingScale 1) ]
                             [ Elements.b login
                             , viewStatus config sync ( siteName, login ) status
                             ]
                         , if RequestPassword.isUnlocked status then
-                            el [ alignRight, centerY ] (Elements.delete (config.onDeletePassword ( siteName, login )))
+                            Elements.delete (config.onDeletePassword ( siteName, login ))
                           else
                             viewGroupStatus config groupId disabled groupStatus
                         ]

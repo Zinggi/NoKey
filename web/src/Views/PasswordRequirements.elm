@@ -112,7 +112,7 @@ getForbidden sets include exclude =
 
 view : (State -> msg) -> State -> Element msg
 view toMsg state =
-    column []
+    column [ spacing (Styles.paddingScale 2) ]
         [ allowedChars state
         , atLeastOneOf state
         ]

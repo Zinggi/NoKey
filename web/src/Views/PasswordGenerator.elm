@@ -93,7 +93,7 @@ view onAcceptPw toMsg state =
             else
                 state.pw
     in
-        column []
+        column [ spacing (Styles.paddingScale 3) ]
             [ if isOk then
                 Elements.inputText (Just SetPw) { label = "Password", placeholder = "" } pw
                     |> Element.map (\msg -> update msg state |> toMsg)

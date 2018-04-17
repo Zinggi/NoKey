@@ -19,7 +19,7 @@ view model =
 
 newSiteForm : Views.PasswordGenerator.State -> PasswordMetaData -> String -> Int -> Element Msg
 newSiteForm requirementsState entry currentGroupId maxSecurityLevel =
-    column [ spacing (Styles.paddingScale 2) ]
+    column [ spacing (Styles.paddingScale 3) ]
         [ Elements.inputText (Just SiteNameChanged) { placeholder = "example.com", label = "Site" } entry.siteName
         , Elements.inputText (Just UserNameChanged) { placeholder = "", label = "Login" } entry.userName
 

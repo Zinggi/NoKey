@@ -57,7 +57,7 @@ onKey desiredCode msg =
 
 inputGroup : String -> List (Element msg) -> Element msg
 inputGroup heading contents =
-    column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 1), alignLeft ]
+    column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 2), alignLeft ]
         (el Styles.groupHeading (h4 heading) :: contents)
 
 
@@ -156,9 +156,9 @@ expandable onExpand isExpanded attrs header content =
                         )
                         [ header
                         , if isExpanded then
-                            Icons.arrowUp
+                            Icons.normal Icons.arrowUp
                           else
-                            Icons.arrowDown
+                            Icons.normal Icons.arrowDown
                         ]
                 , onPress = Just onExpand
                 }
@@ -288,6 +288,20 @@ text txt =
     el [ Font.size (Styles.scaled 1), alignLeft ] (Element.text txt)
 
 
+textWithCustomOverflow : String -> String -> Element msg
+textWithCustomOverflow overflow txt =
+    el [ Font.size (Styles.scaled 1), alignLeft, clipX, width fill ]
+        (Element.html <|
+            Html.div
+                [ Attr.class "se text width-fill height-fill"
+
+                -- Provides a ellipsis fallback, as only firefox supports custom text-overflow
+                , Attr.attribute "style" <| "overflow: hidden; text-overflow: ellipsis; text-overflow: \"" ++ overflow ++ "\";"
+                ]
+                [ Html.text txt ]
+        )
+
+
 p : String -> Element msg
 p txt =
     paragraph [] [ text txt ]
@@ -348,7 +362,7 @@ backButton : msg -> Element msg
 backButton msg =
     Input.button [ width shrink ]
         { onPress = Just msg
-        , label = row [] [ Icons.back, text "Back" ]
+        , label = row [] [ Icons.normal Icons.back, text "Back" ]
         }
 
 
@@ -356,16 +370,16 @@ pageToIcon : Page -> Element msg
 pageToIcon page =
     case page of
         Home ->
-            Icons.dashBoard
+            Icons.normal Icons.dashBoard
 
         Passwords ->
-            Icons.passwords
+            Icons.normal Icons.passwords
 
         Devices ->
-            Icons.devices
+            Icons.normal Icons.devices
 
         Options ->
-            Icons.options
+            Icons.normal Icons.options
 
         _ ->
             empty
@@ -421,7 +435,7 @@ delete onPress =
     Input.button []
         { label =
             el (padding (Styles.paddingScale 1) :: Styles.borderStyle)
-                (row [ spacing (Styles.paddingScale 0) ] [ Icons.delete, text "Delete" ])
+                (row [ spacing (Styles.paddingScale 0) ] [ Icons.small Icons.delete, text "Delete" ])
         , onPress = Just onPress
         }
 
@@ -475,9 +489,9 @@ groupIcon isLocked ( level, _ ) =
     row [ width shrink ]
         [ h3 (toString level)
         , if isLocked then
-            Icons.locked
+            Icons.small Icons.locked
           else
-            Icons.unlocked
+            Icons.small Icons.unlocked
         ]
 
 
@@ -524,10 +538,10 @@ clampedNumberInput onChange label ( min, default, max ) n =
         toNumber s =
             String.toInt s |> Result.map (clamp min max) |> Result.withDefault default |> onChange
 
-        inp att t =
+        inp att t pad =
             Input.text
                 ([ Background.color Styles.transparent
-                 , padding 0
+                 , padding pad
                  , htmlAttribute (Attr.type_ t)
                  , htmlAttribute (Attr.min (toString min))
                  , htmlAttribute (Attr.max (toString max))
@@ -542,6 +556,12 @@ clampedNumberInput onChange label ( min, default, max ) n =
                 , placeholder = Nothing
                 , text = toString m
                 }
+
+        length =
+            max - min
+
+        btn inc txt =
+            customButton (Just (onChange (clamp min max (m + inc)))) (el [ width (px 24), Font.size (Styles.scaled 3) ] (text txt))
     in
         column [ height shrink ]
             [ el
@@ -552,11 +572,19 @@ clampedNumberInput onChange label ( min, default, max ) n =
             , row
                 [ padding (Styles.paddingScale 2)
                 , spacing (Styles.paddingScale 1)
-                , width (fillBetween { min = Nothing, max = Just 500 })
+
+                -- , width (fillBetween { min = Nothing, max = Just 500 })
                 ]
-                [ inp [ width fill ] "range"
-                , inp [ width (px (14 + 14 * String.length (toString m))) ] "number"
-                ]
+                ((if length >= 3 then
+                    [ inp [ width fill ] "range" 0 ]
+                  else
+                    []
+                 )
+                    ++ [ inp [ width (px (14 + 14 * String.length (toString m))) ] "number" 5
+                       , btn 1 "+"
+                       , btn -1 "-"
+                       ]
+                )
             ]
 
 
@@ -570,22 +598,9 @@ spacer =
     el [ width fill ] empty
 
 
-inputWithLabel : Maybe (String -> msg) -> String -> String -> String -> Element msg
-inputWithLabel onChange label placeholder value =
-    row []
-        [ el [ width (fillPortion 1) ] (text label)
-        , inputHelper Input.text [ width (fillPortion 3) ] onChange placeholder value
-        ]
-
-
 search : (String -> msg) -> String -> Element msg
 search onChange value =
     inputHelper Input.search [] (Just onChange) "search" value
-
-
-textInput : Maybe (String -> msg) -> String -> String -> Element msg
-textInput onChange placeholder value =
-    inputHelper Input.text [] onChange placeholder value
 
 
 passwordEntry : Maybe (String -> msg) -> String -> Bool -> String -> Element msg
@@ -662,7 +677,8 @@ inputText onMsg { placeholder, label } txt =
         , Border.rounded 0
         , padding 0
         , width fill
-        , hackInLineStyle "max-width" "500px"
+
+        -- , hackInLineStyle "max-width" "500px"
         , hackInLineStyle "min-width" "0px"
         ]
         { label =

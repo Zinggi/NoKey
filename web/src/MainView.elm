@@ -61,6 +61,15 @@ viewModel model =
     let
         numberOfKnownDevices =
             Data.Sync.knownIds model.syncData |> Dict.size
+
+        cont =
+            column
+                [ centerX
+                , width (fillBetween { min = Just 320, max = Just 1024 })
+                , height fill
+                , padding (Styles.paddingScale 3)
+                , scrollbars
+                ]
     in
         -- TODO: hack:
         -- I set the height here to get scroll behaviour to work, see
@@ -68,19 +77,21 @@ viewModel model =
         column [ unselectable ]
             -- the nesting seems to be nececairy to get the correct centering + max width behaviour
             [ row
-                [ centerX, width (fillBetween { min = Just 320, max = Just 1024 }), height fill, heightHack ]
+                [ heightHack, height fill ]
                 -- TODO: display notification on top of other as popup, (card with high elevation)
                 [ column [ width fill, height fill, scrollbars ]
                     (if Notifications.count model.notifications > 0 then
-                        [ Views.Notifications.view notificationsConfig
-                            model.syncData
-                            model.notifications
-                            numberOfKnownDevices
-                            model.notificationsView
+                        [ cont
+                            [ Views.Notifications.view notificationsConfig
+                                model.syncData
+                                model.notifications
+                                numberOfKnownDevices
+                                model.notificationsView
+                            ]
                         ]
                      else
                         [ viewTitle model.currentPage model.toasties
-                        , column [ height fill, padding (Styles.paddingScale 3), scrollbars ]
+                        , cont
                             [ viewPage model.currentPage model ]
                         , bottomNavigation model.currentPage
                         ]
@@ -125,11 +136,16 @@ viewTitle page toasties =
                     ]
                 ]
                 [ Html.text txt ]
+
+        attr =
+            [ below (html toast), width (fillBetween { min = Just 320, max = Just 1024 }), centerX ]
     in
-        if Route.hasBackButton page then
-            row [ below (html toast) ] [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] empty ]
-        else
-            el [ below (html toast) ] title
+        (if Route.hasBackButton page then
+            row attr [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] empty ]
+         else
+            el attr title
+        )
+            |> (\c -> row (width fill :: Styles.cardShadow 2) [ column [ width fill ] [ c ] ])
 
 
 toastyConfig : Toasty.Config msg
@@ -192,8 +208,18 @@ bottomNavigation page =
              , alignBottom
              , above (el [ alignRight, padding (Styles.paddingScale 3) ] (viewActionButton page))
              ]
-                ++ Styles.cardShadow 3
             )
+        |> (\c ->
+                row (width fill :: Styles.cardShadow 2)
+                    [ column [ width fill ]
+                        [ column
+                            [ width (fillBetween { min = Just 320, max = Just 1024 })
+                            , centerX
+                            ]
+                            [ c ]
+                        ]
+                    ]
+           )
 
 
 viewActionButton : Page -> Element Msg

@@ -72,8 +72,8 @@ view config diag =
         inp isEnabled rest =
             column []
                 (row [ spacing (Styles.paddingScale 1), Elements.onEnter config.onSubmitToken ]
-                    [ Elements.textInput (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag))) "enter token" diag.inputToken
-                    , Elements.button (boolToMaybe isEnabled config.onSubmitToken) "submit"
+                    [ Elements.inputText (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag))) { placeholder = "enter token", label = "" } diag.inputToken
+                    , Elements.primaryButton (boolToMaybe isEnabled config.onSubmitToken) "Pair"
                     ]
                     :: rest
                 )

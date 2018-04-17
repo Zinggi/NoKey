@@ -8,46 +8,46 @@ import Loader
 
 dashBoard =
     -- TODO: maybe .home is better
-    FeatherIcons.grid |> toElement
+    FeatherIcons.grid
 
 
 passwords =
     -- TODO: make better icon
-    FeatherIcons.lock |> toElement
+    FeatherIcons.lock
 
 
 devices =
     -- TODO: make better icon, .smartphone, .tablet
-    FeatherIcons.monitor |> toElement
+    FeatherIcons.monitor
 
 
 options =
     -- ,.sliders , .menu, .list, .alignJustify
-    FeatherIcons.settings |> toElement
+    FeatherIcons.settings
 
 
 locked =
-    FeatherIcons.lock |> toElement
+    FeatherIcons.lock
 
 
 unlocked =
-    FeatherIcons.unlock |> toElement
+    FeatherIcons.unlock
 
 
 delete =
-    FeatherIcons.trash2 |> toElement
+    FeatherIcons.trash2
 
 
 back =
-    FeatherIcons.chevronLeft |> toElement
+    FeatherIcons.chevronLeft
 
 
 arrowUp =
-    FeatherIcons.chevronsUp |> toElement
+    FeatherIcons.chevronsUp
 
 
 arrowDown =
-    FeatherIcons.chevronsDown |> toElement
+    FeatherIcons.chevronsDown
 
 
 loading =
@@ -56,6 +56,18 @@ loading =
 
 loaderOptions =
     Loader.defaultOptions
+
+
+small icon =
+    icon
+        |> FeatherIcons.withSize 18
+        |> toElement
+
+
+normal icon =
+    icon
+        |> FeatherIcons.withSize 24
+        |> toElement
 
 
 toElement : FeatherIcons.Icon -> Element msg
