@@ -18,9 +18,9 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
     + (first time) `cd ../web/`, `elm-github-install`, `cd ../server`
     + `cd assets`, `yarn build`, `cd ..`
   * Digest assets `MIX_ENV=prod mix phx.digest`
-  * Possibly increment version in `mix.exs`
+  * Possibly increment version in `server/mix.exs` and `web/src/Data/Sync.elm`
   * Compile `MIX_ENV=prod mix compile`
-  * (optional) test if it works: `PORT=4001 MIX_ENV=prod mix phx.server`
+  * (optional) test if it works: `PORT=4001 MIX_ENV=prod mix phx.server` (doesn't work because dev has no ssl)
     + If there is an error, maybe cleaning elm-stuff helps?
   * Build release:
     

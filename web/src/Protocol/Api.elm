@@ -635,25 +635,29 @@ startTimer id timeout model =
 
 pairWith : String -> Time -> Model -> ( Model, Cmd Model.Msg )
 pairWith myId time model =
-    model
-        |> updateProtocol (\s -> { s | pairingState = WaitForPaired time model.pairingDialogue.inputToken })
-        |> withCmds
-            [ Http.post (apiUrl "/pairWith")
-                (Http.jsonBody
-                    (JE.object
-                        [ ( "deviceId", JE.string myId )
+    let
+        cleanToken =
+            Helper.cleanString model.pairingDialogue.inputToken |> Helper.replaceString " " "-"
+    in
+        model
+            |> updateProtocol (\s -> { s | pairingState = WaitForPaired time cleanToken })
+            |> withCmds
+                [ Http.post (apiUrl "/pairWith")
+                    (Http.jsonBody
+                        (JE.object
+                            [ ( "deviceId", JE.string myId )
 
-                        -- Remove unnecessary whitespace from token and replace spaces with dashes
-                        , ( "token", JE.string (Helper.cleanString model.pairingDialogue.inputToken |> Helper.replaceString " " "-") )
-                        ]
+                            -- Remove unnecessary whitespace from token and replace spaces with dashes
+                            , ( "token", JE.string cleanToken )
+                            ]
+                        )
                     )
-                )
-                (JD.field "otherId" JD.string)
-                |> Http.toTask
-                |> Task.attempt PairedWith
-                |> Cmd.map (protocolMsg << Server)
-            ]
-        |> andThenUpdate (startTimer Pairing (60 * Time.second))
+                    (JD.field "otherId" JD.string)
+                    |> Http.toTask
+                    |> Task.attempt PairedWith
+                    |> Cmd.map (protocolMsg << Server)
+                ]
+            |> andThenUpdate (startTimer Pairing (60 * Time.second))
 
 
 finishPairing : String -> String -> SyncData -> Cmd Model.Msg
