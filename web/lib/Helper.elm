@@ -1,5 +1,6 @@
 module Helper exposing (..)
 
+import Regex
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Set exposing (Set)
@@ -200,6 +201,19 @@ removeAllExcept key dict =
 
 
 -- String
+
+
+cleanString : String -> String
+cleanString string =
+    string
+        |> Regex.replace Regex.All (Regex.regex "\\s\\s+") (always " ")
+        |> String.trim
+
+
+replaceString : String -> String -> String -> String
+replaceString search substitution string =
+    string
+        |> Regex.replace Regex.All (Regex.regex (Regex.escape search)) (\_ -> substitution)
 
 
 replaceIndices : List ( Int, Char ) -> String -> String

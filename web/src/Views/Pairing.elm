@@ -1,5 +1,6 @@
 module Views.Pairing exposing (State, Config, view, receivedToken, init, tokenSubmitted, pairingCompleted, getTockenClicked)
 
+import Regex
 import Element exposing (..)
 import RemoteData exposing (WebData, RemoteData(..))
 import Http exposing (Error(..))
@@ -11,7 +12,6 @@ import Styles
 
 type alias State =
     { token : WebData String
-    , pairingCodeInput : String
     , inputToken : String
     , tokenSubmitStatus : SubmitStatus
     }
@@ -19,7 +19,7 @@ type alias State =
 
 init : State
 init =
-    { pairingCodeInput = "", token = NotAsked, inputToken = "", tokenSubmitStatus = Initial }
+    { token = NotAsked, inputToken = "", tokenSubmitStatus = Initial }
 
 
 type alias Config msg =
@@ -66,22 +66,32 @@ pairingCompleted a s =
     { s | tokenSubmitStatus = Answer a }
 
 
+shouldShowPairButton : String -> Bool
+shouldShowPairButton txt =
+    Regex.contains (Regex.regex "\\s*\\w+\\s+\\w+\\s+\\w+\\s+\\w+\\s*") txt
+
+
 view : Config msg -> State -> Element msg
 view config diag =
     let
         inp isEnabled rest =
-            column []
-                (row [ spacing (Styles.paddingScale 1), Elements.onEnter config.onSubmitToken ]
+            column [ spacing (Styles.paddingScale 2) ]
+                -- TODO: make scan possible
+                [ column [] [ Elements.p "Scan the QR code (not possible yet) or type the words shown below it" ]
+                , row [ spacing (Styles.paddingScale 1), Elements.onEnter config.onSubmitToken ]
                     [ Elements.inputText (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag))) { placeholder = "enter token", label = "" } diag.inputToken
-                    , Elements.primaryButton (boolToMaybe isEnabled config.onSubmitToken) "Pair"
+                    , if shouldShowPairButton diag.inputToken then
+                        Elements.primaryButton (boolToMaybe isEnabled config.onSubmitToken) "Pair"
+                      else
+                        empty
                     ]
-                    :: rest
-                )
+                , column [ width shrink, centerX, spacing (Styles.paddingScale 1) ]
+                    (rest ++ [ Elements.button (Just config.onGetTokenClicked) "Get a new code" ])
+                ]
     in
         -- TODO: Scan QR code, I could probably use https://github.com/felipenmoura/qr-code-scanner
-        column []
-            [ Elements.button (Just config.onGetTokenClicked) "Get code"
-            , case ( diag.token, diag.tokenSubmitStatus ) of
+        column [ height shrink, spacing (Styles.paddingScale 2) ]
+            [ case ( diag.token, diag.tokenSubmitStatus ) of
                 ( _, Submitted ) ->
                     inp True [ Elements.p "Wait for token.." ]
 
@@ -111,14 +121,17 @@ view config diag =
                             inp True [ Elements.p ("Something went wrong: " ++ toString e) ]
 
                 ( Success t, _ ) ->
-                    inp True
-                        [ column [] [ Elements.p "Scan the QR code or type the words shown below it" ]
-                        , column []
-                            [ QRCode.encode t
-                                |> Result.map (QRCode.toSvg >> html)
-                                |> Result.withDefault
-                                    (Elements.p "Error while encoding to QRCode.")
+                    let
+                        niceT =
+                            Helper.replaceString "-" " " t
+                    in
+                        inp True
+                            [ el [ centerX, width shrink ]
+                                (QRCode.encode niceT
+                                    |> Result.map (QRCode.toSvg >> html)
+                                    |> Result.withDefault
+                                        (Elements.p "Error while encoding to QRCode.")
+                                )
+                            , el [ centerX ] (Elements.text niceT)
                             ]
-                        , column [] [ Elements.text t ]
-                        ]
             ]

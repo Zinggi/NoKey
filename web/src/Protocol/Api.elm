@@ -642,7 +642,9 @@ pairWith myId time model =
                 (Http.jsonBody
                     (JE.object
                         [ ( "deviceId", JE.string myId )
-                        , ( "token", JE.string model.pairingDialogue.inputToken )
+
+                        -- Remove unnecessary whitespace from token and replace spaces with dashes
+                        , ( "token", JE.string (Helper.cleanString model.pairingDialogue.inputToken |> Helper.replaceString " " "-") )
                         ]
                     )
                 )

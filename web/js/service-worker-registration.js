@@ -18,7 +18,7 @@
 /* eslint-env browser */
 'use strict';
 
-module.exports = () => {
+module.exports = (onNewContentAvailable) => {
     if ('serviceWorker' in navigator) {
         // Delay registration until after the page has loaded, to ensure that our
         // precaching requests don't degrade the first visit experience.
@@ -39,12 +39,14 @@ module.exports = () => {
                         switch (installingWorker.state) {
                             case 'installed':
                                 if (navigator.serviceWorker.controller) {
-                                    // TODO: display update notification to user
                                     // At this point, the old content will have been purged and the fresh content will
                                     // have been added to the cache.
                                     // It's the perfect time to display a "New content is available; please refresh."
                                     // message in the page's interface.
                                     console.log('New or updated content is available.');
+                                    if (onNewContentAvailable) {
+                                        onNewContentAvailable();
+                                    }
                                 } else {
                                     // At this point, everything has been precached.
                                     // It's the perfect time to display a "Content is cached for offline use." message.

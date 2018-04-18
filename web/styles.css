@@ -1,4 +1,19 @@
 
+#newUpdate {
+    position: fixed;
+    z-index: 1000;
+    top: 0px;
+    background: rgb(25, 152, 194);
+    color: white;
+    width: calc(100% - 20px);
+    padding: 10px;
+}
+#newUpdateButton {
+    padding: 7px;
+    border-radius: 5px;
+    border: none;
+    background: #fff1de;
+}
 /*
  * Taken from animate.css
  */
