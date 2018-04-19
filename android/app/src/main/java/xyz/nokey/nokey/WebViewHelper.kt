@@ -1,7 +1,7 @@
 // Some code here was borrowed from:
 // https://github.com/xtools-at/Android-PWA-Wrapper
 
-package ch.ethz.nokey.nokey
+package xyz.nokey.nokey
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -19,10 +19,6 @@ import android.net.Uri
 import android.os.Handler
 import android.content.pm.ApplicationInfo
 import android.util.Log
-import android.net.http.SslError
-import android.webkit.SslErrorHandler
-
-
 
 
 class WebViewHelper(private val activity: MainActivity, private val uiManager: UIManager) {
@@ -142,14 +138,14 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
             }
 
             // TODO! comment out from release
-            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+/*            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
                 if (Build.FINGERPRINT.contains("generic")) {
                     // Ignore SSL certificate errors in emulator
                     handler.proceed()
                 } else {
                     super.onReceivedSslError(view, handler, error)
                 }
-            }
+            }*/
         }
 
         // Now we can call these functions from javascript
@@ -178,6 +174,7 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
     // handle load errors
     private fun handleLoadError(errorCode: Int) {
         if (errorCode != WebViewClient.ERROR_UNSUPPORTED_SCHEME) {
+            Log.e("sasas", "offline: $errorCode")
             uiManager.setOffline(true)
             // TODO?
         } else {
@@ -189,7 +186,7 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
     // handle external urls
     private fun handleUrlLoad(view: WebView, url: String): Boolean {
         // prevent loading content that isn't ours
-        if (!url.startsWith(activity.appUrl)) {
+        if (!url.startsWith(activity.appBaseUrl)) {
             // stop loading
             view.stopLoading()
 

@@ -2,5 +2,7 @@
   <h2>Welcome to NoKey!</h2>
   <p class="lead">
     <a href="<%= page_path(@conn, :webApp) %>">start the web app</a>
+    <a href="https://chrome.google.com/webstore/detail/nokey/jfgokfcaagmicdnbebhfccjkbjkdbnjc">Chrome extension</a> (unlisted)
+
   </p>
 </div>

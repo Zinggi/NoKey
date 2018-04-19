@@ -1,4 +1,4 @@
-package ch.ethz.nokey.nokey
+package xyz.nokey.nokey
 
 import org.junit.Test
 

@@ -25,6 +25,8 @@ https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
  * Increment version in `manifest.json`
  * `yarn build`
  * `web-ext build -s addon/`
+ * create archive of source code:
+    `cd ..`, `git archive master -o web_extension/web-ext-artifacts/nokey-<0.1.0>.source.zip`
 
 
 

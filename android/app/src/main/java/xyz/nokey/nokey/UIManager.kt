@@ -1,4 +1,4 @@
-package ch.ethz.nokey.nokey
+package xyz.nokey.nokey
 
 import android.os.Build
 import android.view.View

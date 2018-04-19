@@ -11,6 +11,7 @@
 .idea/dictionaries
 .idea/libraries
 .idea/caches
+.idea/assetWizardSettings.xml
 
 # Log Files
 *.log
