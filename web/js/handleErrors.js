@@ -56,7 +56,9 @@ const onError = (message, url, line, column, error) => {
     let txt = '';
     try {
         txt = stringifyOnce(
-            { message: message, url: url, line: line, column: column, error: error, log: log, errors: logE }
+            { message: message, url: url, line: line, column: column, error: error, log: log, errors: logE,
+              nav: window.navigator.userAgent, other: message.message
+            }
             , null, 2
         );
     } catch (error) {

@@ -1,20 +1,23 @@
 # The WebExtension for NoKey
 
-## Develop
-(optional) [web-ext](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Getting_started_with_web-ext):
-    dev server with independent browser: `web-ext run`
+## Setup
 
-## Debug
-
-* install dependencies:
+ * install dependencies:
     `yarn`
+
+ * install dependencies mentioned in '../web/README.md' using `elm-github-install`
+
+
+## Develop
 
 * watch files:
     `yarn watch`
-    `web-ext run -s addon/`
+    `web-ext run -s addon/` ([web-ext](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Getting_started_with_web-ext))
 
 * build files:
     `yarn build`
+
+https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
 
 
 ## create a package
@@ -23,7 +26,6 @@
  * `yarn build`
  * `web-ext build -s addon/`
 
-https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
 
 
 

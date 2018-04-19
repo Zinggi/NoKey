@@ -1,4 +1,4 @@
-# Web
+# NoKey Web
 
 This is the shared part of the password manager.
 This website can later be embedded in the browser extension, the android app, etc.
