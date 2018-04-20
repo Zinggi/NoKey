@@ -25,8 +25,20 @@ https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
  * Increment version in `manifest.json`
  * `yarn build`
  * `web-ext build -s addon/`
- * create archive of source code:
+
+## Publish
+### Firefox
+ * https://addons.mozilla.org/en-US/developers/
+ * `edit listing` -> `upload new version`
+ * download signed version
+ * (create archive of source code:)
     `cd ..`, `git archive master -o web_extension/web-ext-artifacts/nokey-<0.1.0>.source.zip`
+
+
+### Chrome
+ * https://chrome.google.com/webstore/developer/dashboard
+ * click edit and upload new .zip
+ * publish changes, takes ~60min until the store updates
 
 
 

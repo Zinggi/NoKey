@@ -3,7 +3,7 @@
 
   "name": "NoKey",
   "description": "A distributed password manager without a master passwords",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Florian Zinggeler",
 
   "applications": {
