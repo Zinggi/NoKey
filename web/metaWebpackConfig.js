@@ -3,6 +3,9 @@ const SWPrecacheWebpackPlugin = require('sw-precache-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = (config) => {
+    if (config.additionalCopy === undefined) {
+        config.additionalCopy = [];
+    }
     return (env, argv) => ({
         entry: path.resolve(config.basePath, 'index.js'),
         output: {
@@ -41,7 +44,7 @@ module.exports = (config) => {
             // stats: 'errors-only'
         },
         plugins: [
-            new CopyWebpackPlugin([{ from: path.resolve(config.basePath, 'staticFiles/') }], {}),
+            new CopyWebpackPlugin([{ from: path.resolve(config.basePath, 'staticFiles/') }].concat(config.additionalCopy), {}),
             new SWPrecacheWebpackPlugin({
                 cacheId: 'noKey',
                 dontCacheBustUrlsMatching: /\.\w{8}\./,

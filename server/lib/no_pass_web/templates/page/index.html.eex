@@ -1,8 +1,42 @@
-<div class="jumbotron">
+<div class="row">
   <h2>Welcome to NoKey!</h2>
   <p class="lead">
-    <a href="<%= page_path(@conn, :webApp) %>">start the web app</a>
-    <a href="https://chrome.google.com/webstore/detail/nokey/jfgokfcaagmicdnbebhfccjkbjkdbnjc">Chrome extension</a> (unlisted)
-
+    NoKey is a distributed password manager without a master password.
+    <i>TODO</i>
   </p>
+</div>
+<div class="row">
+  <h3>Try the alpha version</h3>
+  <p>
+    You can try out NoKey right now, but it's in an early alpha phase.
+    This means that there will be bugs and things that don't work, but you can still give it a try.
+  </p>
+  <p>
+    <b>Don't rely on NoKey just yet!</b> There will probably be backwards incompatible changes before a proper release,
+    which would mean that if you would already rely on it now, you would lose your passwords once it's out of alpha.
+  </p>
+  <div class="col-lg-4">
+    <h4>Web app</h4>
+    <p>
+      Try it right now in your browser: <a href="<%= page_path(@conn, :webApp) %>">Start the web app</a>
+    </p>
+  </div>
+  <div class="col-lg-4">
+    <h4>Android</h4>
+    <p>
+      Download the .apk here: <a href="/downloads/nokey-android-0.1.0.apk">Android</a>
+    </p>
+  </div>
+  <div class="col-lg-4">
+    <h4>Chrome Extension</h4>
+    <p>
+      Install from here: <a target="_blank" rel="noopener" href="https://chrome.google.com/webstore/detail/nokey/jfgokfcaagmicdnbebhfccjkbjkdbnjc">Chrome Extension</a>
+    </p>
+  </div>
+  <div class="col-lg-4">
+    <h4>Firefox Extension</h4>
+    <p>
+      Download it here: <a href="/downloads/nokey-firefox-0.1.0.xpi">Firefox Extension</a>
+    </p>
+  </div>
 </div>

@@ -1,7 +1,7 @@
 .gradle
 /build
 /local.properties
-
+/app/release/
 
 # IntelliJ
 *.iml

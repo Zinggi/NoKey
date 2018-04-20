@@ -8,9 +8,18 @@
     <meta name="author" content="">
 
     <title>NoKey</title>
+
+
+    <link rel="stylesheet" href="/lib/theme.min.css">
   </head>
 
   <body style="background: rgb(255,241,222);">
+    <div class="container">
+      <div class="masthead"><h3>NoKey</h3></div>
       <%= render @view_module, @view_template, assigns %>
+      <footer class="footer">
+        <p>TODO: github link</p>
+      </footer>
+    </div>
   </body>
 </html>
