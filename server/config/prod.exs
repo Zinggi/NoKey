@@ -15,7 +15,7 @@ use Mix.Config
 # which you typically run after static files are built.
 config :no_pass, NoPassWeb.Endpoint,
   load_from_system_env: true,
-  url: [host: "virt35.ethz.ch", port: {:system, "PORT"}],
+  url: [host: "nokey.xyz", port: {:system, "PORT"}],
   cache_static_manifest: "priv/static/cache_manifest.json",
   server: true,
   # Is this ok? We probably would be better off with a list of allowed origins
@@ -27,9 +27,9 @@ config :no_pass, NoPassWeb.Endpoint,
   force_ssl: [hsts: true],
   http: [port: 80],
   https: [:inet6, port: 443,
-    keyfile: "/etc/letsencrypt/live/virt35.ethz.ch/privkey.pem",
-    certfile: "/etc/letsencrypt/live/virt35.ethz.ch/cert.pem",
-    cacertfile: "/etc/letsencrypt/live/virt35.ethz.ch/chain.pem"
+    keyfile: "/etc/letsencrypt/live/nokey.xyz/privkey.pem",
+    certfile: "/etc/letsencrypt/live/nokey.xyz/cert.pem",
+    cacertfile: "/etc/letsencrypt/live/nokey.xyz/chain.pem"
   ]
 
 
