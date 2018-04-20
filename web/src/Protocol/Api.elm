@@ -81,7 +81,7 @@ endPointUrl pre path =
     -- "10.2.54.70"
     -- "floyogaarch.fritz.box"
     -- Server
-    "virt35.ethz.ch"
+    "nokey.xyz"
         -- |> (\ip -> pre ++ ip ++ ":4000" ++ path)
         |> (\ip -> pre ++ ip ++ path)
 

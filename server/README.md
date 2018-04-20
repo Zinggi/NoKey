@@ -9,6 +9,13 @@ To start dev server:
 
 Now visit [`localhost:4000`](http://localhost:4000) from your browser.
 
+
+## Let's encrypt guide
+
+  * mostly follow this: https://medium.com/@a4word/phoenix-app-secured-with-let-s-encrypt-469ac0995775
+  * `vim /etc/letsencrypt/letsencrypt.ini`
+  * make sure webroot is correct
+
 ## Deploy
 
   * Only get prod dependencies `mix deps.get --only prod`
