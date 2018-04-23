@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="">
-    <meta name="author" content="">
+    <meta name="description" content="distributed password manager without a master password">
+    <meta name="author" content="Florian Zinggeler">
 
     <title>NoKey</title>
 
@@ -15,10 +15,10 @@
 
   <body style="background: rgb(255,241,222);">
     <div class="container">
-      <div class="masthead"><h3>NoKey</h3></div>
+      <div class="page-header"><h1>NoKey</h1></div>
       <%= render @view_module, @view_template, assigns %>
       <footer class="footer">
-        <p>TODO: github link</p>
+        <a href="https://github.com/Zinggi/NoKey">Github</a>
       </footer>
     </div>
   </body>

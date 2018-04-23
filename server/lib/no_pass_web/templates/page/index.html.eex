@@ -1,20 +1,21 @@
+<h2>Welcome to NoKey!</h2>
+<p class="lead">
+  NoKey is a distributed password manager without a master password.
+  <i>TODO</i>
+</p>
+<h3>Try the alpha version</h3>
+<p>
+  You can try out NoKey right now, but it's in an early alpha phase.
+  This means that there will be bugs and things that don't work, but you can still give it a try.
+</p>
+<p>
+  <b>Don't rely on NoKey just yet!</b> There will probably be backwards incompatible changes before a proper release,
+  which would mean that if you would already rely on it now, you would lose your passwords once it's out of alpha.
+</p>
+<p>
+  You can report issues <a href="https://github.com/Zinggi/NoKey/issues">here</a>.
+</p>
 <div class="row">
-  <h2>Welcome to NoKey!</h2>
-  <p class="lead">
-    NoKey is a distributed password manager without a master password.
-    <i>TODO</i>
-  </p>
-</div>
-<div class="row">
-  <h3>Try the alpha version</h3>
-  <p>
-    You can try out NoKey right now, but it's in an early alpha phase.
-    This means that there will be bugs and things that don't work, but you can still give it a try.
-  </p>
-  <p>
-    <b>Don't rely on NoKey just yet!</b> There will probably be backwards incompatible changes before a proper release,
-    which would mean that if you would already rely on it now, you would lose your passwords once it's out of alpha.
-  </p>
   <div class="col-lg-4">
     <h4>Web app</h4>
     <p>

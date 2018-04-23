@@ -83,7 +83,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
                 width: 600,
                 height: 300,
                 type: 'popup', // TODO: test difference between:"normal" "popup" ("panel": deprecated on chrome) ("detached_panel" doesn't exist on chrome)
-                allowScriptsToClose: true // TODO: make window close on esc and save and forget button: window.close
+                allowScriptsToClose: true
             }).then((win) => {
                 win.document.body.style = "width: 600; height: 300;";
                 win.document.documentElement.style = "width: 600; height: 300;";
