@@ -6,10 +6,10 @@ TODO: explain what this is
 
 This package is organized in these folders:
 
-    * `web/`: Contains the shared elm code + the web app
-    * `web_extension/`: Contains the extension code
-    * `android/`: Contains the android version
-    * `server/`: Contains the elixir code for the server
+  * `web/`: Contains the shared elm code + the web app
+  * `web_extension/`: Contains the extension code
+  * `android/`: Contains the android version
+  * `server/`: Contains the elixir code for the server
 
 The server and webextension both require the `web/` folder to be present, as they make use of the common code there.
 
