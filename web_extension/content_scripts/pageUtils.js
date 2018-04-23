@@ -69,6 +69,9 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
                 // console.log("on icon click", event);
                 openPopup(event.target, isPw, isSignUp);
             });
+            input.addEventListener("focus", (event) => {
+                openPopup(event.target, isPw, isSignUp);
+            });
         }
     };
 };
@@ -86,7 +89,7 @@ const onNodeAdded = (accounts) => () => {
     // console.log("onNodeAdded");
 
     groups = pwLib.classifyForms();
-    console.log("groups:", groups); // TODO: comment out
+    // console.log("groups:", groups); // TODO: comment out
 
     const hijackedOnSubmit = (group) => (event) => {
         const entry = getFormData(group);
@@ -126,7 +129,25 @@ let currentGroup = null;
 const fillCurrentInput = (content) => {
     if (!currentInput) return;
 
-    currentInput.value = content;
+    fillInput(content, currentInput);
+};
+
+const fillInput = (txt, elem) => {
+    // console.log("XXXX");
+    // fill
+    elem.value = txt;
+    // simulate click
+    let mEvt = document.createEvent("MouseEvents");
+    mEvt.initMouseEvent("click", true, true, window,
+        0, 0, 0, 0, 0, false, false, false, false, 0, null);
+    elem.dispatchEvent(mEvt);
+    // try another way:
+    elem.click();
+    // TODO: we might need to simulate button presses
+    pwLib.simulateEvent('click', elem);
+    pwLib.simulateEvent('change', elem);
+    pwLib.simulateEvent('mousedown', elem);
+    pwLib.simulateKeydown('a');
 };
 
 const fillCurrentForm = (msg) => {
@@ -134,8 +155,8 @@ const fillCurrentForm = (msg) => {
 
     closePopup();
     const group = groups[currentGroup];
-    group.pws.forEach((elem) => elem.value = msg.password);
-    group.logins.forEach((elem) => elem.value = msg.login);
+    group.pws.forEach((elem) => { fillInput(msg.password, elem); });
+    group.logins.forEach((elem) => { fillInput(msg.login, elem); });
 };
 
 const closePopup = () => {
@@ -147,7 +168,8 @@ const closePopup = () => {
 const openPopup = (elem, isPw, isSignUp) => {
     if (!popupLoaded) return;
 
-    actionOutsidePopup.listen(true);
+    // Don't allow to immediately close again:
+    setTimeout(() => { actionOutsidePopup.listen(true); }, 1000);
     showContainer(elem, popupContainer, isPw, isSignUp);
 
     const rect = elem.getBoundingClientRect();

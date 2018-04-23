@@ -65,19 +65,22 @@ init =
 
 newSiteEntry : SiteEntry -> Bool -> Notifications -> Notifications
 newSiteEntry entry isNew ns =
-    -- Only keep the most recent entry for a specific site.
-    replaceIfElseInsert
-        (\n ->
-            case n of
-                ExternalSiteEntry ent isN ->
-                    ent.site == entry.site
-
-                _ ->
-                    False
-        )
-        (ExternalSiteEntry entry isNew)
+    if List.any ((==) "") [ entry.password, entry.login, entry.site ] then
         ns
-        |> Tuple.second
+    else
+        -- Only keep the most recent entry for a specific site.
+        replaceIfElseInsert
+            (\n ->
+                case n of
+                    ExternalSiteEntry ent isN ->
+                        ent.site == entry.site
+
+                    _ ->
+                        False
+            )
+            (ExternalSiteEntry entry isNew)
+            ns
+            |> Tuple.second
 
 
 insert : NotificationT -> Notifications -> Notifications

@@ -275,7 +275,7 @@ update msg model =
 
         AddSiteEntry { isSignUp, entry } ->
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials
-            -- LogIn can be ignored if we have already an entry for it
+            -- LogIn can be ignored if we already have an entry for it
             if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
             else

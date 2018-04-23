@@ -23,6 +23,7 @@ https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
 ## create a package
 
  * Increment version in `manifest.json`
+ * Remove 'unsafe-eval' from manifest. It's only needed because of how webpack works in dev mode
  * `yarn build`
  * `web-ext build -s addon/`
 

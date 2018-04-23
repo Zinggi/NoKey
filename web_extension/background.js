@@ -3,7 +3,7 @@ import Elm from "./elm/elm.js";
 // console.log("(background) start background.js");
 
 const sendMsgToAll = (msg, ports) => {
-    console.log("send msg:", msg, "to:", ports);
+    // console.log("send msg:", msg, "to:", ports);
     for (let key in ports) {
         if (ports[key]) {
             ports[key].postMessage(msg);
@@ -12,7 +12,7 @@ const sendMsgToAll = (msg, ports) => {
 };
 
 
-console.log(Elm.MainBackground);
+// console.log(Elm.MainBackground);
 setup(Elm.MainBackground.fullscreen, (app) => {
     // console.log("(background) started", app);
 
@@ -85,6 +85,8 @@ setup(Elm.MainBackground.fullscreen, (app) => {
                 type: 'popup', // TODO: test difference between:"normal" "popup" ("panel": deprecated on chrome) ("detached_panel" doesn't exist on chrome)
                 allowScriptsToClose: true // TODO: make window close on esc and save and forget button: window.close
             }).then((win) => {
+                win.document.body.style = "width: 600; height: 300;";
+                win.document.documentElement.style = "width: 600; height: 300;";
                 chrome.windows.onRemoved.addListener((id) => {
                     console.log("on remove window");
                     if (id == win.id) {
