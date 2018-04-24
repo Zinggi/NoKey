@@ -2,6 +2,7 @@ module Views.Pairing exposing (State, Config, view, receivedToken, init, tokenSu
 
 import Regex
 import Element exposing (..)
+import Html.Attributes as Attr
 import RemoteData exposing (WebData, RemoteData(..))
 import Http exposing (Error(..))
 import QRCode
@@ -79,7 +80,15 @@ view config diag =
                 -- TODO: make scan possible
                 [ column [] [ Elements.p "Scan the QR code (not possible yet) or type the words shown below it" ]
                 , row [ spacing (Styles.paddingScale 1), Elements.onEnter config.onSubmitToken ]
-                    [ Elements.inputText (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag))) { placeholder = "enter token", label = "" } diag.inputToken
+                    [ Elements.inputText
+                        [ htmlAttribute (Attr.autocomplete False)
+                        , htmlAttribute (Attr.attribute "autocorrect" "off")
+                        , htmlAttribute (Attr.attribute "autocapitalize" "off")
+                        , htmlAttribute (Attr.spellcheck False)
+                        ]
+                        (boolToMaybe isEnabled (\s -> config.toMsg (update (SetInput s) diag)))
+                        { placeholder = "enter token", label = "" }
+                        diag.inputToken
                     , if shouldShowPairButton diag.inputToken then
                         Elements.primaryButton (boolToMaybe isEnabled config.onSubmitToken) "Pair"
                       else

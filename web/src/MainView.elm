@@ -93,7 +93,7 @@ viewModel model =
                         [ viewTitle model.currentPage model.toasties
                         , cont
                             [ viewPage model.currentPage model ]
-                        , bottomNavigation model.currentPage
+                        , bottomNavigation model.currentPage model
                         ]
                     )
                 ]
@@ -145,7 +145,7 @@ viewTitle page toasties =
          else
             el attr title
         )
-            |> (\c -> row (width fill :: Styles.cardShadow 2) [ column [ width fill ] [ c ] ])
+            |> (\c -> row (width fill :: Styles.cardShadow 2 ++ Styles.titleHighlight) [ column [ width fill ] [ c ] ])
 
 
 toastyConfig : Toasty.Config msg
@@ -199,14 +199,14 @@ transitionOutAttrs =
     ]
 
 
-bottomNavigation : Page -> Element Msg
-bottomNavigation page =
+bottomNavigation : Page -> Model -> Element Msg
+bottomNavigation page model =
     [ Home, Devices, Passwords, Options ]
         |> List.map (\p -> Elements.pageButton (NavigateTo p) (page == p) p)
         |> row
             ([ padding (Styles.paddingScale 1)
              , alignBottom
-             , above (el [ alignRight, padding (Styles.paddingScale 3) ] (viewActionButton page))
+             , above (el [ alignRight, paddingXY (Styles.paddingScale 3) (Styles.paddingScale 5) ] (viewActionButton page model))
              ]
             )
         |> (\c ->
@@ -222,11 +222,11 @@ bottomNavigation page =
            )
 
 
-viewActionButton : Page -> Element Msg
-viewActionButton page =
+viewActionButton : Page -> Model -> Element Msg
+viewActionButton page model =
     case page of
         Passwords ->
-            Views.Passwords.actionButton passwordsConfig
+            Views.Passwords.actionButton passwordsConfig model
 
         Devices ->
             Views.Devices.actionButton

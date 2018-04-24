@@ -85,6 +85,10 @@ borderStyle =
     ]
 
 
+titleHighlight =
+    [ Background.color accentColor, Font.color white ]
+
+
 
 -- cardShadow =
 --     Border.shadow { offset = ( 1, 1 ), blur = 3, size = 0, color = shadowColor }

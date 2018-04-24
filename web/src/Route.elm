@@ -67,7 +67,7 @@ pageToTitle : Page -> String
 pageToTitle page =
     case page of
         Home ->
-            "Dashboard"
+            "Home"
 
         NewPassword ->
             "New Password"

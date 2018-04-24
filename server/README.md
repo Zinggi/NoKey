@@ -35,6 +35,7 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
         + `MIX_ENV=prod mix release --env=prod`
         + (optional) test it: `REPLACE_OS_VARS=true PORT=4001 SECRET_KEY_BASE="<SECRET>" ERLANG_COOKIE="<SECRET>" _build/prod/rel/no_pass/bin/no_pass console`
         + Copy release: `cp _build/prod/rel/no_pass/releases/0.0.1/no_pass.tar.gz ~/nokey/builds/`
+        + `cd ~/nokey/builds/`
         + unzip `tar xvf no_pass.tar.gz`
         + start `sudo REPLACE_OS_VARS=true PORT=80 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' ./bin/no_pass start`
     

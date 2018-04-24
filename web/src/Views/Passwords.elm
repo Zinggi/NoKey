@@ -77,9 +77,12 @@ view config ({ syncData, passwordsView } as model) =
             ]
 
 
-actionButton : Config msg -> Element msg
-actionButton config =
-    Elements.floatingButton config.onAddNewPassword "Add new"
+actionButton : Config msg -> { m | syncData : SyncData } -> Element msg
+actionButton config model =
+    if (Data.Sync.knownIds model.syncData |> Dict.size) > 1 then
+        Elements.floatingButton config.onAddNewPassword "Add new"
+    else
+        empty
 
 
 search : Config msg -> Bool -> String -> Element msg
@@ -227,7 +230,7 @@ viewSiteData config sync siteName userNames groupId disabled groupStatus =
                 (\( login, status ) ->
                     column [ spacing (Styles.paddingScale 1) ]
                         [ column [ spacing (Styles.paddingScale 1) ]
-                            [ Elements.b login
+                            [ Elements.inputText [] Nothing { label = "Login", placeholder = "" } login
                             , viewStatus config sync ( siteName, login ) status
                             ]
                         , if RequestPassword.isUnlocked status then

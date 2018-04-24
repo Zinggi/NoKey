@@ -5,10 +5,14 @@ const app = Elm.Popup.fullscreen();
 const port = browser.runtime.connect({name: "popup" + Math.random() });
 port.onMessage.addListener((msg) => {
     // console.log("(popup) got new state", state);
-    if (msg.type == "onNewState") {
+    if (msg.type === "onNewState") {
         // console.log("(content) got new state", state);
         app.ports.onNewState.send(msg.data);
-    } else if (msg.type == "closePopup") {
+    } else if (msg.type === "setSize") {
+        window.document.documentElement.setAttribute("style", "");
+        window.document.body.setAttribute("style", "");
+    } else if (msg.type === "closePopup") {
+        window.document.body.setAttribute("style", "width: 780px; height: 580px;");
         window.close();
     }
 });

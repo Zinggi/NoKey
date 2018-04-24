@@ -6,9 +6,9 @@ import FeatherIcons
 import Loader
 
 
-dashBoard =
-    -- TODO: maybe .home is better
-    FeatherIcons.grid
+home =
+    -- .home, .grid
+    FeatherIcons.home
 
 
 passwords =

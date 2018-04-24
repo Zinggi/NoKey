@@ -370,7 +370,7 @@ pageToIcon : Page -> Element msg
 pageToIcon page =
     case page of
         Home ->
-            Icons.normal Icons.dashBoard
+            Icons.normal Icons.home
 
         Passwords ->
             Icons.normal Icons.passwords
@@ -523,7 +523,7 @@ myAvatar onSetDeviceName id ( name, idPart ) attrs =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
         , row []
-            [ inputText (Just onSetDeviceName) { placeholder = "Name your device..", label = "" } name
+            [ inputText [] (Just onSetDeviceName) { placeholder = "Name your device..", label = "" } name
             , helperMayIdPart idPart
             ]
         ]
@@ -603,12 +603,13 @@ search onChange value =
     inputHelper Input.search [] (Just onChange) "search" value
 
 
-passwordEntry : Maybe (String -> msg) -> String -> Bool -> String -> Element msg
-passwordEntry onChange label shouldShow value =
-    row []
-        [ el [ width (fillPortion 1), htmlAttribute (Attr.type_ "password"), htmlAttribute (Attr.name "password") ] (text label)
-        , password [ width (fillPortion 3) ] onChange shouldShow value
-        ]
+
+-- passwordEntry : Maybe (String -> msg) -> String -> Bool -> String -> Element msg
+-- passwordEntry onChange label shouldShow value =
+--     row []
+--         [ el [ width (fillPortion 1), htmlAttribute (Attr.type_ "password"), htmlAttribute (Attr.name "password") ] (text label)
+--         , password [ width (fillPortion 3) ] onChange shouldShow value
+--         ]
 
 
 table : List ( String, a -> Element msg ) -> List a -> Element msg
@@ -627,23 +628,23 @@ table headers data =
 
 
 password attr onChange shouldShow value =
-    Input.currentPassword
-        (attr
-            ++ [ padding 0
-               , width shrink
-               , htmlAttribute
-                    (Attr.size
-                        (if shouldShow then
-                            String.length value
-                         else
-                            5
-                        )
-                    )
-               ]
-        )
+    Input.currentPassword (attr ++ textInputAttrs)
+        -- (attr
+        --     ++ [ padding 0
+        --        , width shrink
+        --        , htmlAttribute
+        --             (Attr.size
+        --                 (if shouldShow then
+        --                     String.length value
+        --                  else
+        --                     5
+        --                 )
+        --             )
+        --        ]
+        -- )
         { onChange = onChange
         , text = value
-        , label = Input.labelLeft [ padding 0 ] empty
+        , label = textLabel "Password"
         , placeholder =
             Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text "********")
         , show = shouldShow
@@ -669,29 +670,35 @@ inputHelper fn attr onChange placeholder value =
         }
 
 
-inputText : Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
-inputText onMsg { placeholder, label } txt =
-    Input.text
-        [ Background.color Styles.transparent
-        , Border.widthEach { bottom = 2, left = 0, right = 0, top = 0 }
-        , Border.rounded 0
-        , padding 0
-        , width fill
-
-        -- , hackInLineStyle "max-width" "500px"
-        , hackInLineStyle "min-width" "0px"
-        ]
-        { label =
-            Input.labelAbove
-                [ Font.size (Styles.scaled 1)
-                , Font.bold
-                ]
-                (if String.isEmpty label then
-                    empty
-                 else
-                    text label
-                )
+inputText : List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
+inputText attrs onMsg { placeholder, label } txt =
+    Input.text (textInputAttrs ++ attrs)
+        { label = textLabel label
         , onChange = onMsg
         , placeholder = Just (Input.placeholder [] (text placeholder))
         , text = txt
         }
+
+
+textInputAttrs =
+    [ Background.color Styles.transparent
+    , Border.widthEach { bottom = 2, left = 0, right = 0, top = 0 }
+    , Border.rounded 0
+    , padding 0
+    , width fill
+
+    -- , hackInLineStyle "max-width" "500px"
+    , hackInLineStyle "min-width" "0px"
+    ]
+
+
+textLabel label =
+    Input.labelAbove
+        [ Font.size (Styles.scaled 1)
+        , Font.bold
+        ]
+        (if String.isEmpty label then
+            empty
+         else
+            text label
+        )

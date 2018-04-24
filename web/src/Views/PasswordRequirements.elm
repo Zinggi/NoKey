@@ -122,8 +122,8 @@ view toMsg state =
 allowedChars state =
     Elements.inputGroup "Allowed Characters"
         [ toggleSets SetAllowed [] state.allowedSets
-        , Elements.inputText (Just SetIncludeCustom) { label = "Include custom", placeholder = "" } state.includeCustom
-        , Elements.inputText (Just SetExcludeCustom) { label = "Exclude custom", placeholder = "" } state.excludeCustom
+        , Elements.inputText [] (Just SetIncludeCustom) { label = "Include custom", placeholder = "" } state.includeCustom
+        , Elements.inputText [] (Just SetExcludeCustom) { label = "Exclude custom", placeholder = "" } state.excludeCustom
         ]
 
 
@@ -141,7 +141,7 @@ atLeastOneOf state =
                 state.allowedSets
             )
             state.atLeastOneOf
-        , Elements.inputText (Just SetCustom) { label = "Custom", placeholder = "" } state.custom
+        , Elements.inputText [] (Just SetCustom) { label = "Custom", placeholder = "" } state.custom
         ]
 
 

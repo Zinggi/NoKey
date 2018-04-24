@@ -136,15 +136,8 @@ const fillInput = (txt, elem) => {
     // console.log("XXXX");
     // fill
     elem.value = txt;
-    // simulate click
-    let mEvt = document.createEvent("MouseEvents");
-    mEvt.initMouseEvent("click", true, true, window,
-        0, 0, 0, 0, 0, false, false, false, false, 0, null);
-    elem.dispatchEvent(mEvt);
-    // try another way:
-    elem.click();
     // TODO: we might need to simulate button presses
-    pwLib.simulateEvent('click', elem);
+    // pwLib.simulateEvent('click', elem);
     pwLib.simulateEvent('change', elem);
     pwLib.simulateEvent('mousedown', elem);
     pwLib.simulateKeydown('a');

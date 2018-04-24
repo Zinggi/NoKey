@@ -20,10 +20,10 @@ view model =
 newSiteForm : Views.PasswordGenerator.State -> PasswordMetaData -> String -> Int -> Element Msg
 newSiteForm requirementsState entry currentGroupId maxSecurityLevel =
     column [ spacing (Styles.paddingScale 3) ]
-        [ Elements.inputText (Just SiteNameChanged) { placeholder = "example.com", label = "Site" } entry.siteName
-        , Elements.inputText (Just UserNameChanged) { placeholder = "", label = "Login" } entry.userName
+        [ Elements.inputText [] (Just SiteNameChanged) { placeholder = "example.com", label = "Site" } entry.siteName
+        , Elements.inputText [] (Just UserNameChanged) { placeholder = "", label = "Login" } entry.userName
 
-        -- TODO: replace with a 'radio button', showing existing groups and offer to create a new group
+        -- TODO: offer to create a named group
         , Elements.clampedNumberInput SecurityLevelChanged "Security Level" ( 2, 2, maxSecurityLevel ) entry.securityLevel
         , el [ height shrink, width fill ] (Views.PasswordGenerator.view (AddPassword currentGroupId) NewPasswordRequirements requirementsState)
         ]

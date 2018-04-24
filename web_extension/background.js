@@ -21,6 +21,11 @@ setup(Elm.MainBackground.fullscreen, (app) => {
     let lastPort = null;
     let hasPopupOpen = false;
 
+    // TODO: this is a very primitive way to check if we are running on firefox.
+    // It stops working as soon as chrome adds this api too
+    const isFirefox = (browser.contentScripts && browser.contentScripts.register) ? true : false;
+    console.log("Is Firefox:", isFirefox);
+
     chrome.runtime.onConnect.addListener(function(port) {
         // console.log("(background) port connected", port.name);
         ports[port.name] = port;
@@ -78,16 +83,19 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             }
             hasPopupOpen = true;
             const popupUrl = browser.extension.getURL("popup/main.html");
-            browser.windows.create({
+            browser.windows.create(Object.assign({
                 url: popupUrl,
                 width: 600,
-                height: 300,
-                type: 'popup', // TODO: test difference between:"normal" "popup" ("panel": deprecated on chrome) ("detached_panel" doesn't exist on chrome)
-                allowScriptsToClose: true
-            }).then((win) => {
-                win.document.body.style = "width: 600; height: 300;";
-                win.document.documentElement.style = "width: 600; height: 300;";
-                chrome.windows.onRemoved.addListener((id) => {
+                height: 400,
+                type: 'popup'
+            }, isFirefox && { allowScriptsToClose: true })).then((win) => {
+                // This hack tries to resize the popup to the correct size.
+                // This is crazy, but everything else I tried failed..
+                [100, 500, 1000, 2000, 5000, 10000].map((t) => {
+                    setTimeout(() => { sendMsgToAll({ type: "setSize" }, ports); }, t);
+                });
+
+                browser.windows.onRemoved.addListener((id) => {
                     console.log("on remove window");
                     if (id == win.id) {
                         hasPopupOpen = false;

@@ -52,24 +52,25 @@ viewEntry config sync maxSecurityLevel n state =
             ]
 
         ExternalSiteEntry entry isNew ->
-            [ Elements.inputGroup
-                (if isNew then
+            [ Elements.h3 <|
+                if isNew then
                     "Save this site?"
-                 else
+                else
                     "Save updated password?"
-                )
-                [ Elements.inputText Nothing { label = "Site", placeholder = "" } entry.site
-                , Elements.inputText Nothing { label = "Login", placeholder = "" } entry.login
-                , Elements.passwordEntry Nothing "Password" False entry.password
-                , Elements.clampedNumberInput config.toMsg "Security Level" ( 2, 2, maxSecurityLevel ) state
-                ]
+            , Elements.inputText [] Nothing { label = "Site", placeholder = "" } entry.site
+            , Elements.inputText [] Nothing { label = "Login", placeholder = "" } entry.login
+            , Elements.password [] Nothing False entry.password
+            , Elements.clampedNumberInput config.toMsg "Security Level" ( 2, 2, maxSecurityLevel ) state
             , Elements.buttonRow []
-                [ Elements.button
-                    (Just
-                        (config.onSaveEntry n.id
-                            (Data.Sync.currentGroupId state sync)
-                            { entry | securityLevel = min maxSecurityLevel state }
-                        )
+                [ Elements.primaryButton
+                    (if maxSecurityLevel == 1 then
+                        Nothing
+                     else
+                        Just
+                            (config.onSaveEntry n.id
+                                (Data.Sync.currentGroupId state sync)
+                                { entry | securityLevel = min maxSecurityLevel state }
+                            )
                     )
                     "Save"
                 , Elements.button (Just (config.onDismiss n.id)) "Forget"
