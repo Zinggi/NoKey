@@ -15,7 +15,9 @@
 
   <body style="background: rgb(255,241,222);">
     <div class="container">
-      <div class="page-header"><h1>NoKey</h1></div>
+      <div class="page-header">
+        <img src="/imgs/logo.svg" style="width: 100%;max-width: 500px;" alt="NoKey logo" />
+      </div>
       <%= render @view_module, @view_template, assigns %>
       <footer class="footer">
         <a href="https://github.com/Zinggi/NoKey">Github</a>
