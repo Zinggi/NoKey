@@ -10,5 +10,5 @@ You'll need [Android Studio](https://developer.android.com/studio/index.html).
   * generate signed apk
   * upload apk to play console: https://play.google.com/apps/publish
   * download derived apk
-  * test on local device: `adb install -r nokey-android-<0.2.0>.apk`
+  * test on local device: `adb install -r 3-1.apk`
   * upload to github releases

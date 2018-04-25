@@ -3,7 +3,7 @@
 
   "name": "NoKey",
   "description": "A distributed password manager without a master passwords",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Florian Zinggeler",
 
   "applications": {
@@ -53,5 +53,5 @@
     }
   ],
 
-  "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self';"
+  "content_security_policy": "script-src 'self'; object-src 'self';"
 }

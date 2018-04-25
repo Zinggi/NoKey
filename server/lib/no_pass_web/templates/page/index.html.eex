@@ -13,7 +13,7 @@
   which would mean that if you would already rely on it now, you would lose your passwords once it's out of alpha.
 </p>
 <p>
-  You can report issues <a href="https://github.com/Zinggi/NoKey/issues">here</a>.
+  You can report issues <a href="https://github.com/Zinggi/NoKey/issues">here on GitHub</a>.
 </p>
 <div class="row">
   <div class="col-lg-4">
@@ -25,7 +25,7 @@
   <div class="col-lg-4">
     <h4>Android</h4>
     <p>
-      Download the .apk here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.1.1/Android_0.1.1.apk">Android</a>
+      Download the .apk here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.1.2/Android-0.1.2.apk">Android</a>
     </p>
   </div>
   <div class="col-lg-4">
@@ -37,7 +37,7 @@
   <div class="col-lg-4">
     <h4>Firefox Extension</h4>
     <p>
-      Download it here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.1.1/firefox_0.1.1.xpi">Firefox Extension</a>
+      Download it here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.1.2/Firefox-0.1.2.xpi">Firefox Extension</a>
     </p>
   </div>
 </div>
