@@ -25,8 +25,8 @@ config :no_pass, NoPassWeb.Endpoint,
   # get this from env
   secret_key_base: "${SECRET_KEY_BASE}",
   force_ssl: [hsts: true],
-  http: [port: 80],
-  https: [:inet6, port: 443,
+  http: [port: {:system, "PORT"}],
+  https: [:inet6, port: {:system, "SSL_PORT"},
     keyfile: "/etc/letsencrypt/live/nokey.xyz/privkey.pem",
     certfile: "/etc/letsencrypt/live/nokey.xyz/cert.pem",
     cacertfile: "/etc/letsencrypt/live/nokey.xyz/chain.pem"
