@@ -117,6 +117,11 @@ type DeviceType
     | WebExtension
 
 
+isAndroid : SyncData -> Bool
+isAndroid sync =
+    sync.deviceType == Android
+
+
 sharesToDistribute : SyncData -> Dict GroupId (Dict DeviceId Value)
 sharesToDistribute sync =
     ORDict.getWith TimestampedVersionRegister.get sync.shared.sharesToDistribute

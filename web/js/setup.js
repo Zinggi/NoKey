@@ -261,6 +261,20 @@ const getRandomInts = (n) => {
 };
 
 
+const setupAndroid = (app) => {
+    app.ports.scanQR.subscribe(() => {
+        // console.log("scan QR called!!!");
+        window.Android.scanQR();
+    });
+
+    window.Android.fromAndroid = (msg) => {
+        if (msg.type == 'QrResult') {
+            // console.log("Got QR: ", msg.data);
+            app.ports.onGotQR.send(msg.data);
+        }
+    };
+};
+
 const setup = (startFn, onStart, onError) => {
     if (crypto === undefined) {
         throw Error("window.crypto not available");
@@ -272,7 +286,6 @@ const setup = (startFn, onStart, onError) => {
         // e.g. more than enough for 32 character passwords.
         const rands = getRandomInts(9);
 
-        // TODO: add android
         let deviceType = "Browser";
         if (typeof window.Android !== 'undefined') {
             deviceType = "Android";
@@ -289,14 +302,14 @@ const setup = (startFn, onStart, onError) => {
             deviceType: deviceType
         };
 
-        // TODO: remove! This is only for testing
-        window.testCrypto = {
+        // This was only for testing
+        /*window.testCrypto = {
             sign: (data) => sign(keys.signingKey.private, data),
             verify: (signature, data) => verify(keys.signingKey.exportedPublic, signature, data),
             encrypt: (data) => encrypt(keys.encryptionKey.exportedPublic, data),
             decrypt: (data) => decrypt(keys.encryptionKey.private, data),
             keys: keys
-        };
+        };*/
 
         // console.log(flags);
         const app = startFn(flags);
@@ -377,7 +390,7 @@ const setup = (startFn, onStart, onError) => {
         // port encryptShares : { shares : List (GroupId, Value), publicKey : Value, deviceId : DeviceId, reqIds : Value } -> Cmd msg
         // port onDidEncryptShares : ({ deviceId : DeviceId, encryptedShares : Value, reqIds : Value } -> msg) -> Sub msg
         app.ports.encryptShares.subscribe((msg) => {
-            console.log("should encrypt shares:", msg);
+            // console.log("should encrypt shares:", msg);
 
             const cmds = msg.shares.map((idShare) => {
                 let share = idShare[1];
@@ -387,7 +400,7 @@ const setup = (startFn, onStart, onError) => {
                 });
             });
             Promise.all(cmds).then((shares) => {
-                console.log("new shares encrypted:", shares);
+                // console.log("new shares encrypted:", shares);
                 app.ports.onDidEncryptShares.send({ encryptedShares: shares, deviceId: msg.deviceId, reqIds: msg.reqIds });
             });
         });
@@ -395,7 +408,7 @@ const setup = (startFn, onStart, onError) => {
         // port decryptRequestedShares : { ids : List String, shares : Value, time : Time, otherId : DeviceId } -> Cmd msg
         // port onDidDecryptRequestedShares : ({ shares : Value, time : Time, otherId : DeviceId, ids : List String } -> msg) -> Sub msg
         app.ports.decryptRequestedShares.subscribe((msg) => {
-            console.log("should decrypt requested shares", msg);
+            // console.log("should decrypt requested shares", msg);
 
             const cmds = msg.shares.map((idShare) => {
                 let share = idShare[1];
@@ -405,10 +418,14 @@ const setup = (startFn, onStart, onError) => {
                 });
             });
             Promise.all(cmds).then((decShares) => {
-                console.log("requested shares decrypted", decShares);
+                // console.log("requested shares decrypted", decShares);
                 app.ports.onDidDecryptRequestedShares.send({ shares: decShares, time: msg.time, otherId: msg.otherId, ids: msg.ids });
             });
         });
+
+        if (deviceType === "Android") {
+            setupAndroid(app);
+        }
 
         if (onStart) {
             onStart(app);

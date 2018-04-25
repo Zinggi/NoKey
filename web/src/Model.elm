@@ -72,6 +72,8 @@ type Msg
     | DoneWithTutorial
     | NavigateBack
     | ToastyMsg (Toasty.Msg String)
+    | ScanQR
+    | OnGotQR String
     | ShowToast String
 
 

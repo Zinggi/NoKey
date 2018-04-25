@@ -1,4 +1,15 @@
-module Views.Pairing exposing (State, Config, view, receivedToken, init, tokenSubmitted, pairingCompleted, getTockenClicked)
+module Views.Pairing
+    exposing
+        ( State
+        , Config
+        , view
+        , receivedToken
+        , init
+        , tokenSubmitted
+        , pairingCompleted
+        , getTockenClicked
+        , setInputToken
+        )
 
 import Regex
 import Element exposing (..)
@@ -26,6 +37,7 @@ init =
 type alias Config msg =
     { onGetTokenClicked : msg
     , onSubmitToken : msg
+    , onScanQR : msg
     , toMsg : State -> msg
     }
 
@@ -38,7 +50,7 @@ update : Msg -> State -> State
 update msg state =
     case msg of
         SetInput s ->
-            { state | inputToken = s }
+            setInputToken s state
 
 
 receivedToken : WebData String -> State -> State
@@ -67,19 +79,30 @@ pairingCompleted a s =
     { s | tokenSubmitStatus = Answer a }
 
 
+setInputToken : String -> State -> State
+setInputToken token state =
+    { state | inputToken = token }
+
+
 shouldShowPairButton : String -> Bool
 shouldShowPairButton txt =
     Regex.contains (Regex.regex "\\s*\\w+\\s+\\w+\\s+\\w+\\s+\\w+\\s*") txt
 
 
-view : Config msg -> State -> Element msg
-view config diag =
+view : Config msg -> Bool -> State -> Element msg
+view config isAndroid diag =
     let
         inp isEnabled rest =
             column [ spacing (Styles.paddingScale 2) ]
                 -- TODO: make scan possible
-                [ column [] [ Elements.p "Scan the QR code (not possible yet) or type the words shown below it" ]
-                , row [ spacing (Styles.paddingScale 1), Elements.onEnter config.onSubmitToken ]
+                [ column [] [ Elements.p "Use your other device to scan the QR code or type the words shown below it" ]
+                , row
+                    (spacing (Styles.paddingScale 1)
+                        :: if shouldShowPairButton diag.inputToken then
+                            [ Elements.onEnter config.onSubmitToken ]
+                           else
+                            []
+                    )
                     [ Elements.inputText
                         [ htmlAttribute (Attr.autocomplete False)
                         , htmlAttribute (Attr.attribute "autocorrect" "off")
@@ -91,6 +114,10 @@ view config diag =
                         diag.inputToken
                     , if shouldShowPairButton diag.inputToken then
                         Elements.primaryButton (boolToMaybe isEnabled config.onSubmitToken) "Pair"
+                      else
+                        empty
+                    , if isAndroid then
+                        Elements.primaryButton (Just config.onScanQR) "Scan"
                       else
                         empty
                     ]

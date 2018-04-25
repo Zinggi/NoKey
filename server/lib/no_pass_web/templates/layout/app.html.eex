@@ -20,7 +20,7 @@
       </div>
       <%= render @view_module, @view_template, assigns %>
       <footer class="footer">
-        <a href="https://github.com/Zinggi/NoKey">Github</a>
+        <a href="https://github.com/Zinggi/NoKey">GitHub</a>
       </footer>
     </div>
   </body>

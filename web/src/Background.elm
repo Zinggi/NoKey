@@ -317,6 +317,14 @@ update msg model =
             ( model, Cmd.none )
                 |> Toasty.addToast MainView.toastyConfig ToastyMsg txt
 
+        ScanQR ->
+            model |> withCmds [ Ports.scanQR () ]
+
+        OnGotQR code ->
+            model
+                |> updatePairingDialogue (Views.Pairing.setInputToken code)
+                |> withCmds [ Helper.withTimestamp DoTokenSubmitted ]
+
 
 getToken : Model -> ( Model, Cmd Msg )
 getToken model =
@@ -384,6 +392,7 @@ subs state =
             , Ports.onNewEncryptedShares NewEncryptedShares
             , Ports.onDidEncryptShares SharesReadyToSend
             , Ports.onDidDecryptRequestedShares DidDecryptRequestedShares
+            , Ports.onGotQR OnGotQR
             ]
 
         _ ->

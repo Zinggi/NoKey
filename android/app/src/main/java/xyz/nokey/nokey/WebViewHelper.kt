@@ -18,6 +18,7 @@ import android.app.AlertDialog
 import android.net.Uri
 import android.os.Handler
 import android.content.pm.ApplicationInfo
+import android.net.http.SslError
 import android.util.Log
 
 
@@ -64,23 +65,13 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
         webSettings.apply {
             // enable JS
             javaScriptEnabled = true
-            // TODO: probably not needed
-            // must be set for our js-popup-blocker:
-            // setSupportMultipleWindows(true)
 
-            // PWA settings TODO?
+            // PWA settings
             domStorageEnabled = true
             setAppCachePath(activity.applicationContext.cacheDir.absolutePath)
 
             setAppCacheEnabled(true)
             databaseEnabled = true
-
-            // TODO: probably not needed
-            // turn on/off mixed content (both https+http within one page) for API >= 21
-//            val enableMixedContent =  false
-//            if (enableMixedContent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-//                mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-//            }
         }
 
         // retrieve content from cache primarily if not connected
@@ -88,20 +79,6 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
 
         // enable HTML5-support
         webView.webChromeClient = object : WebChromeClient() {
-            //simple yet effective redirect/popup blocker
-            // TODO? needed???
-//            override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
-//                val href = view.handler.obtainMessage()
-//                view.requestFocusNodeHref(href)
-//                val popupUrl = href.data.getString("url")
-//                if (popupUrl != null) {
-//                    //it's null for most rouge browser hijack ads
-//                    webView.loadUrl(popupUrl)
-//                    return true
-//                }
-//                return false
-//            }
-
             // update ProgressBar
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 uiManager.setLoadingProgress(newProgress)
@@ -138,29 +115,34 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
             }
 
             // TODO! comment out from release
-/*            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
-                if (Build.FINGERPRINT.contains("generic")) {
-                    // Ignore SSL certificate errors in emulator
-                    handler.proceed()
-                } else {
-                    super.onReceivedSslError(view, handler, error)
-                }
+            /*override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+                handler.proceed()
             }*/
         }
 
         // Now we can call these functions from javascript
         webView.addJavascriptInterface(object {
             @JavascriptInterface
+            fun scanQR() {
+                activity.scanQR()
+            }
+
+            /*@JavascriptInterface
             fun test() {
-                Log.d("sdsd", "sdsdsd")
                 // communicate back to JS
                 webView.loadUrl("javascript:fromAndroid(\"lloldsds\"");
                 // new and better way:
                 webView.evaluateJavascript("(function() { return 'this'; })();", { s ->
                     Log.d("sdsd", s) // Prints: "this"
                 })
-            }
+            }*/
         }, "Android")
+    }
+
+    fun onScanQrResult(contents: String) {
+        webView.evaluateJavascript(
+                "window.Android.fromAndroid({ type: 'QrResult', data: '$contents' });", {  }
+        )
     }
 
     // show "no app found" dialog
@@ -207,7 +189,6 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
         } else {
             // let WebView load the page!
             // activate loading animation screen
-            // TODO?
             uiManager.setLoading(true)
             // return value for shouldOverrideUrlLoading
             return false

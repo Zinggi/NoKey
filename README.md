@@ -19,3 +19,9 @@ To run everything, you need [yarn](https://yarnpkg.com/) and [elm](http://elm-la
 
 More specific instructions can be found in the corresponding folders.
 
+## Creating a release
+
+  * Grep for `TODO!`s: `rg TODO!` and resolve them
+  * Find stray log statements: `rg "^([^/\n]*(console.log|Log\.[de])|[^-]*Debug.log)"` and possibly remove them
+  * TODO: increment version
+

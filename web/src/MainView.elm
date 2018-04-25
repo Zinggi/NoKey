@@ -258,7 +258,7 @@ viewPage page model =
         Pairing ->
             -- , -- TODO: consider if we should just automatically request a pairing code
             --   -- upon navigating to this view. This way a user doesn't have to decide what to press
-            Views.Pairing.view pairingConfig model.pairingDialogue
+            Views.Pairing.view pairingConfig (Data.Sync.isAndroid model.syncData) model.pairingDialogue
 
         Tutorial ->
             Views.Tutorial.view
@@ -269,7 +269,7 @@ viewPage page model =
 
 pairingConfig : Views.Pairing.Config Msg
 pairingConfig =
-    { onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing }
+    { onSubmitToken = TokenSubmitted, onGetTokenClicked = GetTokenClicked, toMsg = UpdatePairing, onScanQR = ScanQR }
 
 
 passwordsConfig : Views.Passwords.Config Msg
