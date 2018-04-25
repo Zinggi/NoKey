@@ -25,19 +25,19 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
     + (first time) `cd ../web/`, `elm-github-install`, `cd ../server`
     + `cd assets`, `yarn build`, `cd ..`
   * Digest assets `MIX_ENV=prod mix phx.digest`
-  * Possibly increment version in `server/mix.exs` and `web/src/Data/Sync.elm`
+  * Possibly increment version in `server/mix.exs`
   * Compile `MIX_ENV=prod mix compile`
-  * (optional) test if it works: `PORT=4001 MIX_ENV=prod mix phx.server` (doesn't work because dev has no ssl)
+  * (optional) test if it works: `sudo PORT=4001 SSL_PORT=4443 MIX_ENV=prod mix phx.server`
     + If there is an error, maybe cleaning elm-stuff helps?
   * Build release:
     
     - if first time:
         + `MIX_ENV=prod mix release --env=prod`
-        + (optional) test it: `REPLACE_OS_VARS=true PORT=4001 SECRET_KEY_BASE="<SECRET>" ERLANG_COOKIE="<SECRET>" _build/prod/rel/no_pass/bin/no_pass console`
+        + (optional) test it: `REPLACE_OS_VARS=true PORT=4001 SSL_PORT=4443 SECRET_KEY_BASE="<SECRET>" ERLANG_COOKIE="<SECRET>" _build/prod/rel/no_pass/bin/no_pass console`
         + Copy release: `cp _build/prod/rel/no_pass/releases/0.0.1/no_pass.tar.gz ~/nokey/builds/`
         + `cd ~/nokey/builds/`
         + unzip `tar xvf no_pass.tar.gz`
-        + start `sudo REPLACE_OS_VARS=true PORT=80 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' ./bin/no_pass start`
+        + start `sudo REPLACE_OS_VARS=true PORT=80 SSL_PORT=443 SECRET_KEY_BASE='<SECRET>' ERLANG_COOKIE='<SECRET>' ./bin/no_pass start`
     
     - else:
         + create upgrade: `MIX_ENV=prod mix release --env=prod --upgrade`
