@@ -12,11 +12,12 @@ use Mix.Config
 onlyLocal = false
 
 config :no_pass, NoPassWeb.Endpoint,
-  http: [port: 4000, ip: (if onlyLocal, do: {127,0,0,1}, else: {0,0,0,0})],
+  http: [port: 4000, ip: if(onlyLocal, do: {127, 0, 0, 1}, else: {0, 0, 0, 0})],
   debug_errors: true,
   code_reloader: true,
   check_origin: false
-  # watchers: [yarn: ["watch" , cd: Path.expand("../assets", __DIR__)]]
+
+# watchers: [yarn: ["watch" , cd: Path.expand("../assets", __DIR__)]]
 
 # ## SSL Support
 #
@@ -51,4 +52,3 @@ config :logger, :console, format: "[$level] $message\n"
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
 config :phoenix, :stacktrace_depth, 20
-

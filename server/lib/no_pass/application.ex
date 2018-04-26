@@ -12,7 +12,7 @@ defmodule NoPass.Application do
       supervisor(NoPassWeb.Endpoint, []),
       # Start your own worker by calling: NoPass.Worker.start_link(arg1, arg2, arg3)
       # worker(NoPass.Worker, [arg1, arg2, arg3]),
-      worker(NoPass.TokenStore, []),
+      worker(NoPass.TokenStore, [])
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

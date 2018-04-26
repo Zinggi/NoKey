@@ -26,12 +26,13 @@ config :no_pass, NoPassWeb.Endpoint,
   secret_key_base: "${SECRET_KEY_BASE}",
   force_ssl: [hsts: true],
   http: [port: {:system, "PORT"}],
-  https: [:inet6, port: {:system, "SSL_PORT"},
+  https: [
+    :inet6,
+    port: {:system, "SSL_PORT"},
     keyfile: "/etc/letsencrypt/live/nokey.xyz/privkey.pem",
     certfile: "/etc/letsencrypt/live/nokey.xyz/cert.pem",
     cacertfile: "/etc/letsencrypt/live/nokey.xyz/chain.pem"
   ]
-
 
 # Do not print debug messages in production
 config :logger, level: :info

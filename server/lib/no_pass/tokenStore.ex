@@ -3,13 +3,13 @@ defmodule NoPass.TokenStore do
 
   ### API
   def start_link() do
-    GenServer.start_link(__MODULE__, %{}, [name: __MODULE__])
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
   def store(token, id) do
     GenServer.cast(__MODULE__, {:store, token, id})
   end
-  
+
   def has_token?(token) do
     GenServer.call(__MODULE__, {:has_token, token})
   end
@@ -18,10 +18,11 @@ defmodule NoPass.TokenStore do
     GenServer.call(__MODULE__, {:try_remove, token})
   end
 
-
   ### GenServer
-  @polling_interval 21*1000 # ms
-  @max_allowed_age 60 # s
+  # ms
+  @polling_interval 21 * 1000
+  # s
+  @max_allowed_age 60
 
   def init(state) do
     scheduleExpire()
@@ -38,15 +39,18 @@ defmodule NoPass.TokenStore do
   end
 
   def handle_cast({:store, token, id}, state) do
-    timestamp = DateTime.utc_now |> DateTime.to_unix
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
     {:noreply, Map.put(state, token, %{timestamp: timestamp, id: id})}
   end
 
   def handle_info(:expire_keys, state) do
-    now = DateTime.utc_now |> DateTime.to_unix
-    keys_to_drop = Enum.filter Map.keys(state), fn(ele) ->
-      (now - Map.get(state, ele, %{timestamp: 0})[:timestamp]) >= @max_allowed_age
-    end
+    now = DateTime.utc_now() |> DateTime.to_unix()
+
+    keys_to_drop =
+      Enum.filter(Map.keys(state), fn ele ->
+        now - Map.get(state, ele, %{timestamp: 0})[:timestamp] >= @max_allowed_age
+      end)
+
     state = Map.drop(state, keys_to_drop)
 
     scheduleExpire()
@@ -56,7 +60,4 @@ defmodule NoPass.TokenStore do
   defp scheduleExpire() do
     Process.send_after(self(), :expire_keys, @polling_interval)
   end
-
 end
-
-

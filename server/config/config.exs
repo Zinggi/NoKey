@@ -5,15 +5,12 @@
 # is restricted to this project.
 use Mix.Config
 
-
-
 # Configures the endpoint
 config :no_pass, NoPassWeb.Endpoint,
   url: [host: "localhost"],
   secret_key_base: "wv6HgnIycCAeGvfcPBZWyoRERjbFkJoTsz7EnjSC1wHWRU0e7m3YKgj6MwgtjKwH",
   render_errors: [view: NoPassWeb.ErrorView, accepts: ~w(html json)],
-  pubsub: [name: NoPass.PubSub,
-           adapter: Phoenix.PubSub.PG2]
+  pubsub: [name: NoPass.PubSub, adapter: Phoenix.PubSub.PG2]
 
 # Configures Elixir's Logger
 config :logger, :console,
@@ -22,4 +19,4 @@ config :logger, :console,
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
-import_config "#{Mix.env}.exs"
+import_config "#{Mix.env()}.exs"
