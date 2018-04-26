@@ -264,7 +264,8 @@ const getRandomInts = (n) => {
 const setupAndroid = (app) => {
     app.ports.scanQR.subscribe(() => {
         // console.log("scan QR called!!!");
-        window.Android.scanQR();
+        if (window.Android.scanQR)
+            window.Android.scanQR();
     });
 
     window.Android.fromAndroid = (msg) => {
