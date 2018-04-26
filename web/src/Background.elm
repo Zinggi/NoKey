@@ -16,6 +16,7 @@ import Data.PasswordMeta
 import Data.Notifications as Notifications exposing (SiteEntry)
 import Data.Sync
 import Data.Storage
+import Data.Options
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
@@ -35,7 +36,18 @@ init flags location =
     in
         case newState of
             Loaded model ->
-                newState |> withCmds [ onLoaded model, setTitle model.syncData ]
+                let
+                    -- Kind of a hack to support group 1:
+                    -- Just unlock group 1 at the very beginning (if it exists)
+                    -- If the group is locked there are some weired edge cases that are avoided by unlocking it here.
+                    -- We also have to remember to unlock it as soon as it becomes available, e.g. after we receive the key.
+                    newSync =
+                        Data.Sync.unlockGroup1IfExists model.syncData
+
+                    newModel =
+                        { model | syncData = newSync }
+                in
+                    Loaded newModel |> withCmds [ onLoaded newModel, setTitle newModel.syncData ]
 
             _ ->
                 newState |> noCmd
@@ -275,12 +287,22 @@ update msg model =
 
         AddSiteEntry { isSignUp, entry } ->
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials
-            -- LogIn can be ignored if we already have an entry for it
-            if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
+            -- LogIn can be ignored if we already have an entry for it,
+            -- TODO: unless the group is unlocked and the entered password differs from the one we saved.
+            if Data.Sync.numberOfKnownDevices model.syncData < Data.Options.minSecurityLevel model.options then
+                model |> noCmd
+            else if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
             else
                 -- add new password entry
                 model |> updateNotifications (Notifications.newSiteEntry entry True)
+
+        SetOptions options ->
+            let
+                newM =
+                    { model | options = options }
+            in
+                newM |> withCmds [ storeState newM ]
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd
@@ -335,8 +357,15 @@ getToken model =
 
 saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )
 saveEntry groupId entry model =
-    { model | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry }
-        |> withCmds [ Helper.withTimestamp (InsertSite ( entry.site, entry.login ) ( entry.securityLevel, groupId ) entry.password) ]
+    let
+        n =
+            Data.Sync.numberOfKnownDevices model.syncData
+
+        minSecLevel =
+            Data.Options.minSecurityLevel model.options
+    in
+        { model | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry }
+            |> withCmds [ Helper.withTimestamp (InsertSite ( entry.site, entry.login ) ( clamp minSecLevel (min 5 n) entry.securityLevel, groupId ) entry.password) ]
 
 
 updateSeed : Model -> Model

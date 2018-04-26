@@ -6,6 +6,7 @@ import Elements
 import Route
 import Model exposing (Msg(..), Model)
 import Data.Sync
+import Data.Options exposing (Options)
 import Route exposing (Page(..))
 import Styles
 import Views.Passwords
@@ -53,9 +54,9 @@ hints model =
     }
 
 
-needsPairingHint : { a | syncData : Data.Sync.SyncData } -> Maybe (Element Msg)
-needsPairingHint { syncData } =
-    if Dict.size (Data.Sync.knownIds syncData) <= 1 then
+needsPairingHint : { a | syncData : Data.Sync.SyncData, options : Options } -> Maybe (Element Msg)
+needsPairingHint { syncData, options } =
+    if Data.Sync.numberOfKnownDevices syncData < Data.Options.minSecurityLevel options then
         Just viewPairingHint
     else
         Nothing
@@ -87,6 +88,6 @@ viewSummery model =
     column []
         [ row []
             [ Elements.b "Devices"
-            , Elements.text (toString (Dict.size (Data.Sync.knownIds model.syncData)))
+            , Elements.text (toString (Data.Sync.numberOfKnownDevices model.syncData))
             ]
         ]

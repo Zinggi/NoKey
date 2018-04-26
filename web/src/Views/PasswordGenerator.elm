@@ -1,13 +1,6 @@
 module Views.PasswordGenerator exposing (State, init, view, nextPassword)
 
--- import Html exposing (Html)
--- import Html.Attributes as Attr
--- import Html.Events exposing (onCheck, onInput)
-
 import Element exposing (..)
-import Element.Input as Input
-import Element.Background as Background
-import Html
 import Random.Pcg.Extended as Random exposing (Seed)
 
 
@@ -16,6 +9,7 @@ import Random.Pcg.Extended as Random exposing (Seed)
 import Views.PasswordRequirements as PwReq
 import Elements
 import Styles
+import Helper
 
 
 type alias State =
@@ -76,8 +70,8 @@ nextPassword state =
 -- View
 
 
-view : (String -> msg) -> (State -> msg) -> State -> Element msg
-view onAcceptPw toMsg state =
+view : (String -> msg) -> Bool -> (State -> msg) -> State -> Element msg
+view onAcceptPw canAdd toMsg state =
     let
         ( isOk, pass, error ) =
             case PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.first of
@@ -106,7 +100,7 @@ view onAcceptPw toMsg state =
                     if isOk then
                         [ Elements.button (Just NextPw) "Next"
                             |> Element.map (\msg -> update msg state |> toMsg)
-                        , Elements.primaryButton (Just (onAcceptPw pw)) "Ok"
+                        , Elements.primaryButton (Helper.boolToMaybe canAdd (onAcceptPw pw)) "Ok"
                         ]
                     else
                         [ Elements.primaryButton (Just Reset) "Reset"

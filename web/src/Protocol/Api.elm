@@ -249,6 +249,8 @@ update model msg =
         --     case msg of
         --         Self _ ->
         --             ()
+        --         Unverified _ _ _ _ ->
+        --             ()
         --         _ ->
         --             Debug.log ("\tgot msg:\n" ++ toString msg ++ "\n\tin state:\n" ++ toString state.pairingState) ()
     in
@@ -367,12 +369,12 @@ update model msg =
 
             --
             ( Self (JoinedChannel v), _ ) ->
-                let
-                    _ =
-                        Debug.log "(re)join channel" v
-                in
-                    model
-                        |> withCmds [ askForNewVersion sync ]
+                -- let
+                --     _ =
+                --         Debug.log "(re)join channel" v
+                -- in
+                model
+                    |> withCmds [ askForNewVersion sync ]
 
             ( Self (NewMsg v), _ ) ->
                 model
@@ -540,21 +542,26 @@ grantedShareRequest { shares, time, otherId, ids } model =
 
 receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
 receiveFinishPairing token time otherToken otherId otherSync model =
-    -- merge sync, send finish and go back to init. Also save here, as this after this there is no sync update
+    -- merge sync, send finish and go back to init. Also save here, as after this there is no sync update
     if token == otherToken then
         let
-            ( mergedSync, cmd ) =
+            ( mergedSync, decryptCmd ) =
                 Data.Sync.merge decryptMyShares time otherSync model.syncData
+
+            -- Create shares for the new device for all currently unlocked groups
+            ( newSync, encryptCmd ) =
+                Data.Sync.createNewSharesIfPossible encryptNewShares time mergedSync
 
             newModel =
                 backToInit model
-                    |> (\m -> { m | syncData = mergedSync })
+                    |> (\m -> { m | syncData = newSync })
         in
             newModel
                 |> withCmds
-                    [ finishPairing otherId token mergedSync
+                    [ finishPairing otherId token newSync
                     , Ports.storeState (Data.Storage.encode newModel)
-                    , cmd
+                    , decryptCmd
+                    , encryptCmd
                     , Navigation.back 1
                     ]
                 |> andThenUpdate syncToOthers

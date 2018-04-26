@@ -9,6 +9,7 @@ import Styles
 import Icons
 import Data.RequestGroupPassword as RequestPassword exposing (Status(..), PasswordStatus(..))
 import Data.Sync exposing (SyncData)
+import Data.Options exposing (Options)
 import Data exposing (..)
 import Data.TaskList exposing (Task(..))
 import Simple.Fuzzy as Fuzzy
@@ -77,9 +78,9 @@ view config ({ syncData, passwordsView } as model) =
             ]
 
 
-actionButton : Config msg -> { m | syncData : SyncData } -> Element msg
+actionButton : Config msg -> { m | syncData : SyncData, options : Options } -> Element msg
 actionButton config model =
-    if (Data.Sync.knownIds model.syncData |> Dict.size) > 1 then
+    if Data.Sync.numberOfKnownDevices model.syncData >= Data.Options.minSecurityLevel model.options then
         Elements.floatingButton config.onAddNewPassword "Add new"
     else
         empty
@@ -224,7 +225,7 @@ viewSiteHeader siteName userNames =
 
 viewSiteData : Config msg -> SyncData -> String -> Dict String PasswordStatus -> GroupId -> Bool -> Status -> Element msg
 viewSiteData config sync siteName userNames groupId disabled groupStatus =
-    column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 2) ]
+    column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 4) ]
         (Dict.toList userNames
             |> List.map
                 (\( login, status ) ->
@@ -325,7 +326,14 @@ viewGroupStatus config groupId disabled status =
                 unlockGroupsButton config.onRequestPasswordPressed [ ( groupId, status ) ]
 
         Done _ _ ->
-            lockGroupsButton config.onLockGroupsPressed [ ( groupId, status ) ]
+            let
+                ( level, _ ) =
+                    groupId
+            in
+                if level == 1 then
+                    empty
+                else
+                    lockGroupsButton config.onLockGroupsPressed [ ( groupId, status ) ]
 
         Error e ->
             Elements.text ("Error: " ++ e)

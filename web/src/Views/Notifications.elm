@@ -26,18 +26,18 @@ init =
     2
 
 
-view : Config msg -> SyncData -> Notifications -> Int -> State -> Element msg
-view config sync ns maxSecurityLevel state =
+view : Config msg -> SyncData -> Notifications -> ( Int, Int ) -> State -> Element msg
+view config sync ns ( minSecLevel, numberOfKnownDevices ) state =
     case Notifications.first ns of
         Just n ->
-            viewEntry config sync maxSecurityLevel n state
+            viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state
 
         Nothing ->
             empty
 
 
-viewEntry : Config msg -> SyncData -> Int -> Notification -> State -> Element msg
-viewEntry config sync maxSecurityLevel n state =
+viewEntry : Config msg -> SyncData -> ( Int, Int ) -> Notification -> State -> Element msg
+viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state =
     (case n.data of
         ShareRequestT req ->
             [ column []
@@ -60,16 +60,16 @@ viewEntry config sync maxSecurityLevel n state =
             , Elements.inputText [] Nothing { label = "Site", placeholder = "" } entry.site
             , Elements.inputText [] Nothing { label = "Login", placeholder = "" } entry.login
             , Elements.password [] Nothing False entry.password
-            , Elements.clampedNumberInput config.toMsg "Security Level" ( 2, 2, maxSecurityLevel ) state
+            , Elements.clampedNumberInput config.toMsg "Security Level" ( minSecLevel, 2, min 5 numberOfKnownDevices ) state
             , Elements.buttonRow []
                 [ Elements.primaryButton
-                    (if maxSecurityLevel == 1 then
+                    (if numberOfKnownDevices < minSecLevel then
                         Nothing
                      else
                         Just
                             (config.onSaveEntry n.id
                                 (Data.Sync.currentGroupId state sync)
-                                { entry | securityLevel = min maxSecurityLevel state }
+                                { entry | securityLevel = clamp minSecLevel 5 state }
                             )
                     )
                     "Save"

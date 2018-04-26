@@ -2,34 +2,7 @@ module Data exposing (..)
 
 import Json.Encode as JE exposing (Value)
 import Json.Decode as JD exposing (Decoder)
-import Json.Decode.Pipeline as JD exposing (required)
-import Time exposing (Time)
 import Helper exposing (encodeTuple, encodeTuple2, decodeTuple, decodeTuple2)
-
-
--- Settings
-
-
-type alias Settings =
-    { timeUntilAutoLock : Time
-    }
-
-
-defaultSettings : Settings
-defaultSettings =
-    { timeUntilAutoLock = 10 * Time.minute }
-
-
-settingsDecoder : Decoder Settings
-settingsDecoder =
-    JD.decode (\t -> { timeUntilAutoLock = t })
-        |> required "timeUntilAutoLock" JD.float
-
-
-encodeSettings : Settings -> Value
-encodeSettings settings =
-    JE.object [ ( "timeUntilAutoLock", JE.float settings.timeUntilAutoLock ) ]
-
 
 
 -- For ports

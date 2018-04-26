@@ -15,6 +15,7 @@ import Elements
 import Data.Sync
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
+import Data.Options
 import Views.Dashboard
 import Views.Options
 import Views.Pairing
@@ -60,7 +61,10 @@ viewModel : Model -> Element Msg
 viewModel model =
     let
         numberOfKnownDevices =
-            Data.Sync.knownIds model.syncData |> Dict.size
+            Data.Sync.numberOfKnownDevices model.syncData
+
+        minSecLevel =
+            Data.Options.minSecurityLevel model.options
 
         cont =
             column
@@ -85,7 +89,7 @@ viewModel model =
                             [ Views.Notifications.view notificationsConfig
                                 model.syncData
                                 model.notifications
-                                numberOfKnownDevices
+                                ( minSecLevel, numberOfKnownDevices )
                                 model.notificationsView
                             ]
                         ]

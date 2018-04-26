@@ -52,10 +52,20 @@ init =
     State { groupPws = Dict.empty, pws = Dict.empty }
 
 
-getAllShares : GroupId -> State -> List Share
-getAllShares groupId (State state) =
+getAllShares : GroupId -> Dict GroupId SecretSharing.Share -> State -> List Share
+getAllShares groupId myShares (State state) =
     Dict.get groupId state.groupPws
-        |> Maybe.map (.shares >> Set.toList)
+        |> Maybe.map .shares
+        |> Maybe.map
+            (\shares ->
+                case Dict.get groupId myShares of
+                    Just share ->
+                        Set.insert share shares
+
+                    Nothing ->
+                        shares
+            )
+        |> Maybe.map Set.toList
         |> Maybe.withDefault []
 
 
