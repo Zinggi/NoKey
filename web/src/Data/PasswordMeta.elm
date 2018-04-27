@@ -16,4 +16,4 @@ default =
 
 reset : PasswordMetaData -> PasswordMetaData
 reset meta =
-    { meta | siteName = "" }
+    { meta | siteName = "", securityLevel = 2, length = 16 }

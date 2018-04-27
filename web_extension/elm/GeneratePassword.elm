@@ -34,7 +34,7 @@ update msg model =
 
 
 view model =
-    PW.view OnAcceptPw Pw model
+    PW.view OnAcceptPw True Pw model
         |> Element.layout (padding (Styles.paddingScale 3) :: Styles.background)
 
 
