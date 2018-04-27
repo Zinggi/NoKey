@@ -1,4 +1,4 @@
-module Views.Passwords exposing (Config, State, Msg, init, update, tasks, view, actionButton)
+module Views.Passwords exposing (Config, State, Msg, init, update, tasks, view, actionButton, finishEdit)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -14,6 +14,7 @@ import Data exposing (..)
 import Data.TaskList exposing (Task(..))
 import Simple.Fuzzy as Fuzzy
 import Helper
+import Views.PasswordGenerator
 
 
 {-
@@ -22,7 +23,6 @@ import Helper
        - by default the name is empty
        - The displayed name is level + name (+ parts of id if necessary)
 
-   - TODO: collapse entries, e.g. collapsed only show site name, expanded show accounts + pws
 -}
 
 
@@ -34,18 +34,23 @@ type alias Config msg =
     , onTogglePassword : AccountId -> msg
     , onAddNewPassword : msg
     , onCopyToClipboard : msg
+    , addPassword : GroupId -> AccountId -> String -> msg
+    , onNewPasswordRequirements : Views.PasswordGenerator.State -> msg
     }
 
 
 type alias State =
     { search : String
     , expandedSites : Set String
+    , editPw : Maybe AccountId
     }
 
 
 type Msg
     = UpdateSearch String
     | ToggleSite String
+    | EditPassword AccountId
+    | CancelEdit
 
 
 update : Msg -> State -> State
@@ -57,14 +62,25 @@ update msg state =
         ToggleSite s ->
             { state | expandedSites = Helper.addOrRemoveFromSet s state.expandedSites }
 
+        EditPassword accountId ->
+            { state | editPw = Just accountId }
+
+        CancelEdit ->
+            finishEdit state
+
+
+finishEdit : State -> State
+finishEdit state =
+    { state | editPw = Nothing }
+
 
 init : State
 init =
-    { search = "", expandedSites = Set.empty }
+    { search = "", expandedSites = Set.empty, editPw = Nothing }
 
 
-view : Config msg -> { m | syncData : SyncData, passwordsView : State } -> Element msg
-view config ({ syncData, passwordsView } as model) =
+view : Config msg -> { m | syncData : SyncData, passwordsView : State, requirementsState : Views.PasswordGenerator.State } -> Element msg
+view config ({ syncData, passwordsView, requirementsState } as model) =
     let
         hasPasswords =
             Data.Sync.mapGroups (\_ _ _ _ -> 1) syncData |> (not << List.isEmpty)
@@ -72,7 +88,7 @@ view config ({ syncData, passwordsView } as model) =
         column [ spacing (Styles.paddingScale 1) ]
             [ tasks config passwordsView (Data.Sync.getTasks syncData)
             , search config hasPasswords passwordsView.search
-            , passwords config passwordsView syncData
+            , passwords config passwordsView requirementsState syncData
             , -- This is here such that we can scroll below the action button
               el [ height (px 30) ] empty
             ]
@@ -80,7 +96,7 @@ view config ({ syncData, passwordsView } as model) =
 
 actionButton : Config msg -> { m | syncData : SyncData, options : Options } -> Element msg
 actionButton config model =
-    if Data.Sync.numberOfKnownDevices model.syncData >= Data.Options.minSecurityLevel model.options then
+    if Data.Sync.numberOfKnownDevices model.syncData >= Data.Sync.minSecurityLevel model.options model.syncData then
         Elements.floatingButton config.onAddNewPassword "Add new"
     else
         empty
@@ -143,24 +159,24 @@ viewTask config state task =
                     ]
 
 
-passwords : Config msg -> State -> SyncData -> Element msg
-passwords config state sync =
-    Elements.container (Data.Sync.mapGroups (viewSites config state sync) sync)
+passwords : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> Element msg
+passwords config state requirementsState sync =
+    Elements.container (Data.Sync.mapGroups (viewSites config state requirementsState sync) sync)
 
 
-viewSites : Config msg -> State -> SyncData -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSites config state sync groupId shares groupStatus accounts =
+viewSites : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSites config state requirementsState sync groupId shares groupStatus accounts =
     [ viewGroupHeader config groupId (shares < Tuple.first groupId) groupStatus
-    , viewSitesList config sync groupId (shares < Tuple.first groupId) groupStatus state accounts
+    , viewSitesList config requirementsState sync groupId (shares < Tuple.first groupId) groupStatus state accounts
     ]
         |> column (spacing (Styles.paddingScale 2) :: height shrink :: Styles.grayedOutIf (shares < Tuple.first groupId))
 
 
-viewSitesList : Config msg -> SyncData -> GroupId -> Bool -> Status -> State -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSitesList config sync groupId disabled groupStatus state accounts =
+viewSitesList : Config msg -> Views.PasswordGenerator.State -> SyncData -> GroupId -> Bool -> Status -> State -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSitesList config requirementsState sync groupId disabled groupStatus state accounts =
     Dict.foldl
         (\siteName userNames acc ->
-            viewPw config sync groupId disabled groupStatus state siteName userNames :: acc
+            viewPw config requirementsState sync groupId disabled groupStatus state siteName userNames :: acc
         )
         []
         accounts
@@ -186,8 +202,8 @@ viewGroupHeader config groupId disabled groupStatus =
         ]
 
 
-viewPw : Config msg -> SyncData -> GroupId -> Bool -> Status -> State -> String -> Dict String PasswordStatus -> Element msg
-viewPw config sync groupId disabled groupStatus state siteName userNames =
+viewPw : Config msg -> Views.PasswordGenerator.State -> SyncData -> GroupId -> Bool -> Status -> State -> String -> Dict String PasswordStatus -> Element msg
+viewPw config requirementsState sync groupId disabled groupStatus state siteName userNames =
     let
         filterd =
             List.filterMap
@@ -206,7 +222,7 @@ viewPw config sync groupId disabled groupStatus state siteName userNames =
                 (Set.member siteName state.expandedSites)
                 [ width fill ]
                 (viewSiteHeader siteName userNames)
-                (viewSiteData config sync siteName userNames groupId disabled groupStatus)
+                (viewSiteData config state requirementsState sync siteName userNames groupId disabled groupStatus)
 
 
 viewSiteHeader : String -> Dict String a -> Element msg
@@ -223,8 +239,8 @@ viewSiteHeader siteName userNames =
             ]
 
 
-viewSiteData : Config msg -> SyncData -> String -> Dict String PasswordStatus -> GroupId -> Bool -> Status -> Element msg
-viewSiteData config sync siteName userNames groupId disabled groupStatus =
+viewSiteData : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> String -> Dict String PasswordStatus -> GroupId -> Bool -> Status -> Element msg
+viewSiteData config state requirementsState sync siteName userNames groupId disabled groupStatus =
     column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 4) ]
         (Dict.toList userNames
             |> List.map
@@ -232,45 +248,30 @@ viewSiteData config sync siteName userNames groupId disabled groupStatus =
                     column [ spacing (Styles.paddingScale 1) ]
                         [ column [ spacing (Styles.paddingScale 1) ]
                             [ Elements.inputText [] Nothing { label = "Login", placeholder = "" } login
-                            , viewStatus config sync ( siteName, login ) status
+                            , if state.editPw == Just ( siteName, login ) then
+                                empty
+                              else
+                                viewStatus config sync ( siteName, login ) status
                             ]
                         , if RequestPassword.isUnlocked status then
-                            Elements.delete (config.onDeletePassword ( siteName, login ))
+                            if state.editPw == Just ( siteName, login ) then
+                                column []
+                                    [ Views.PasswordGenerator.view (config.addPassword groupId ( siteName, login ))
+                                        True
+                                        config.onNewPasswordRequirements
+                                        requirementsState
+                                    , Elements.button (Just (config.toMsg CancelEdit)) "Cancel Edit"
+                                    ]
+                            else
+                                row []
+                                    [ Elements.button (Just (config.toMsg (EditPassword ( siteName, login )))) "Edit"
+                                    , Elements.delete (config.onDeletePassword ( siteName, login ))
+                                    ]
                           else
                             viewGroupStatus config groupId disabled groupStatus
                         ]
                 )
         )
-
-
-
--- case filterd of
---     [] ->
---         empty
---     [ ( userName, status ) ] ->
---         pwRow config [ Elements.h4 siteName ] ( siteName, userName ) status
---     other ->
---         column []
---             [ Elements.h4 siteName
---             , List.map
---                 (\( userName, status ) ->
---                     pwRow config [] ( siteName, userName ) status
---                 )
---                 other
---                 |> column [ Styles.paddingLeft (Styles.scaled 1) ]
---             ]
--- pwRow : Config msg -> List (Element msg) -> AccountId -> PasswordStatus -> Element msg
--- pwRow config pre (( _, userName ) as accountId) status =
---     row []
---         [ el [ alignLeft ]
---             (row [ spacing (Styles.scaled 1) ]
---                 (pre ++ [ Elements.b userName, viewStatus config accountId status ])
---             )
---         , if RequestPassword.isUnlocked status then
---             el [ alignRight ] (Elements.delete (config.onDeletePassword accountId))
---           else
---             empty
---         ]
 
 
 unlockGroupsButton : (List GroupId -> Maybe AccountId -> msg) -> List ( GroupId, Status ) -> Element msg

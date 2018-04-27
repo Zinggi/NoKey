@@ -24,6 +24,7 @@ import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersi
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.VClock as VClock exposing (VClock)
 import Crdt.GSet as GSet exposing (GSet)
+import Data.Options
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
@@ -147,6 +148,23 @@ groups sync =
         |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
         |> (\s -> Dict.foldl (\groupId _ acc -> Set.insert groupId acc) s (ORDict.get sync.shared.distributedShares))
         |> Set.toList
+
+
+maxUsedSecurityLevel : SyncData -> Int
+maxUsedSecurityLevel sync =
+    accounts sync
+        |> Dict.foldl (\acid ( l, _ ) acc -> max acc l) 0
+
+
+minUsedSecurityLevel : SyncData -> Int
+minUsedSecurityLevel sync =
+    accounts sync
+        |> Dict.foldl (\acid ( l, _ ) acc -> min acc l) 2
+
+
+minSecurityLevel : Data.Options.Options -> SyncData -> Int
+minSecurityLevel opt sync =
+    min (Data.Options.minSecurityLevel opt) (minUsedSecurityLevel sync)
 
 
 getShare : GroupId -> SyncData -> Maybe SecretSharing.Share
@@ -583,12 +601,15 @@ addNewShares time groupId shares sync =
 insertToStorage : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
 insertToStorage timestamp groupPw accountId groupId pw sync =
     let
+        newReq =
+            Request.invalidatePwCacheIfExists accountId sync.groupPasswordRequestsState
+
         updateFn p fn =
             fn sync.id timestamp ( groupId, p )
     in
         case AES.encryptPassword timestamp groupPw pw of
             Ok encPw ->
-                sync
+                { sync | groupPasswordRequestsState = newReq }
                     |> updateShared
                         (\s ->
                             { s
@@ -885,6 +906,7 @@ merge onShouldDecryptMyShares timestamp other my =
             |> receiveVersion other.id other.shared.version
             -- if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash).
             |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (ORDict.getWith GSet.get newDistributedShares) s.tasks })
+            |> updateGroupPasswordRequest Request.invalidatePwCaches
             |> incrementIf (not (Set.isEmpty sharesITook))
         , cmd
         )

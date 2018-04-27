@@ -64,7 +64,7 @@ viewModel model =
             Data.Sync.numberOfKnownDevices model.syncData
 
         minSecLevel =
-            Data.Options.minSecurityLevel model.options
+            Data.Sync.minSecurityLevel model.options model.syncData
 
         cont =
             column
@@ -247,10 +247,10 @@ viewPage page model =
 
         Passwords ->
             case Views.Dashboard.needsPairingHint model of
-                Just hint ->
+                ( True, hint ) ->
                     hint
 
-                Nothing ->
+                _ ->
                     Views.Passwords.view passwordsConfig model
 
         Devices ->
@@ -284,6 +284,8 @@ passwordsConfig =
     , onTogglePassword = TogglePassword
     , onLockGroupsPressed = LockGroups
     , onAddNewPassword = NavigateTo NewPassword
+    , addPassword = UpdatePassword
+    , onNewPasswordRequirements = NewPasswordRequirements
     , onCopyToClipboard = ShowToast "Copied to clipboard"
     }
 

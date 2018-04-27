@@ -36,7 +36,7 @@ import Route exposing (Page)
 
 
 type Msg
-    = AddPassword String String
+    = AddPassword String
     | SiteNameChanged String
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
@@ -60,6 +60,7 @@ type Msg
     | UpdateNotifications Views.Notifications.State
     | UpdatePasswordView Views.Passwords.Msg
     | SaveEntry Notifications.Id String SiteEntry
+    | UpdatePassword GroupId AccountId String
     | DismissNotification Notifications.Id
     | FillForm AccountId
     | ProtocolMsg Protocol.Msg

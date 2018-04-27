@@ -16,6 +16,9 @@ module Data.RequestGroupPassword
         , removeWaiting
         , removeWaitingGroups
         , cacheAccountPw
+        , invalidatePwCache
+        , invalidatePwCaches
+        , invalidatePwCacheIfExists
         , getAllShares
         , cacheGroupPw
         , getGroupPassword
@@ -288,6 +291,24 @@ tryGetAccountPassword accountId mayEncPw mayPw shouldShow state =
 cacheAccountPw : AccountId -> Password -> Bool -> State -> State
 cacheAccountPw accountId pw shouldShow (State ({ pws } as state)) =
     State { state | pws = Dict.insert accountId ( pw, shouldShow ) pws }
+
+
+invalidatePwCache : AccountId -> State -> State
+invalidatePwCache accountId (State ({ pws } as state)) =
+    State { state | pws = Dict.remove accountId pws }
+
+
+invalidatePwCaches : State -> State
+invalidatePwCaches (State ({ pws } as state)) =
+    State { state | pws = Dict.empty }
+
+
+invalidatePwCacheIfExists : AccountId -> State -> State
+invalidatePwCacheIfExists accountId (State ({ pws } as state)) =
+    if Dict.member accountId pws then
+        invalidatePwCache accountId (State state)
+    else
+        State state
 
 
 cacheGroupPw : GroupId -> GroupPassword -> State -> State

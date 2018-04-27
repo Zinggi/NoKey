@@ -560,6 +560,9 @@ clampedNumberInput onChange label ( min, default, max ) n =
         length =
             max - min
 
+        numInp =
+            inp [ width (px (14 + 14 * String.length (toString m))) ] "number" 5
+
         btn inc txt =
             customButton (Just (onChange (clamp min max (m + inc)))) (el [ width (px 24), Font.size (Styles.scaled 3) ] (text txt))
     in
@@ -575,15 +578,10 @@ clampedNumberInput onChange label ( min, default, max ) n =
 
                 -- , width (fillBetween { min = Nothing, max = Just 500 })
                 ]
-                ((if length >= 3 then
-                    [ inp [ width fill ] "range" 0 ]
-                  else
-                    []
-                 )
-                    ++ [ inp [ width (px (14 + 14 * String.length (toString m))) ] "number" 5
-                       , btn 1 "+"
-                       , btn -1 "-"
-                       ]
+                (if length >= 6 then
+                    [ inp [ width fill ] "range" 0, numInp ]
+                 else
+                    [ numInp, btn 1 "+", btn -1 "-" ]
                 )
             ]
 

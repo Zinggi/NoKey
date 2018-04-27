@@ -73,7 +73,10 @@ pageToTitle page =
             "New Password"
 
         Options ->
-            "Settings"
+            "More"
+
+        Passwords ->
+            "Vault"
 
         other ->
             toString other
