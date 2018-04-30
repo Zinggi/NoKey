@@ -177,7 +177,12 @@ siteLogo : String -> Element msg
 siteLogo siteName =
     let
         letter =
-            String.left 1 siteName
+            (if String.startsWith "www." (String.toLower siteName) then
+                String.dropLeft 4 siteName
+             else
+                siteName
+            )
+                |> String.left 1
                 |> String.toUpper
     in
         -- TODO: maybe use a service to get nice logos.
