@@ -16,7 +16,7 @@ import Data.PasswordMeta
 import Data.Notifications as Notifications exposing (SiteEntry)
 import Data.Sync
 import Data.Storage
-import Data.Options
+import Data.Settings
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
@@ -297,7 +297,7 @@ update msg model =
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials
             -- LogIn can be ignored if we already have an entry for it,
             -- TODO: unless the group is unlocked and the entered password differs from the one we saved.
-            if Data.Sync.numberOfKnownDevices model.syncData < Data.Sync.minSecurityLevel model.options model.syncData then
+            if Data.Sync.numberOfKnownDevices model.syncData < Data.Sync.minSecurityLevel model.syncData then
                 model |> noCmd
             else if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
@@ -305,12 +305,13 @@ update msg model =
                 -- add new password entry
                 model |> updateNotifications (Notifications.newSiteEntry entry True)
 
-        SetOptions options ->
-            let
-                newM =
-                    { model | options = options }
-            in
-                newM |> withCmds [ storeState newM ]
+        SetSettings options ->
+            model
+                |> withCmds [ Helper.withTimestamp (DoSetSettings options) ]
+
+        DoSetSettings options time ->
+            { model | syncData = Data.Sync.setSettings time options model.syncData }
+                |> Api.syncToOthers
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd
@@ -370,7 +371,7 @@ saveEntry groupId entry model =
             Data.Sync.numberOfKnownDevices model.syncData
 
         minSecLevel =
-            Data.Sync.minSecurityLevel model.options model.syncData
+            Data.Sync.minSecurityLevel model.syncData
     in
         { model | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry }
             |> withCmds [ Helper.withTimestamp (InsertSite ( entry.site, entry.login ) ( clamp minSecLevel (min 5 n) entry.securityLevel, groupId ) entry.password) ]

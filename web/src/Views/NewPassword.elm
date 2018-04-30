@@ -5,7 +5,6 @@ import Elements
 import Element exposing (..)
 import Styles
 import Data.Sync
-import Data.Options
 import Views.PasswordGenerator
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Model exposing (Msg(..))
@@ -14,7 +13,7 @@ import Model exposing (Msg(..))
 view model =
     newSiteForm model.requirementsState
         model.newSiteEntry
-        ( Data.Sync.minSecurityLevel model.options model.syncData, Data.Sync.numberOfKnownDevices model.syncData )
+        ( Data.Sync.minSecurityLevel model.syncData, Data.Sync.numberOfKnownDevices model.syncData )
 
 
 newSiteForm : Views.PasswordGenerator.State -> PasswordMetaData -> ( Int, Int ) -> Element Msg

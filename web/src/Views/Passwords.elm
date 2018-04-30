@@ -9,7 +9,7 @@ import Styles
 import Icons
 import Data.RequestGroupPassword as RequestPassword exposing (Status(..), PasswordStatus(..))
 import Data.Sync exposing (SyncData)
-import Data.Options exposing (Options)
+import Data.Settings exposing (Settings)
 import Data exposing (..)
 import Data.TaskList exposing (Task(..))
 import Simple.Fuzzy as Fuzzy
@@ -94,9 +94,9 @@ view config ({ syncData, passwordsView, requirementsState } as model) =
             ]
 
 
-actionButton : Config msg -> { m | syncData : SyncData, options : Options } -> Element msg
+actionButton : Config msg -> { m | syncData : SyncData } -> Element msg
 actionButton config model =
-    if Data.Sync.numberOfKnownDevices model.syncData >= Data.Sync.minSecurityLevel model.options model.syncData then
+    if Data.Sync.numberOfKnownDevices model.syncData >= Data.Sync.minSecurityLevel model.syncData then
         Elements.floatingButton config.onAddNewPassword "Add new"
     else
         empty

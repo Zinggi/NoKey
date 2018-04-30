@@ -18,7 +18,7 @@ import PortUtils
 
 import Helper exposing (withCmds)
 import Data exposing (GroupId, AccountId, Password, DeviceId)
-import Data.Options exposing (Options)
+import Data.Settings exposing (Settings)
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications exposing (Notifications, ShareRequest, SiteEntry)
 import Data.Sync exposing (SyncData)
@@ -77,7 +77,8 @@ type Msg
     | ScanQR
     | OnGotQR String
     | ShowToast String
-    | SetOptions Options
+    | SetSettings Settings
+    | DoSetSettings Settings Time
 
 
 
@@ -112,7 +113,6 @@ type alias Model =
     -- These ones should be serialized:
     , uniqueIdentifyier : String
     , isFirstTimeUser : Bool
-    , options : Options
 
     -- CRDT for synchronisation
     , syncData : SyncData
@@ -157,13 +157,12 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         ( indepSeed, _ ) =
             Random.step Random.independentSeed (Random.initialSeed base)
 
-        { syncData, uniqueIdentifyier, isFirstTimeUser, options } =
+        { syncData, uniqueIdentifyier, isFirstTimeUser } =
             mayState
                 |> Maybe.withDefault
                     { syncData = Data.Sync.init indepSeed encryptionKey signingKey devType uuid
                     , uniqueIdentifyier = uuid
                     , isFirstTimeUser = True
-                    , options = Data.Options.defaults
                     }
     in
         { newSiteEntry = Data.PasswordMeta.default
@@ -180,7 +179,6 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         , isFirstTimeUser = isFirstTimeUser
         , currentPage = Maybe.map Route.fromLocation location |> Maybe.withDefault Route.Home
         , toasties = Toasty.initialState
-        , options = options
         }
 
 

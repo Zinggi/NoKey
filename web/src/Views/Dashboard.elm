@@ -6,7 +6,7 @@ import Elements
 import Route
 import Model exposing (Msg(..), Model)
 import Data.Sync
-import Data.Options exposing (Options)
+import Data.Settings exposing (Settings)
 import Route exposing (Page(..))
 import Styles
 import Views.Passwords
@@ -56,12 +56,12 @@ hints model =
 
 {-| The bool indicates if it should be rendered inside the passwords view
 -}
-needsPairingHint : { a | syncData : Data.Sync.SyncData, options : Options } -> ( Bool, Element Msg )
-needsPairingHint { syncData, options } =
+needsPairingHint : { a | syncData : Data.Sync.SyncData } -> ( Bool, Element Msg )
+needsPairingHint { syncData } =
     let
         ( numDev, minSec, maxLevel ) =
             ( Data.Sync.numberOfKnownDevices syncData
-            , Data.Sync.minSecurityLevel options syncData
+            , Data.Sync.minSecurityLevel syncData
             , Data.Sync.maxUsedSecurityLevel syncData
             )
     in

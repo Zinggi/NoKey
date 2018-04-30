@@ -7,7 +7,7 @@ import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
-import Json.Decode.Pipeline exposing (decode, required)
+import Json.Decode.Pipeline exposing (decode, required, optional)
 import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Time exposing (Time)
@@ -24,7 +24,7 @@ import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersi
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.VClock as VClock exposing (VClock)
 import Crdt.GSet as GSet exposing (GSet)
-import Data.Options
+import Data.Settings exposing (Settings)
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
@@ -107,6 +107,9 @@ type alias SharedData =
 
     -- here we store all passwords, encrypted with the group password
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
+
+    -- We need to sync the settings
+    , settings : Data.Settings.SharedSettings
     , version : VClock
     }
 
@@ -124,6 +127,16 @@ type DeviceType
 isAndroid : SyncData -> Bool
 isAndroid sync =
     sync.deviceType == Android
+
+
+getSettings : SyncData -> Settings
+getSettings sync =
+    Data.Settings.get sync.shared.settings
+
+
+setSettings : Time -> Settings -> SyncData -> SyncData
+setSettings time settings sync =
+    updateShared (\s -> { s | settings = Data.Settings.set sync.id time settings s.settings }) sync
 
 
 sharesToDistribute : SyncData -> Dict GroupId (Dict DeviceId Value)
@@ -162,9 +175,9 @@ minUsedSecurityLevel sync =
         |> Dict.foldl (\acid ( l, _ ) acc -> min acc l) 2
 
 
-minSecurityLevel : Data.Options.Options -> SyncData -> Int
-minSecurityLevel opt sync =
-    min (Data.Options.minSecurityLevel opt) (minUsedSecurityLevel sync)
+minSecurityLevel : SyncData -> Int
+minSecurityLevel sync =
+    min (Data.Settings.minSecurityLevel sync.shared.settings) (minUsedSecurityLevel sync)
 
 
 getShare : GroupId -> SyncData -> Maybe SecretSharing.Share
@@ -219,6 +232,7 @@ initShared seed encryptionKey signingKey devType uuid =
     , sharesToDistribute = ORDict.init seed
     , distributedShares = ORDict.init seed
     , passwords = ORDict.init seed
+    , settings = Data.Settings.init
     , version = VClock.init
     }
 
@@ -900,6 +914,7 @@ merge onShouldDecryptMyShares timestamp other my =
                     ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp)
                         sharesForOthers
                         newSharesToDistribute
+                , settings = Data.Settings.merge other.shared.settings my.shared.settings
                 , version = VClock.merge other.shared.version my.shared.version
                 }
           }
@@ -1016,6 +1031,7 @@ encodeShared shared =
                         shared.sharesToDistribute
                   )
                 , ( "distributedShares", ORDict.encode2 encodeGroupId GSet.encode shared.distributedShares )
+                , ( "settings", Data.Settings.encode shared.settings )
                 , ( "version", VClock.encode shared.version )
                 ]
           )
@@ -1027,26 +1043,28 @@ encodeShared shared =
 
 sharedDecoderV1 : Decoder SharedData
 sharedDecoderV1 =
-    JD.map5
-        (\knownIds passwords sharesToDistribute distributedShares version ->
+    decode
+        (\knownIds passwords sharesToDistribute distributedShares settings version ->
             { knownIds = knownIds
             , passwords = passwords
             , sharesToDistribute = sharesToDistribute
             , distributedShares = distributedShares
+            , settings = settings
             , version = version
             }
         )
-        (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo))
-        (JD.field "passwords" <|
-            ORDict.decoder2 accountIdDecoder
+        |> required "knownIds" (ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo))
+        |> required "passwords"
+            (ORDict.decoder2 accountIdDecoder
                 (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
-        )
-        (JD.field "sharesToDistribute" <|
-            ORDict.decoder2 groupIdDecoder
+            )
+        |> required "sharesToDistribute"
+            (ORDict.decoder2 groupIdDecoder
                 (TimestampedVersionRegister.decoder (JD.dict JD.value))
-        )
-        (JD.field "distributedShares" <| ORDict.decoder2 groupIdDecoder GSet.decoder)
-        (JD.field "version" VClock.decoder)
+            )
+        |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder)
+        |> optional "settings" Data.Settings.decoder Data.Settings.init
+        |> required "version" VClock.decoder
 
 
 sharedDecoder : Decoder SharedData

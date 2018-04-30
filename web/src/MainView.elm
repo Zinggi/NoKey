@@ -15,7 +15,7 @@ import Elements
 import Data.Sync
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
-import Data.Options
+import Data.Settings
 import Views.Dashboard
 import Views.Options
 import Views.Pairing
@@ -64,7 +64,7 @@ viewModel model =
             Data.Sync.numberOfKnownDevices model.syncData
 
         minSecLevel =
-            Data.Sync.minSecurityLevel model.options model.syncData
+            Data.Sync.minSecurityLevel model.syncData
 
         cont =
             column
