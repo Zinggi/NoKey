@@ -528,6 +528,7 @@ grantedShareRequest { shares, time, otherId, ids } model =
                     { state | collectShares = stopAskingDevice (Set.fromList ids) otherId state.collectShares }
                         |> updateState { model | syncData = newSync }
             in
+                -- TODO: if the request is done, inform all, so they stop asking the user
                 case mayForm of
                     Just formData ->
                         -- if done and fillForm is set, call port to fill the form

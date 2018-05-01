@@ -23,6 +23,7 @@ module Data.RequestGroupPassword
         , cacheGroupPw
         , getGroupPassword
         , lockGroups
+        , statusToComparable
         )
 
 import Dict exposing (Dict)
@@ -48,6 +49,16 @@ type Status
     | Waiting Int Int
     | Done (Maybe AccountId) GroupPassword
     | Error String
+
+
+statusToComparable : Status -> String
+statusToComparable st =
+    case st of
+        Done _ _ ->
+            "Done"
+
+        other ->
+            toString other
 
 
 init : State

@@ -148,6 +148,18 @@ update msg model =
                 |> saveEntry groupId { login = userName, site = siteName, password = pw, securityLevel = level }
                 |> mapModel updateSeed
 
+        MovePassword accountId from to ->
+            model |> withCmds [ Helper.withTimestamp (DoMovePassword accountId from to) ]
+
+        DoMovePassword accountId from to time ->
+            let
+                ( newSync, groupsToRequest ) =
+                    Data.Sync.movePassword time accountId from to model.syncData
+            in
+                { model | syncData = newSync }
+                    |> Api.syncToOthers
+                    |> andThenUpdate (Api.requestShares groupsToRequest)
+
         AddPassword pw ->
             let
                 group =

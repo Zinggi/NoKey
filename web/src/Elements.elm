@@ -417,6 +417,18 @@ customPrimaryButton attrs onPress txt =
         }
 
 
+customSelect : (Maybe a -> msg) -> (Bool -> a -> Element msg) -> List a -> Maybe a -> List (Element msg)
+customSelect onSelect renderElement elements selectedElement =
+    List.map
+        (\a ->
+            if selectedElement == Just a then
+                customButton [ Background.color Styles.accentColor ] (Just (onSelect Nothing)) (renderElement True a)
+            else
+                customButton [] (Just (onSelect (Just a))) (renderElement False a)
+        )
+        elements
+
+
 button : Maybe msg -> String -> Element msg
 button onPress txt =
     Input.button []
@@ -445,8 +457,8 @@ delete onPress =
         }
 
 
-customButton : Maybe msg -> Element msg -> Element msg
-customButton onPress inner =
+customButton : List (Attribute msg) -> Maybe msg -> Element msg -> Element msg
+customButton attrs onPress inner =
     Input.button []
         { label =
             el
@@ -458,6 +470,7 @@ customButton onPress inner =
                             Just _ ->
                                 Styles.borderStyle
                        )
+                    ++ attrs
                 )
                 inner
         , onPress = onPress
@@ -569,7 +582,7 @@ clampedNumberInput onChange label ( min, default, max ) n =
             inp [ width (px (14 + 14 * String.length (toString m))) ] "number" 5
 
         btn inc txt =
-            customButton (Just (onChange (clamp min max (m + inc)))) (el [ width (px 24), Font.size (Styles.scaled 3) ] (text txt))
+            customButton [] (Just (onChange (clamp min max (m + inc)))) (el [ width (px 24), Font.size (Styles.scaled 3) ] (text txt))
     in
         column [ height shrink ]
             [ el

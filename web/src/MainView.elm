@@ -286,6 +286,7 @@ passwordsConfig =
     , onAddNewPassword = NavigateTo NewPassword
     , addPassword = UpdatePassword
     , onNewPasswordRequirements = NewPasswordRequirements
+    , movePw = MovePassword
     , onCopyToClipboard = ShowToast "Copied to clipboard"
     }
 

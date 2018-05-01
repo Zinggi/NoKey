@@ -562,6 +562,56 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                         ( newSync, seed3, False, onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers newSync) )
 
 
+doMovePassword : Time -> AccountId -> GroupPassword -> GroupId -> SyncData -> SyncData
+doMovePassword time accountId toPw to sync =
+    case getPassword accountId sync of
+        Just pw ->
+            -- get pw, then insert pw. we dont have to delete the password from the old place,
+            -- as there can only be one accountId
+            sync
+                |> insertToStorage time toPw accountId to pw
+                |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) Dict.empty s.tasks })
+
+        Nothing ->
+            Debug.log "This should never happen: We have the group password, but we can't read the password??" ()
+                |> always sync
+
+
+movePassword : Time -> AccountId -> GroupId -> GroupId -> SyncData -> ( SyncData, List GroupId )
+movePassword time accountId from to sync =
+    let
+        getGroupPw g =
+            Request.getGroupPassword g sync.groupPasswordRequestsState
+
+        addToTasks s groups =
+            { s | tasks = Tasks.moveAccountFromTo accountId from to s.tasks }
+                |> (\s ->
+                        -- indicate we are waiting for group to unlock
+                        List.foldl
+                            (\groupId acc ->
+                                updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId acc)) acc
+                            )
+                            s
+                            groups
+                   )
+                |> (\s -> ( s, groups ))
+    in
+        case ( getGroupPw from, getGroupPw to ) of
+            ( Just fromPw, Just toPw ) ->
+                -- We can move the password
+                ( doMovePassword time accountId toPw to sync, [] )
+
+            -- add to task if we can't do it right now
+            ( Just _, Nothing ) ->
+                addToTasks sync [ to ]
+
+            ( Nothing, Just _ ) ->
+                addToTasks sync [ from ]
+
+            ( Nothing, Nothing ) ->
+                addToTasks sync [ from, to ]
+
+
 getEncryptionKeyOf : DeviceId -> SyncData -> Maybe Value
 getEncryptionKeyOf devId sync =
     knownIds sync
@@ -714,6 +764,27 @@ addShares onShouldAddNewShares time shares sync =
         )
         ( sync, Nothing, Cmd.none )
         shares
+        |> (\( s, mAcc, cmd ) ->
+                -- Move passwords that can be moved
+                let
+                    getGroupPw g =
+                        Request.getGroupPassword g s.groupPasswordRequestsState
+
+                    newSync =
+                        Tasks.processMoveFromTo
+                            (\accountId from to acc ->
+                                case ( getGroupPw from, getGroupPw to ) of
+                                    ( Just fromPw, Just toPw ) ->
+                                        doMovePassword time accountId toPw to acc
+
+                                    _ ->
+                                        acc
+                            )
+                            s.tasks
+                            s
+                in
+                    ( newSync, mAcc, cmd )
+           )
 
 
 addShare : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
@@ -920,7 +991,7 @@ merge onShouldDecryptMyShares timestamp other my =
           }
             |> receiveVersion other.id other.shared.version
             -- if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash).
-            |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (ORDict.getWith GSet.get newDistributedShares) s.tasks })
+            |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) (ORDict.getWith GSet.get newDistributedShares) s.tasks })
             |> updateGroupPasswordRequest Request.invalidatePwCaches
             |> incrementIf (not (Set.isEmpty sharesITook))
         , cmd

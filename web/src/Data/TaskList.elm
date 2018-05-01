@@ -3,6 +3,8 @@ module Data.TaskList
         ( TaskList
         , Task(..)
         , getTasks
+        , moveAccountFromTo
+        , processMoveFromTo
         , getProgress
         , resolveWaitingTasks
         , getStashFor
@@ -24,9 +26,10 @@ import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
 import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
+import Json.Decode.Pipeline as JD exposing (required, optional)
 import Data.RequestGroupPassword as Request exposing (PasswordStatus(..), Status)
 import Data exposing (..)
-import Helper exposing (encodeTuple3, decodeTuple3)
+import Helper exposing (encodeTuple3, decodeTuple3, encodeTuple, decodeTuple, encodeSet, decodeSet)
 
 
 {-
@@ -48,12 +51,13 @@ type alias TaskList =
     { stash : Dict AccountId ( GroupId, Reason, Password )
     , visiblePws : Set AccountId
     , groupPws : Dict GroupId GroupPassword
+    , movePws : Dict ( GroupId, GroupId ) (Set AccountId)
     }
 
 
 init : TaskList
 init =
-    { stash = Dict.empty, groupPws = Dict.empty, visiblePws = Set.empty }
+    { stash = Dict.empty, groupPws = Dict.empty, visiblePws = Set.empty, movePws = Dict.empty }
 
 
 encode : TaskList -> Value
@@ -61,27 +65,27 @@ encode tasks =
     JE.object
         [ ( "stash", JE.dict (encodeAccountId >> JE.encode 0) (encodeTuple3 encodeGroupId encodeReason JE.string) tasks.stash )
         , ( "groupPws", JE.dict (encodeGroupId >> JE.encode 0) (List.map JE.int >> JE.list) tasks.groupPws )
+        , ( "movePws", JE.dict (encodeTuple encodeGroupId >> JE.encode 0) (encodeSet encodeAccountId) tasks.movePws )
         ]
 
 
 decoder : Decoder TaskList
 decoder =
-    JD.map2 (\stash groupPws -> { stash = stash, groupPws = groupPws, visiblePws = Set.empty })
-        (JD.field "stash" <| JD.dict2 accountIdDecoder (decodeTuple3 groupIdDecoder reasonDecoder JD.string))
-        (JD.field "groupPws" <| JD.dict2 groupIdDecoder (JD.list JD.int))
+    JD.decode (\stash groupPws movePws -> { stash = stash, groupPws = groupPws, visiblePws = Set.empty, movePws = movePws })
+        |> required "stash" (JD.dict2 accountIdDecoder (decodeTuple3 groupIdDecoder reasonDecoder JD.string))
+        |> required "groupPws" (JD.dict2 groupIdDecoder (JD.list JD.int))
+        |> optional "movePws" (JD.dict2 (decodeTuple groupIdDecoder) (decodeSet accountIdDecoder)) Dict.empty
 
 
-type
-    Task
-    -- TODO: add more cases, e.g:
-    --      MoveFromGroupToGroup { pws: List AccountId, from: GroupId, to: GroupId }
-    = MoveFromStashToGroup { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status }
-    | WaitForKeysDistributed { accounts : Dict String (Dict String PasswordStatus), group : GroupId, status : Status, progress : Int }
+type Task
+    = MoveFromGroupToGroup { accounts : Dict String (Dict String ()), from : GroupId, fromStatus : Status, to : GroupId, toStatus : Status }
+    | MoveFromStashToGroup { accounts : Dict String (Dict String ()), group : GroupId, status : Status }
+    | WaitForKeysDistributed { accounts : Dict String (Dict String ()), group : GroupId, status : Status, progress : Int }
     | CreateMoreShares { for : List Device, group : GroupId, status : Status }
 
 
-resolveWaitingTasks : Dict GroupId (Set String) -> TaskList -> TaskList
-resolveWaitingTasks dict tasks =
+resolveWaitingTasks : Dict AccountId GroupId -> Dict GroupId (Set String) -> TaskList -> TaskList
+resolveWaitingTasks accounts newDistributedShares tasks =
     Dict.foldl
         (\(( level, _ ) as groupId) set acc ->
             if Set.size set >= level then
@@ -98,7 +102,40 @@ resolveWaitingTasks dict tasks =
                 acc
         )
         tasks
-        dict
+        newDistributedShares
+        -- Resolve MoveFromGroupToGroup
+        |> (\ts ->
+                Dict.foldl
+                    (\( from, to ) accountIds acc ->
+                        if haveMovedToDestination accounts accountIds to then
+                            { acc | movePws = Dict.remove ( from, to ) acc.movePws }
+                        else
+                            acc
+                    )
+                    ts
+                    ts.movePws
+           )
+
+
+moveAccountFromTo : AccountId -> GroupId -> GroupId -> TaskList -> TaskList
+moveAccountFromTo accountId from to tasks =
+    { tasks | movePws = Helper.insertOrUpdate ( from, to ) (Set.singleton accountId) (Set.insert accountId) tasks.movePws }
+
+
+processMoveFromTo : (AccountId -> GroupId -> GroupId -> a -> a) -> TaskList -> a -> a
+processMoveFromTo f tasks start =
+    Dict.foldl
+        (\( from, to ) accounts acc ->
+            Set.foldl (\accountId acc2 -> f accountId from to acc2) acc accounts
+        )
+        start
+        tasks.movePws
+
+
+haveMovedToDestination : Dict AccountId GroupId -> Set AccountId -> GroupId -> Bool
+haveMovedToDestination accounts accountIds destination =
+    Set.toList accountIds
+        |> List.all (\accountId -> Dict.get accountId accounts == Just destination)
 
 
 getProgress : GroupId -> Dict GroupId (Set String) -> Int
@@ -113,13 +150,7 @@ getTasks request groupsNotFullyDistributed progress tasks =
         (\(( siteName, userName ) as accountId) ( groupId, reason, pw ) acc ->
             let
                 insert d =
-                    Dict.insert userName
-                        (if Set.member ( siteName, userName ) tasks.visiblePws then
-                            Unlocked pw
-                         else
-                            UnlockedButHidden
-                        )
-                        d
+                    Dict.insert userName () d
 
                 insertOrUpdate it =
                     Helper.insertOrUpdate siteName (insert Dict.empty) insert it
@@ -167,6 +198,34 @@ getTasks request groupsNotFullyDistributed progress tasks =
                     )
                     ts
                     groupsNotFullyDistributed
+           )
+        -- add MoveFromGroupToGroup tasks
+        |> (\ts ->
+                Dict.foldl
+                    (\( from, to ) accountIds acc ->
+                        let
+                            insert userName d =
+                                Dict.insert userName () d
+
+                            accounts =
+                                Set.foldl
+                                    (\( siteName, login ) acc ->
+                                        Helper.insertOrUpdate siteName (insert login Dict.empty) (insert login) acc
+                                    )
+                                    Dict.empty
+                                    accountIds
+                        in
+                            MoveFromGroupToGroup
+                                { from = from
+                                , to = to
+                                , fromStatus = Request.getStatus from request
+                                , toStatus = Request.getStatus to request
+                                , accounts = accounts
+                                }
+                                :: acc
+                    )
+                    ts
+                    tasks.movePws
            )
 
 

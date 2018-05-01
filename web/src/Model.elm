@@ -76,6 +76,8 @@ type Msg
     | ToastyMsg (Toasty.Msg String)
     | ScanQR
     | OnGotQR String
+    | MovePassword AccountId GroupId GroupId
+    | DoMovePassword AccountId GroupId GroupId Time
     | ShowToast String
     | SetSettings Settings
     | DoSetSettings Settings Time
