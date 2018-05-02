@@ -1,4 +1,11 @@
-
+.elm-overlay {
+    z-index: 100;
+}
+.elm-mini-controls {
+    top: 0 !important;
+    bottom: initial !important;
+    right: 0 !important;
+}
 #newUpdate {
     position: fixed;
     z-index: 1000;

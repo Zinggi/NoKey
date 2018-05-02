@@ -77,11 +77,13 @@ decoder =
         |> optional "movePws" (JD.dict2 (decodeTuple groupIdDecoder) (decodeSet accountIdDecoder)) Dict.empty
 
 
+{-| This type contains all relevant information for the UI
+-}
 type Task
-    = MoveFromGroupToGroup { accounts : Dict String (Dict String ()), from : GroupId, fromStatus : Status, to : GroupId, toStatus : Status }
-    | MoveFromStashToGroup { accounts : Dict String (Dict String ()), group : GroupId, status : Status }
-    | WaitForKeysDistributed { accounts : Dict String (Dict String ()), group : GroupId, status : Status, progress : Int }
-    | CreateMoreShares { for : List Device, group : GroupId, status : Status }
+    = MoveFromGroupToGroup { accounts : Dict String (Dict String ()), from : Group, fromStatus : Status, to : Group, toStatus : Status }
+    | MoveFromStashToGroup { accounts : Dict String (Dict String ()), group : Group, status : Status }
+    | WaitForKeysDistributed { accounts : Dict String (Dict String ()), group : Group, status : Status, progress : Int }
+    | CreateMoreShares { for : List Device, group : Group, status : Status }
 
 
 resolveWaitingTasks : Dict AccountId GroupId -> Dict GroupId (Set String) -> TaskList -> TaskList
@@ -143,90 +145,94 @@ getProgress groupId dict =
     Dict.get groupId dict |> Maybe.map Set.size |> Maybe.withDefault 0
 
 
-getTasks : Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> TaskList -> List Task
-getTasks request groupsNotFullyDistributed progress tasks =
-    -- Collect all same groups into a single task
-    Dict.foldl
-        (\(( siteName, userName ) as accountId) ( groupId, reason, pw ) acc ->
-            let
-                insert d =
-                    Dict.insert userName () d
+getTasks : Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> Dict GroupId String -> TaskList -> List Task
+getTasks request groupsNotFullyDistributed progress postFixDict tasks =
+    let
+        getGroup groupId =
+            ( groupId, Helper.dictGetWithDefault "" groupId postFixDict )
+    in
+        -- Collect all same groups into a single task
+        Dict.foldl
+            (\(( siteName, userName ) as accountId) ( groupId, reason, pw ) acc ->
+                let
+                    insert d =
+                        Dict.insert userName () d
 
-                insertOrUpdate it =
-                    Helper.insertOrUpdate siteName (insert Dict.empty) insert it
+                    insertOrUpdate it =
+                        Helper.insertOrUpdate siteName (insert Dict.empty) insert it
 
-                add it =
-                    case reason of
-                        GroupLocked ->
-                            { it | moveFromStashToGroup = insertOrUpdate it.moveFromStashToGroup }
+                    add it =
+                        case reason of
+                            GroupLocked ->
+                                { it | moveFromStashToGroup = insertOrUpdate it.moveFromStashToGroup }
 
-                        KeysNotYetDistributed ->
-                            { it | waitForKeysDistributed = insertOrUpdate it.waitForKeysDistributed }
-            in
-                Helper.insertOrUpdate groupId (add { moveFromStashToGroup = Dict.empty, waitForKeysDistributed = Dict.empty }) add acc
-        )
-        Dict.empty
-        tasks.stash
-        -- convert to tasks
-        |> Dict.foldl
-            (\groupId { moveFromStashToGroup, waitForKeysDistributed } acc ->
-                (if Dict.isEmpty moveFromStashToGroup then
-                    -- only add if not empty
-                    []
-                 else
-                    [ MoveFromStashToGroup { accounts = moveFromStashToGroup, group = groupId, status = Request.getStatus groupId request } ]
-                )
-                    ++ (if Dict.isEmpty waitForKeysDistributed then
-                            []
-                        else
-                            [ WaitForKeysDistributed
-                                { accounts = waitForKeysDistributed
-                                , group = groupId
-                                , progress = getProgress groupId progress
-                                , status = Request.getStatus groupId request
-                                }
-                            ]
-                       )
-                    ++ acc
+                            KeysNotYetDistributed ->
+                                { it | waitForKeysDistributed = insertOrUpdate it.waitForKeysDistributed }
+                in
+                    Helper.insertOrUpdate groupId (add { moveFromStashToGroup = Dict.empty, waitForKeysDistributed = Dict.empty }) add acc
             )
-            []
-        -- add CreateMoreShares task
-        |> (\ts ->
-                Dict.foldl
-                    (\groupId devices acc ->
-                        CreateMoreShares { group = groupId, status = Request.getStatus groupId request, for = devices } :: acc
+            Dict.empty
+            tasks.stash
+            -- convert to tasks
+            |> Dict.foldl
+                (\groupId { moveFromStashToGroup, waitForKeysDistributed } acc ->
+                    (if Dict.isEmpty moveFromStashToGroup then
+                        -- only add if not empty
+                        []
+                     else
+                        [ MoveFromStashToGroup { accounts = moveFromStashToGroup, group = getGroup groupId, status = Request.getStatus groupId request } ]
                     )
-                    ts
-                    groupsNotFullyDistributed
-           )
-        -- add MoveFromGroupToGroup tasks
-        |> (\ts ->
-                Dict.foldl
-                    (\( from, to ) accountIds acc ->
-                        let
-                            insert userName d =
-                                Dict.insert userName () d
+                        ++ (if Dict.isEmpty waitForKeysDistributed then
+                                []
+                            else
+                                [ WaitForKeysDistributed
+                                    { accounts = waitForKeysDistributed
+                                    , group = getGroup groupId
+                                    , progress = getProgress groupId progress
+                                    , status = Request.getStatus groupId request
+                                    }
+                                ]
+                           )
+                        ++ acc
+                )
+                []
+            -- add CreateMoreShares task
+            |> (\ts ->
+                    Dict.foldl
+                        (\groupId devices acc ->
+                            CreateMoreShares { group = getGroup groupId, status = Request.getStatus groupId request, for = devices } :: acc
+                        )
+                        ts
+                        groupsNotFullyDistributed
+               )
+            -- add MoveFromGroupToGroup tasks
+            |> (\ts ->
+                    Dict.foldl
+                        (\( from, to ) accountIds acc ->
+                            let
+                                insert userName d =
+                                    Dict.insert userName () d
 
-                            accounts =
-                                Set.foldl
-                                    (\( siteName, login ) acc ->
-                                        Helper.insertOrUpdate siteName (insert login Dict.empty) (insert login) acc
-                                    )
-                                    Dict.empty
-                                    accountIds
-                        in
-                            MoveFromGroupToGroup
-                                { from = from
-                                , to = to
-                                , fromStatus = Request.getStatus from request
-                                , toStatus = Request.getStatus to request
-                                , accounts = accounts
-                                }
-                                :: acc
-                    )
-                    ts
-                    tasks.movePws
-           )
+                                accounts =
+                                    Set.foldl
+                                        (\( siteName, login ) acc ->
+                                            Helper.insertOrUpdate siteName (insert login Dict.empty) (insert login) acc
+                                        )
+                                        Dict.empty
+                                        accountIds
+                            in
+                                MoveFromGroupToGroup
+                                    { from = getGroup from
+                                    , to = getGroup to
+                                    , fromStatus = Request.getStatus from request
+                                    , toStatus = Request.getStatus to request
+                                    , accounts = accounts
+                                    }
+                                    :: acc
+                        )
+                        ts
+                        tasks.movePws
+               )
 
 
 insertGroupPw : GroupId -> GroupPassword -> TaskList -> TaskList

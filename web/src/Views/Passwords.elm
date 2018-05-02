@@ -184,19 +184,23 @@ passwords config state requirementsState sync =
     Elements.container (Data.Sync.mapGroups (viewSites config state requirementsState sync) sync)
 
 
-viewSites : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSites config state requirementsState sync groupId shares groupStatus accounts =
-    [ viewGroupHeader config groupId (shares < Tuple.first groupId) groupStatus
-    , viewSitesList config requirementsState sync groupId (shares < Tuple.first groupId) groupStatus state accounts
-    ]
-        |> column (spacing (Styles.paddingScale 2) :: height shrink :: Styles.grayedOutIf (shares < Tuple.first groupId))
+viewSites : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> Group -> Int -> Status -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSites config state requirementsState sync group shares groupStatus accounts =
+    let
+        notEnoughShares =
+            shares < getLevel group
+    in
+        [ viewGroupHeader config group notEnoughShares groupStatus
+        , viewSitesList config requirementsState sync group notEnoughShares groupStatus state accounts
+        ]
+            |> column (spacing (Styles.paddingScale 2) :: height shrink :: Styles.grayedOutIf notEnoughShares)
 
 
-viewSitesList : Config msg -> Views.PasswordGenerator.State -> SyncData -> GroupId -> Bool -> Status -> State -> Dict String (Dict String PasswordStatus) -> Element msg
-viewSitesList config requirementsState sync groupId disabled groupStatus state accounts =
+viewSitesList : Config msg -> Views.PasswordGenerator.State -> SyncData -> Group -> Bool -> Status -> State -> Dict String (Dict String PasswordStatus) -> Element msg
+viewSitesList config requirementsState sync group disabled groupStatus state accounts =
     Dict.foldl
         (\siteName userNames acc ->
-            viewPw config requirementsState sync groupId disabled groupStatus state siteName userNames :: acc
+            viewPw config requirementsState sync group disabled groupStatus state siteName userNames :: acc
         )
         []
         accounts
@@ -214,16 +218,16 @@ viewSitesListSimple config state accounts =
         |> Elements.stripedList (Styles.cardShadow 1) [ width fill ]
 
 
-viewGroupHeader : Config msg -> GroupId -> Bool -> Status -> Element msg
-viewGroupHeader config groupId disabled groupStatus =
+viewGroupHeader : Config msg -> Group -> Bool -> Status -> Element msg
+viewGroupHeader config group disabled groupStatus =
     row []
-        [ el [ alignLeft ] (viewGroup groupId groupStatus)
-        , el [ alignRight ] (viewGroupStatus config [ groupId ] disabled groupStatus)
+        [ el [ alignLeft ] (viewGroup group groupStatus)
+        , el [ alignRight ] (viewGroupStatus config [ group ] disabled groupStatus)
         ]
 
 
-viewPw : Config msg -> Views.PasswordGenerator.State -> SyncData -> GroupId -> Bool -> Status -> State -> String -> Dict String PasswordStatus -> Element msg
-viewPw config requirementsState sync groupId disabled groupStatus state siteName userNames =
+viewPw : Config msg -> Views.PasswordGenerator.State -> SyncData -> Group -> Bool -> Status -> State -> String -> Dict String PasswordStatus -> Element msg
+viewPw config requirementsState sync group disabled groupStatus state siteName userNames =
     let
         filterd =
             List.filterMap
@@ -242,7 +246,7 @@ viewPw config requirementsState sync groupId disabled groupStatus state siteName
                 (Set.member siteName state.expandedSites)
                 [ width fill ]
                 (viewSiteHeader siteName userNames)
-                (viewSiteData config state requirementsState sync siteName userNames groupId disabled groupStatus)
+                (viewSiteData config state requirementsState sync siteName userNames group disabled groupStatus)
 
 
 viewSiteHeader : String -> Dict String a -> Element msg
@@ -259,81 +263,85 @@ viewSiteHeader siteName userNames =
             ]
 
 
-viewSiteData : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> String -> Dict String PasswordStatus -> GroupId -> Bool -> Status -> Element msg
-viewSiteData config state requirementsState sync siteName userNames groupId disabled groupStatus =
-    column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 4) ]
-        (Dict.toList userNames
-            |> List.map
-                (\( login, status ) ->
-                    column [ spacing (Styles.paddingScale 1) ]
-                        [ column [ spacing (Styles.paddingScale 1) ]
-                            [ Elements.inputText [] Nothing { label = "Login", placeholder = "" } login
-                            , if state.editPw == Just ( siteName, login ) then
-                                empty
-                              else
-                                viewStatus config sync ( siteName, login ) status
-                            ]
-                        , if RequestPassword.isUnlocked status then
-                            if state.editPw == Just ( siteName, login ) then
-                                column []
-                                    [ Views.PasswordGenerator.view (config.addPassword groupId ( siteName, login ))
-                                        True
-                                        config.onNewPasswordRequirements
-                                        requirementsState
-                                    , Elements.button (Just (config.toMsg CancelEdit)) "Cancel Edit"
-                                    ]
-                            else if state.movePw == Just ( siteName, login ) then
-                                column []
-                                    [ row []
-                                        (Elements.customSelect (config.toMsg << SelectGroup)
-                                            (\isSelected groupId ->
-                                                Elements.groupIcon True groupId
-                                            )
-                                            (Data.Sync.groups sync |> List.filter (\g -> groupId /= g))
-                                            state.selectedGroup
-                                        )
-                                    , row []
-                                        [ Elements.button (Just (config.toMsg CancelEdit)) "Cancel Move"
-                                        , case state.selectedGroup of
-                                            Just g ->
-                                                Elements.primaryButton (Just (config.movePw ( siteName, login ) groupId g)) "Move"
-
-                                            Nothing ->
-                                                empty
+viewSiteData : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> String -> Dict String PasswordStatus -> Group -> Bool -> Status -> Element msg
+viewSiteData config state requirementsState sync siteName userNames group disabled groupStatus =
+    let
+        ( groupId, _ ) =
+            group
+    in
+        column [ padding (Styles.paddingScale 2), spacing (Styles.paddingScale 4) ]
+            (Dict.toList userNames
+                |> List.map
+                    (\( login, status ) ->
+                        column [ spacing (Styles.paddingScale 1) ]
+                            [ column [ spacing (Styles.paddingScale 1) ]
+                                [ Elements.inputText [] Nothing { label = "Login", placeholder = "" } login
+                                , if state.editPw == Just ( siteName, login ) then
+                                    empty
+                                  else
+                                    viewStatus config sync ( siteName, login ) status
+                                ]
+                            , if RequestPassword.isUnlocked status then
+                                if state.editPw == Just ( siteName, login ) then
+                                    column []
+                                        [ Views.PasswordGenerator.view (config.addPassword groupId ( siteName, login ))
+                                            True
+                                            config.onNewPasswordRequirements
+                                            requirementsState
+                                        , Elements.button (Just (config.toMsg CancelEdit)) "Cancel Edit"
                                         ]
-                                    ]
-                            else
-                                row []
-                                    [ Elements.button (Just (config.toMsg (EditPassword ( siteName, login )))) "Edit"
-                                    , if List.length (Data.Sync.groups sync) >= 2 then
-                                        Elements.button (Just (config.toMsg (MovePw ( siteName, login )))) "Move"
-                                      else
-                                        empty
-                                    , Elements.delete (config.onDeletePassword ( siteName, login ))
-                                    ]
-                          else
-                            viewGroupStatus config [ groupId ] disabled groupStatus
-                        ]
-                )
-        )
+                                else if state.movePw == Just ( siteName, login ) then
+                                    column []
+                                        [ row []
+                                            (Elements.customSelect (config.toMsg << SelectGroup << Maybe.map Tuple.first)
+                                                (\isSelected group ->
+                                                    Elements.groupIcon True group
+                                                )
+                                                (\( g, _ ) -> Just g == state.selectedGroup)
+                                                (Data.Sync.namedGroups sync |> List.filter (\( g, _ ) -> groupId /= g))
+                                            )
+                                        , row []
+                                            [ Elements.button (Just (config.toMsg CancelEdit)) "Cancel Move"
+                                            , case state.selectedGroup of
+                                                Just g ->
+                                                    Elements.primaryButton (Just (config.movePw ( siteName, login ) groupId g)) "Move"
+
+                                                Nothing ->
+                                                    empty
+                                            ]
+                                        ]
+                                else
+                                    row []
+                                        [ Elements.button (Just (config.toMsg (EditPassword ( siteName, login )))) "Edit"
+                                        , if List.length (Data.Sync.groups sync) >= 2 then
+                                            Elements.button (Just (config.toMsg (MovePw ( siteName, login )))) "Move"
+                                          else
+                                            empty
+                                        , Elements.delete (config.onDeletePassword ( siteName, login ))
+                                        ]
+                              else
+                                viewGroupStatus config [ group ] disabled groupStatus
+                            ]
+                    )
+            )
 
 
-unlockGroupsButton : (List GroupId -> Maybe AccountId -> msg) -> List ( GroupId, Status ) -> Element msg
+unlockGroupsButton : (List GroupId -> Maybe AccountId -> msg) -> List ( Group, Status ) -> Element msg
 unlockGroupsButton onRequestPasswordPressed =
     groupsButtonHelper "Unlock" (\ids -> onRequestPasswordPressed ids Nothing)
 
 
-lockGroupsButton : (List GroupId -> msg) -> List ( GroupId, Status ) -> Element msg
+lockGroupsButton : (List GroupId -> msg) -> List ( Group, Status ) -> Element msg
 lockGroupsButton =
     groupsButtonHelper "Lock"
 
 
-groupsButtonHelper : String -> (List GroupId -> msg) -> List ( GroupId, Status ) -> Element msg
+groupsButtonHelper : String -> (List GroupId -> msg) -> List ( Group, Status ) -> Element msg
 groupsButtonHelper txt onPress groups =
     let
         groupIds =
-            List.map (Tuple.first) groups
-                |> List.filter (\x -> Tuple.first x /= 1)
+            List.map (Tuple.first << Tuple.first) groups
+                |> List.filter (\( l, _ ) -> l /= 1)
     in
         if List.isEmpty groupIds then
             empty
@@ -343,23 +351,22 @@ groupsButtonHelper txt onPress groups =
                 (row [ spacing (Styles.paddingScale 0) ] [ Elements.text txt, viewGroups groups ])
 
 
-viewGroups : List ( GroupId, Status ) -> Element msg
+viewGroups : List ( Group, Status ) -> Element msg
 viewGroups groups =
     row [] (Elements.enumeration (\( g, s ) -> viewGroup g s) groups)
 
 
-viewGroup : GroupId -> Status -> Element msg
-viewGroup groupId status =
-    -- TODO: maybe show more info here, e.g. who has a key
+viewGroup : Group -> Status -> Element msg
+viewGroup group status =
     case status of
         Done _ _ ->
-            Elements.groupIcon False groupId
+            Elements.groupIcon False group
 
         _ ->
-            Elements.groupIcon True groupId
+            Elements.groupIcon True group
 
 
-viewGroupsStatus : Config msg -> List ( GroupId, Status ) -> Bool -> Element msg
+viewGroupsStatus : Config msg -> List ( Group, Status ) -> Bool -> Element msg
 viewGroupsStatus config groups disabled =
     let
         groupedByStatus =
@@ -383,7 +390,7 @@ viewGroupsStatus config groups disabled =
                 |> row []
 
 
-viewGroupStatus : Config msg -> List GroupId -> Bool -> Status -> Element msg
+viewGroupStatus : Config msg -> List Group -> Bool -> Status -> Element msg
 viewGroupStatus config groupIds disabled status =
     let
         idsWithStatus =

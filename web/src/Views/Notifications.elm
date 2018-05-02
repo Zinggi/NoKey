@@ -38,43 +38,52 @@ view config sync ns ( minSecLevel, numberOfKnownDevices ) state =
 
 viewEntry : Config msg -> SyncData -> ( Int, Int ) -> Notification -> State -> Element msg
 viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state =
-    (case n.data of
-        ShareRequestT req ->
-            [ column []
-                [ Elements.avatar [] (Data.Sync.getDevice req.deviceId sync)
-                , Elements.p "wants to unlock"
-                , row [] (Elements.enumeration (Elements.groupIcon True) (Set.toList req.keys))
+    let
+        groups gs =
+            let
+                dict =
+                    Data.Sync.namedGroupsDict sync
+            in
+                Set.toList gs
+                    |> List.map (\g -> ( g, Data.Sync.getPostFixFromDict g dict ))
+    in
+        (case n.data of
+            ShareRequestT req ->
+                [ column []
+                    [ Elements.avatar [] (Data.Sync.getDevice req.deviceId sync)
+                    , Elements.p "wants to unlock"
+                    , row [] (Elements.enumeration (Elements.groupIcon True) (groups req.keys))
+                    ]
+                , Elements.buttonRow []
+                    [ Elements.button (Just (config.onRejectRequest n.id req)) "Disallow"
+                    , Elements.primaryButton (Just (config.onGrantRequest n.id req)) "Allow"
+                    ]
                 ]
-            , Elements.buttonRow []
-                [ Elements.button (Just (config.onRejectRequest n.id req)) "Disallow"
-                , Elements.primaryButton (Just (config.onGrantRequest n.id req)) "Allow"
-                ]
-            ]
 
-        ExternalSiteEntry entry isNew ->
-            [ Elements.h3 <|
-                if isNew then
-                    "Save this site?"
-                else
-                    "Save updated password?"
-            , Elements.inputText [] Nothing { label = "Site", placeholder = "" } entry.site
-            , Elements.inputText [] Nothing { label = "Login", placeholder = "" } entry.login
-            , Elements.password [] Nothing False entry.password
-            , Elements.clampedNumberInput config.toMsg "Security Level" ( minSecLevel, 2, min 5 numberOfKnownDevices ) state
-            , Elements.buttonRow []
-                [ Elements.primaryButton
-                    (if numberOfKnownDevices < minSecLevel then
-                        Nothing
-                     else
-                        Just
-                            (config.onSaveEntry n.id
-                                (Data.Sync.currentGroupId state sync)
-                                { entry | securityLevel = clamp minSecLevel 5 state }
-                            )
-                    )
-                    "Save"
-                , Elements.button (Just (config.onDismiss n.id)) "Forget"
+            ExternalSiteEntry entry isNew ->
+                [ Elements.h3 <|
+                    if isNew then
+                        "Save this site?"
+                    else
+                        "Save updated password?"
+                , Elements.inputText [] Nothing { label = "Site", placeholder = "" } entry.site
+                , Elements.inputText [] Nothing { label = "Login", placeholder = "" } entry.login
+                , Elements.password [] Nothing False entry.password
+                , Elements.clampedNumberInput config.toMsg "Security Level" ( minSecLevel, 2, min 5 numberOfKnownDevices ) state
+                , Elements.buttonRow []
+                    [ Elements.primaryButton
+                        (if numberOfKnownDevices < minSecLevel then
+                            Nothing
+                         else
+                            Just
+                                (config.onSaveEntry n.id
+                                    (Data.Sync.currentGroupId state sync)
+                                    { entry | securityLevel = clamp minSecLevel 5 state }
+                                )
+                        )
+                        "Save"
+                    , Elements.button (Just (config.onDismiss n.id)) "Forget"
+                    ]
                 ]
-            ]
-    )
-        |> column [ height shrink, width fill, padding (Styles.paddingScale 3), spacing (Styles.paddingScale 2) ]
+        )
+            |> column [ height shrink, width fill, padding (Styles.paddingScale 3), spacing (Styles.paddingScale 2) ]

@@ -417,11 +417,11 @@ customPrimaryButton attrs onPress txt =
         }
 
 
-customSelect : (Maybe a -> msg) -> (Bool -> a -> Element msg) -> List a -> Maybe a -> List (Element msg)
-customSelect onSelect renderElement elements selectedElement =
+customSelect : (Maybe a -> msg) -> (Bool -> a -> Element msg) -> (a -> Bool) -> List a -> List (Element msg)
+customSelect onSelect renderElement isSelected elements =
     List.map
         (\a ->
-            if selectedElement == Just a then
+            if isSelected a then
                 customButton [ Background.color Styles.accentColor ] (Just (onSelect Nothing)) (renderElement True a)
             else
                 customButton [] (Just (onSelect (Just a))) (renderElement False a)
@@ -502,10 +502,14 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
         }
 
 
-groupIcon : Bool -> GroupId -> Element msg
-groupIcon isLocked ( level, _ ) =
+groupIcon : Bool -> Group -> Element msg
+groupIcon isLocked ( ( level, _ ), post ) =
     row [ width shrink ]
         [ h3 (toString level)
+        , if post == "" then
+            empty
+          else
+            p ("(" ++ post ++ ")")
         , if isLocked then
             Icons.small Icons.locked
           else

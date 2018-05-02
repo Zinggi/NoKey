@@ -155,12 +155,47 @@ accounts sync =
         |> Dict.map (\key ( groupId, _ ) -> groupId)
 
 
-groups : SyncData -> List GroupId
-groups sync =
+allGroups : SyncData -> List GroupId
+allGroups sync =
     accounts sync
         |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
         |> (\s -> Dict.foldl (\groupId _ acc -> Set.insert groupId acc) s (ORDict.get sync.shared.distributedShares))
         |> Set.toList
+
+
+{-| This is different to allGroups, as it will only contain the groups that are actually in use
+-}
+groups : SyncData -> List GroupId
+groups sync =
+    accounts sync
+        |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
+        |> Set.toList
+
+
+{-| Gets all the groups, and a string containing a postfix to distinguish groups of the same level.
+-}
+namedGroups : SyncData -> List ( GroupId, String )
+namedGroups sync =
+    groups sync
+        |> Dict.groupBy Tuple.first
+        -- Now we have a Dict Level (List GroupId)
+        |> Dict.map
+            (\level groupIds ->
+                List.map Tuple.second groupIds
+                    |> (\ids -> List.map2 (\id post -> ( ( level, id ), post )) ids (Helper.findNonEqualBeginning ids))
+            )
+        -- Now we have a Dict Level (List (GroupId, PostFix))
+        |> Dict.foldl (\_ inner acc -> acc ++ inner) []
+
+
+namedGroupsDict : SyncData -> Dict GroupId String
+namedGroupsDict sync =
+    Dict.fromList (namedGroups sync)
+
+
+getPostFixFromDict : GroupId -> Dict GroupId String -> String
+getPostFixFromDict g dict =
+    Dict.get g dict |> Maybe.withDefault ""
 
 
 maxUsedSecurityLevel : SyncData -> Int
@@ -514,7 +549,7 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                         { sync | tasks = Tasks.insertPwToStash reason groupId accountId pw sync.tasks }
             in
                 -- if groupId already exists then
-                if List.member groupId (groups sync) then
+                if List.member groupId (allGroups sync) then
                     -- ask others for their shares/keys
                     ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId sync))
                         -- add password to stash (since the group is locked)
@@ -723,33 +758,37 @@ getDevice id sync =
         |> Maybe.withDefault { id = id, name = "", postFix = "" }
 
 
-mapGroups : (GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
+mapGroups : (Group -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
 mapGroups f sync =
-    encryptedPasswords sync
-        |> Dict.foldl
-            (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
-                let
-                    status =
-                        Request.getPwStatus accountId groupId sync.groupPasswordRequestsState
+    let
+        postFixDict =
+            namedGroupsDict sync
+    in
+        encryptedPasswords sync
+            |> Dict.foldl
+                (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
+                    let
+                        status =
+                            Request.getPwStatus accountId groupId sync.groupPasswordRequestsState
 
-                    inner =
-                        Dict.singleton userName status
-                in
-                    Helper.insertOrUpdate groupId
-                        (Dict.singleton siteName inner)
-                        (Helper.insertOrUpdate siteName inner (Dict.insert userName status))
-                        acc
-            )
-            Dict.empty
-        |> Dict.foldl
-            (\groupId dict acc ->
-                f groupId
-                    (Tasks.getProgress groupId (distributedShares sync))
-                    (Request.getStatus groupId sync.groupPasswordRequestsState)
-                    dict
-                    :: acc
-            )
-            []
+                        inner =
+                            Dict.singleton userName status
+                    in
+                        Helper.insertOrUpdate groupId
+                            (Dict.singleton siteName inner)
+                            (Helper.insertOrUpdate siteName inner (Dict.insert userName status))
+                            acc
+                )
+                Dict.empty
+            |> Dict.foldl
+                (\groupId dict acc ->
+                    f ( groupId, getPostFixFromDict groupId postFixDict )
+                        (Tasks.getProgress groupId (distributedShares sync))
+                        (Request.getStatus groupId sync.groupPasswordRequestsState)
+                        dict
+                        :: acc
+                )
+                []
 
 
 addShares : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> List ( GroupId, SecretSharing.Share ) -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
@@ -815,7 +854,7 @@ createNewSharesIfPossible onShouldAddNewShares time sync =
                 ( newSync, cmd :: cmds )
         )
         ( sync, [] )
-        (groups sync)
+        (allGroups sync)
         |> (\( s, cs ) -> ( s, Cmd.batch cs ))
 
 
@@ -839,25 +878,25 @@ createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
                     -- Generate new shares for those that need them
                     SecretSharing.createMoreShares
                         (getXValuesFor (devicesNeedingSharesFor groupId sync2) sync2)
-                        (Request.getAllShares groupId sync.myShares sync.groupPasswordRequestsState)
+                        (Request.getAllShares groupId sync2.myShares sync2.groupPasswordRequestsState)
 
                 -- take out our share
                 ( myShares, sharesForOthers, newDistributedShares ) =
                     case newShares of
                         Ok shares ->
-                            case Dict.get sync.id shares of
+                            case Dict.get sync2.id shares of
                                 Just share ->
-                                    ( Dict.insert groupId share sync.myShares
-                                    , Dict.remove sync.id shares
-                                    , addIdToDistributedShares sync.id groupId sync.shared.distributedShares
+                                    ( Dict.insert groupId share sync2.myShares
+                                    , Dict.remove sync2.id shares
+                                    , addIdToDistributedShares sync2.id groupId sync2.shared.distributedShares
                                     )
 
                                 Nothing ->
-                                    ( sync.myShares, shares, sync.shared.distributedShares )
+                                    ( sync2.myShares, shares, sync2.shared.distributedShares )
 
                         Err e ->
                             Debug.log "Failed to create more shares" e
-                                |> always ( sync.myShares, Dict.empty, sync.shared.distributedShares )
+                                |> always ( sync2.myShares, Dict.empty, sync2.shared.distributedShares )
 
                 -- Call encryptShares port here
                 cmd =
@@ -898,14 +937,14 @@ unlockGroup1IfExists : SyncData -> SyncData
 unlockGroup1IfExists sync =
     let
         ( newSync, _ ) =
-            requestPasswordPressed (groups sync |> List.filter (\( l, _ ) -> l == 1)) Nothing sync
+            requestPasswordPressed (allGroups sync |> List.filter (\( l, _ ) -> l == 1)) Nothing sync
     in
         newSync
 
 
 getTasks : SyncData -> List Task
 getTasks sync =
-    Tasks.getTasks sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) sync.tasks
+    Tasks.getTasks sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) (namedGroupsDict sync) sync.tasks
 
 
 distributedShares : SyncData -> Dict GroupId (Set DeviceId)
@@ -970,6 +1009,10 @@ merge onShouldDecryptMyShares timestamp other my =
                 mergedDistributedShares
                 sharesITook
 
+        shouldIncrement =
+            -- If we modified the shared data in any way, we have to increment the version!
+            not (Set.isEmpty sharesITook)
+
         cmd =
             if Dict.isEmpty myEncryptedShares then
                 Cmd.none
@@ -993,7 +1036,7 @@ merge onShouldDecryptMyShares timestamp other my =
             -- if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash).
             |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) (ORDict.getWith GSet.get newDistributedShares) s.tasks })
             |> updateGroupPasswordRequest Request.invalidatePwCaches
-            |> incrementIf (not (Set.isEmpty sharesITook))
+            |> incrementIf shouldIncrement
         , cmd
         )
 
@@ -1046,7 +1089,15 @@ getMyShares id sharesToDistribute =
                     )
 
                 Nothing ->
-                    ( myShares, other, sharesITook )
+                    -- Don't update this group!
+                    -- That's why we remove this group id here from the
+                    -- shares to distribute, as afterwards (in merge)
+                    -- all entries of this dict will be used to update the
+                    -- sharesToDistribute ORDict.
+                    --
+                    -- In a previous version I forgot to do that and it cause massive headaches as
+                    -- this caused the devices to de-sync!
+                    ( myShares, Dict.remove groupId other, sharesITook )
         )
         ( Dict.empty, sharesToDistribute, Set.empty )
         sharesToDistribute
