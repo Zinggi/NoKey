@@ -121,7 +121,31 @@ resolveWaitingTasks accounts newDistributedShares tasks =
 
 moveAccountFromTo : AccountId -> GroupId -> GroupId -> TaskList -> TaskList
 moveAccountFromTo accountId from to tasks =
-    { tasks | movePws = Helper.insertOrUpdate ( from, to ) (Set.singleton accountId) (Set.insert accountId) tasks.movePws }
+    let
+        mayKey =
+            Dict.foldl
+                (\key accounts acc ->
+                    if Set.member accountId accounts then
+                        Just key
+                    else
+                        acc
+                )
+                Nothing
+                tasks.movePws
+
+        insert =
+            Helper.insertOrUpdate ( from, to ) (Set.singleton accountId) (Set.insert accountId)
+    in
+        { tasks
+            | movePws =
+                case mayKey of
+                    Just key ->
+                        Dict.remove key tasks.movePws
+                            |> insert
+
+                    Nothing ->
+                        insert tasks.movePws
+        }
 
 
 processMoveFromTo : (AccountId -> GroupId -> GroupId -> a -> a) -> TaskList -> a -> a

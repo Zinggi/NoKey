@@ -159,15 +159,11 @@ viewTask config state task =
                     ]
 
             WaitForKeysDistributed { accounts, group, status, progress } ->
-                let
-                    ( level, _ ) =
-                        group
-                in
-                    card
-                        [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString level ++ ") keys are distributed to save")
-                        , viewSitesListSimple config state accounts
-                        , row [] [ Elements.p "into", viewGroup group status ]
-                        ]
+                card
+                    [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString (getLevel group) ++ ") keys are distributed to save")
+                    , viewSitesListSimple config state accounts
+                    , row [] [ Elements.p "into", viewGroup group status ]
+                    ]
 
             CreateMoreShares { for, group, status } ->
                 card
