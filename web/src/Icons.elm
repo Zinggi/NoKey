@@ -4,6 +4,7 @@ import Element exposing (..)
 import Styles
 import FeatherIcons
 import Loader
+import Icons.Svg
 
 
 home =
@@ -17,8 +18,7 @@ passwords =
 
 
 devices =
-    -- TODO: make better icon, .smartphone, .tablet
-    FeatherIcons.monitor
+    Icons.Svg.devices
 
 
 options =
@@ -68,6 +68,10 @@ normal icon =
     icon
         |> FeatherIcons.withSize 24
         |> toElement
+
+
+svgIcon description path =
+    image [] { src = path, description = description }
 
 
 toElement : FeatherIcons.Icon -> Element msg
