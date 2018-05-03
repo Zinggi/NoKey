@@ -219,7 +219,6 @@ update msg model =
                 |> noCmd
 
         DeletePassword key ->
-            -- TODO: first require confirmation
             { model | syncData = Data.Sync.deletePassword key model.syncData }
                 |> Api.syncToOthers
 
@@ -243,10 +242,12 @@ update msg model =
                 |> withCmds [ Helper.withTimestamp DoTokenSubmitted ]
 
         RemoveDevice uuid ->
-            -- TODO: require confirmation
+            model |> withCmds [ Helper.withTimestamp (DoRemoveDevice uuid) ]
+
+        DoRemoveDevice uuid time ->
             let
                 ( sync, removeCmd ) =
-                    Api.removeDevice uuid model.syncData
+                    Api.removeDevice time uuid model.syncData
             in
                 { model | syncData = sync }
                     |> Api.syncToOthers
@@ -297,9 +298,12 @@ update msg model =
                 |> addCmds [ Ports.closePopup (), Api.rejectShareRequest req.deviceId req.reqIds ]
 
         ResetDevice ->
-            -- TODO: require confirmation
             Model.reset model
                 |> withCmds [ resetStorage (Model.reset model) ]
+
+        UpdateSettingsView state ->
+            { model | settingsView = state }
+                |> noCmd
 
         SendOutAccountsFor site ->
             { model | currentSite = Just site }
@@ -330,6 +334,9 @@ update msg model =
 
         UpdatePasswordView m ->
             { model | passwordsView = Views.Passwords.update m model.passwordsView } |> noCmd
+
+        UpdateDevicesView m ->
+            { model | devicesView = m } |> noCmd
 
         FillForm (( siteName, userName ) as accountId) ->
             case Data.Sync.getPassword accountId model.syncData of

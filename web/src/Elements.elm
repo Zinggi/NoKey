@@ -457,6 +457,20 @@ delete onPress =
         }
 
 
+deleteDanger onPress =
+    Input.button []
+        { label =
+            el (padding (Styles.paddingScale 1) :: Styles.borderStyle ++ Styles.dangerStyle)
+                (row [ spacing (Styles.paddingScale 0) ] [ Icons.small Icons.delete, text "Delete" ])
+        , onPress = Just onPress
+        }
+
+
+dangerButton : Maybe msg -> String -> Element msg
+dangerButton onPress txt =
+    customButton Styles.dangerStyle onPress (text txt)
+
+
 customButton : List (Attribute msg) -> Maybe msg -> Element msg -> Element msg
 customButton attrs onPress inner =
     Input.button []

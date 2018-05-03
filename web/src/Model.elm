@@ -27,7 +27,9 @@ import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
 import Views.Pairing
 import Views.Notifications
+import Views.Devices
 import Views.Passwords
+import Views.Settings
 import Ports
 import Route exposing (Page)
 
@@ -46,6 +48,7 @@ type Msg
     | TokenSubmitted
     | DoTokenSubmitted Time
     | RemoveDevice String
+    | DoRemoveDevice String Time
     | SetDeviceName String
     | InsertSite AccountId GroupId Password Time
     | RequestPasswordPressed (List GroupId) (Maybe AccountId)
@@ -80,6 +83,8 @@ type Msg
     | DoMovePassword AccountId GroupId GroupId Time
     | ShowToast String
     | SetSettings Settings
+    | UpdateSettingsView Views.Settings.State
+    | UpdateDevicesView Views.Devices.State
     | DoSetSettings Settings Time
 
 
@@ -105,6 +110,8 @@ type alias Model =
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
     , passwordsView : Views.Passwords.State
+    , settingsView : Views.Settings.State
+    , devicesView : Views.Devices.State
     , protocolState : Protocol.State
     , currentPage : Page
     , toasties : Toast
@@ -175,6 +182,8 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         , pairingDialogue = Views.Pairing.init
         , notifications = Notifications.init
         , notificationsView = Views.Notifications.init
+        , settingsView = Views.Settings.init
+        , devicesView = Views.Devices.init
         , passwordsView = Views.Passwords.init
         , protocolState = Protocol.init
         , currentSite = Nothing

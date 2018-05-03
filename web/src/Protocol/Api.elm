@@ -122,9 +122,9 @@ connectPrivateSocket uuid =
 --
 
 
-removeDevice : DeviceId -> SyncData -> ( SyncData, Cmd Model.Msg )
-removeDevice uuid sync =
-    ( Data.Sync.removeDevice uuid sync
+removeDevice : Time -> DeviceId -> SyncData -> ( SyncData, Cmd Model.Msg )
+removeDevice time uuid sync =
+    ( Data.Sync.removeDevice time uuid sync
     , informOfRemove uuid
     )
 

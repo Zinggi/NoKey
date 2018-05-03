@@ -174,7 +174,7 @@ groups sync =
 
 {-| Gets all the groups, and a string containing a postfix to distinguish groups of the same level.
 -}
-namedGroups : SyncData -> List ( GroupId, String )
+namedGroups : SyncData -> List Group
 namedGroups sync =
     groups sync
         |> Dict.groupBy Tuple.first
@@ -186,6 +186,12 @@ namedGroups sync =
             )
         -- Now we have a Dict Level (List (GroupId, PostFix))
         |> Dict.foldl (\_ inner acc -> acc ++ inner) []
+
+
+namedGroupsWithLevel : (Int -> Bool) -> SyncData -> List Group
+namedGroupsWithLevel f sync =
+    namedGroups sync
+        |> List.filter (\( ( l, _ ), _ ) -> f l)
 
 
 namedGroupsDict : SyncData -> Dict GroupId String
@@ -449,9 +455,22 @@ knownOtherIds sync =
     ORDict.get sync.shared.knownIds |> Dict.remove sync.id |> Dict.keys
 
 
-removeDevice : String -> SyncData -> SyncData
-removeDevice uuid sync =
-    updateShared (\s -> { s | knownIds = ORDict.remove uuid s.knownIds }) sync
+removeDevice : Time -> String -> SyncData -> SyncData
+removeDevice time uuid sync =
+    -- Remove uuid from everywhere, except from distributedShares.
+    -- We don't remove it from distributedShares, as there is no guarantee if the deleted device
+    -- actually deletes their shares.
+    updateShared
+        (\s ->
+            { s
+                | knownIds = ORDict.remove uuid s.knownIds
+                , sharesToDistribute =
+                    ORDict.updateIf (\_ val -> TimestampedVersionRegister.get val |> Dict.member uuid)
+                        (\_ val -> TimestampedVersionRegister.update sync.id time (Dict.remove uuid) val)
+                        s.sharesToDistribute
+            }
+        )
+        sync
 
 
 getName : SyncData -> ( String, String )

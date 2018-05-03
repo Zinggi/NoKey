@@ -46,6 +46,7 @@ type alias State =
     , expandedSites : Set String
     , editPw : Maybe AccountId
     , movePw : Maybe AccountId
+    , deletePressed : Maybe AccountId
     , selectedGroup : Maybe GroupId
     }
 
@@ -56,6 +57,7 @@ type Msg
     | EditPassword AccountId
     | MovePw AccountId
     | SelectGroup (Maybe GroupId)
+    | PressDelete AccountId
     | CancelEdit
 
 
@@ -77,18 +79,21 @@ update msg state =
         SelectGroup groupId ->
             { state | selectedGroup = groupId }
 
+        PressDelete accountId ->
+            { state | deletePressed = Just accountId }
+
         CancelEdit ->
             finishEdit state
 
 
 finishEdit : State -> State
 finishEdit state =
-    { state | editPw = Nothing, movePw = Nothing, selectedGroup = Nothing }
+    { state | editPw = Nothing, movePw = Nothing, selectedGroup = Nothing, deletePressed = Nothing }
 
 
 init : State
 init =
-    { search = "", expandedSites = Set.empty, editPw = Nothing, movePw = Nothing, selectedGroup = Nothing }
+    { search = "", expandedSites = Set.empty, editPw = Nothing, movePw = Nothing, selectedGroup = Nothing, deletePressed = Nothing }
 
 
 view : Config msg -> { m | syncData : SyncData, passwordsView : State, requirementsState : Views.PasswordGenerator.State } -> Element msg
@@ -140,6 +145,9 @@ viewTask config state task =
     let
         card =
             Elements.card 1 []
+
+        niceRow =
+            row [ spacing (Styles.paddingScale 0) ]
     in
         case task of
             MoveFromGroupToGroup { accounts, from, to, fromStatus, toStatus } ->
@@ -147,7 +155,7 @@ viewTask config state task =
                     [ row [ spacing (Styles.paddingScale 1) ]
                         [ viewGroupsStatus config [ ( from, fromStatus ), ( to, toStatus ) ] False, Elements.text "to move" ]
                     , viewSitesListSimple config state accounts
-                    , row [] [ Elements.p "from", viewGroup from fromStatus, Elements.p "to", viewGroup to toStatus ]
+                    , niceRow [ Elements.p "from", viewGroup from fromStatus, Elements.p "to", viewGroup to toStatus ]
                     ]
 
             MoveFromStashToGroup { accounts, group, status } ->
@@ -155,14 +163,14 @@ viewTask config state task =
                     [ row [ spacing (Styles.paddingScale 1) ]
                         [ viewGroupStatus config [ group ] False status, Elements.text "to save" ]
                     , viewSitesListSimple config state accounts
-                    , row [] [ Elements.p "into", viewGroup group status ]
+                    , niceRow [ Elements.p "into", viewGroup group status ]
                     ]
 
             WaitForKeysDistributed { accounts, group, status, progress } ->
                 card
                     [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString (getLevel group) ++ ") keys are distributed to save")
                     , viewSitesListSimple config state accounts
-                    , row [] [ Elements.p "into", viewGroup group status ]
+                    , niceRow [ Elements.p "into", viewGroup group status ]
                     ]
 
             CreateMoreShares { for, group, status } ->
@@ -279,7 +287,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                 ]
                             , if RequestPassword.isUnlocked status then
                                 if state.editPw == Just ( siteName, login ) then
-                                    column []
+                                    column [ spacing (Styles.paddingScale 1) ]
                                         [ Views.PasswordGenerator.view (config.addPassword groupId ( siteName, login ))
                                             True
                                             config.onNewPasswordRequirements
@@ -287,8 +295,9 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                         , Elements.button (Just (config.toMsg CancelEdit)) "Cancel Edit"
                                         ]
                                 else if state.movePw == Just ( siteName, login ) then
-                                    column []
-                                        [ row []
+                                    column [ spacing (Styles.paddingScale 1) ]
+                                        [ Elements.p "Move to which group?"
+                                        , row [ spacing (Styles.paddingScale 0) ]
                                             (Elements.customSelect (config.toMsg << SelectGroup << Maybe.map Tuple.first)
                                                 (\isSelected group ->
                                                     Elements.groupIcon True group
@@ -296,7 +305,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                                 (\( g, _ ) -> Just g == state.selectedGroup)
                                                 (Data.Sync.namedGroups sync |> List.filter (\( g, _ ) -> groupId /= g))
                                             )
-                                        , row []
+                                        , row [ spacing (Styles.paddingScale 0) ]
                                             [ Elements.button (Just (config.toMsg CancelEdit)) "Cancel Move"
                                             , case state.selectedGroup of
                                                 Just g ->
@@ -306,14 +315,22 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                                     empty
                                             ]
                                         ]
+                                else if state.deletePressed == Just ( siteName, login ) then
+                                    column [ spacing (Styles.paddingScale 1) ]
+                                        [ Elements.p "Are you sure you want to delete that password?"
+                                        , row [ spacing (Styles.paddingScale 0) ]
+                                            [ Elements.button (Just (config.toMsg CancelEdit)) "Cancel"
+                                            , Elements.deleteDanger (config.onDeletePassword ( siteName, login ))
+                                            ]
+                                        ]
                                 else
-                                    row []
+                                    row [ spacing (Styles.paddingScale 0) ]
                                         [ Elements.button (Just (config.toMsg (EditPassword ( siteName, login )))) "Edit"
                                         , if List.length (Data.Sync.groups sync) >= 2 then
                                             Elements.button (Just (config.toMsg (MovePw ( siteName, login )))) "Move"
                                           else
                                             empty
-                                        , Elements.delete (config.onDeletePassword ( siteName, login ))
+                                        , Elements.delete (config.toMsg (PressDelete ( siteName, login )))
                                         ]
                               else
                                 viewGroupStatus config [ group ] disabled groupStatus
@@ -349,7 +366,7 @@ groupsButtonHelper txt onPress groups =
 
 viewGroups : List ( Group, Status ) -> Element msg
 viewGroups groups =
-    row [] (Elements.enumeration (\( g, s ) -> viewGroup g s) groups)
+    row [ spacing (Styles.paddingScale 0) ] (Elements.enumeration (\( g, s ) -> viewGroup g s) groups)
 
 
 viewGroup : Group -> Status -> Element msg
@@ -383,7 +400,7 @@ viewGroupsStatus config groups disabled =
                             _ ->
                                 empty
                     )
-                |> row []
+                |> row [ spacing (Styles.paddingScale 0) ]
 
 
 viewGroupStatus : Config msg -> List Group -> Bool -> Status -> Element msg

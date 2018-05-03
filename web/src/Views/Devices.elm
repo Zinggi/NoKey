@@ -1,24 +1,46 @@
-module Views.Devices exposing (view, actionButton)
+module Views.Devices exposing (view, actionButton, Config, State, init)
 
 import Dict exposing (Dict)
 import Element exposing (..)
 import Elements
 import Styles
-import Model exposing (Msg(..))
+import Data.Sync exposing (SyncData)
 import Route exposing (Page(..))
 
 
-view : String -> Dict String ( String, String ) -> Element Msg
-view myId knownIds =
-    column [ spacing (Styles.paddingScale 1) ]
-        (Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
-            :: devicesMap (viewDeviceEntry myId) knownIds
-        )
+type alias State =
+    { confirmDelete : Maybe String }
 
 
-actionButton : Element Msg
-actionButton =
-    Elements.floatingButton (NavigateTo Pairing) "Pair new device"
+init : State
+init =
+    { confirmDelete = Nothing }
+
+
+type alias Config msg =
+    { toMsg : State -> msg
+    , onSetDeviceName : String -> msg
+    , onGoToPairing : msg
+    , onRemoveDevice : String -> msg
+    }
+
+
+view : Config msg -> { m | syncData : SyncData, uniqueIdentifyier : String } -> State -> Element msg
+view config { syncData, uniqueIdentifyier } state =
+    let
+        ( myId, knownIds ) =
+            ( uniqueIdentifyier, Data.Sync.knownDevices syncData )
+    in
+        column [ spacing (Styles.paddingScale 1) ]
+            (Elements.myAvatar config.onSetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
+                :: devicesMap (viewDeviceEntry config syncData state myId) knownIds
+                ++ [ el [ height (px 30) ] empty ]
+            )
+
+
+actionButton : Config msg -> Element msg
+actionButton config =
+    Elements.floatingButton config.onGoToPairing "Pair new device"
 
 
 {-| TODO: fix input lag on input fields. Workaround:
@@ -27,14 +49,48 @@ actionButton =
     https://ellie-app.com/3fPSxX6VHK7a1/0
 
 -}
-viewDeviceEntry : String -> String -> ( String, String ) -> Element Msg
-viewDeviceEntry myId uuid ( name, idPart ) =
+viewDeviceEntry : Config msg -> SyncData -> State -> String -> String -> ( String, String ) -> Element msg
+viewDeviceEntry config sync state myId uuid ( name, idPart ) =
     if myId == uuid then
         empty
     else
-        row []
-            [ Elements.avatar [ width fill ] { id = uuid, name = name, postFix = idPart }
-            , Elements.delete (RemoveDevice uuid)
+        column [ height shrink, spacing (Styles.paddingScale 1) ]
+            [ row []
+                [ Elements.avatar [ width fill ] { id = uuid, name = name, postFix = idPart }
+                , if state.confirmDelete == Just uuid then
+                    empty
+                  else
+                    Elements.delete (config.toMsg { state | confirmDelete = Just uuid })
+                ]
+            , if state.confirmDelete == Just uuid then
+                let
+                    numDevAfter =
+                        Data.Sync.numberOfKnownDevices sync - 1
+                in
+                    column [ spacing (Styles.paddingScale 1) ]
+                        [ Elements.b "Are you sure?"
+
+                        -- TODO: this is not true, as when a device gets removed, we delete all its shares.
+                        -- Should we keep them?
+                        -- , Elements.p "You can reverse this later by just pairing again."
+                        , if numDevAfter < Data.Sync.maxUsedSecurityLevel sync then
+                            paragraph []
+                                [ Elements.b "WARNING"
+                                , Elements.p "If you remove this device, the passwords saved in "
+                                , Data.Sync.namedGroupsWithLevel (\l -> l > numDevAfter) sync
+                                    |> Elements.enumeration (Elements.groupIcon True)
+                                    |> row []
+                                , Elements.p "will no longer be accessible. Better pair one more device and remove it then"
+                                ]
+                          else
+                            empty
+                        , row [ spacing (Styles.paddingScale 0) ]
+                            [ Elements.button (Just (config.toMsg { state | confirmDelete = Nothing })) "Cancel"
+                            , Elements.deleteDanger (config.onRemoveDevice uuid)
+                            ]
+                        ]
+              else
+                empty
             ]
 
 
