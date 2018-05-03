@@ -244,6 +244,15 @@ update model msg =
     let
         ( state, sync ) =
             ( model.protocolState, model.syncData )
+
+        -- _ =
+        --     case msg of
+        --         Self _ ->
+        --             ()
+        --         Unverified _ _ _ _ ->
+        --             ()
+        --         _ ->
+        --             Debug.log ("\tgot msg:\n" ++ toString msg ++ "\n\tin state:\n" ++ toString state.pairingState) ()
     in
         (case ( msg, model.protocolState.pairingState ) of
             ( Server (ReceiveToken time maybeToken), Init ) ->
@@ -335,7 +344,7 @@ update model msg =
                     else
                         model
                             |> updateNotifications (always notifications)
-                            |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
+                            |> andThenUpdate (startTimer (ShareRequest nId) (10 * Time.second))
 
             ( Authenticated otherId time (GrantedShareRequest ids shares), _ ) ->
                 model
@@ -523,12 +532,19 @@ grantedShareRequest { shares, time, otherId, ids } model =
                 ( newSync, mayForm, cmd ) =
                     Data.Sync.addShares encryptNewShares time decodedShares model.syncData
 
+                waitingGroups =
+                    Data.Sync.getWaitingGroups newSync
+
                 newModel =
-                    -- stop asking the ones that already gave us a share
-                    { state | collectShares = stopAskingDevice (Set.fromList ids) otherId state.collectShares }
+                    -- stop asking the ones that already gave us a share or
+                    -- if the request is done
+                    { state
+                        | collectShares =
+                            stopAskingDevice (Set.fromList ids) otherId state.collectShares
+                                |> removeFinishedGroups (Set.fromList waitingGroups)
+                    }
                         |> updateState { model | syncData = newSync }
             in
-                -- TODO: if the request is done, inform all, so they stop asking the user
                 case mayForm of
                     Just formData ->
                         -- if done and fillForm is set, call port to fill the form
@@ -769,6 +785,36 @@ stopAskingDevice ids otherId collectShares =
                 Set.foldl (\id -> Dict.update id (Maybe.map (\( devs, gs ) -> ( Set.remove otherId devs, gs ))))
                     dict
                     ids
+
+        Start ->
+            Start
+
+
+removeFinishedGroups : Set GroupId -> CollectSharesState -> CollectSharesState
+removeFinishedGroups waitingGroups state =
+    case state of
+        WaitForShares dict ->
+            let
+                newDict =
+                    Dict.foldl
+                        (\id ( devices, groups ) acc ->
+                            -- remove ones that aren't waiting, if empty, remove whole entry
+                            let
+                                newWaiting =
+                                    Set.intersect (Set.fromList groups) waitingGroups
+                            in
+                                if Set.isEmpty newWaiting then
+                                    acc
+                                else
+                                    Dict.insert id ( devices, Set.toList newWaiting ) acc
+                        )
+                        Dict.empty
+                        dict
+            in
+                if Dict.isEmpty newDict then
+                    Start
+                else
+                    WaitForShares newDict
 
         Start ->
             Start

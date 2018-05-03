@@ -933,6 +933,11 @@ requestPasswordPressed groupIds mayAccount sync =
         ( newSync, mayFill )
 
 
+getWaitingGroups : SyncData -> List GroupId
+getWaitingGroups sync =
+    Request.getWaiting sync.groupPasswordRequestsState
+
+
 unlockGroup1IfExists : SyncData -> SyncData
 unlockGroup1IfExists sync =
     let
