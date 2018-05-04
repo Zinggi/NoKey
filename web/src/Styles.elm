@@ -169,3 +169,31 @@ altFont =
             }
         , Font.sansSerif
         ]
+
+
+unselectable : Attribute msg
+unselectable =
+    htmlAttribute
+        (Attr.style
+            [ ( "-webkit-touch-callout", "none" )
+            , ( "-webkit-user-select", "none" )
+            , ( "-khtml-user-select", "none" )
+            , ( "-moz-user-select", "none" )
+            , ( "-ms-user-select", "none" )
+            , ( "user-select", "none" )
+            ]
+        )
+
+
+selectable : Attribute msg
+selectable =
+    htmlAttribute
+        (Attr.style
+            [ ( "-webkit-touch-callout", "all" )
+            , ( "-webkit-user-select", "all" )
+            , ( "-khtml-user-select", "all" )
+            , ( "-moz-user-select", "all" )
+            , ( "-ms-user-select", "all" )
+            , ( "user-select", "all" )
+            ]
+        )

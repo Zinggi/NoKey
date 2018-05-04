@@ -279,7 +279,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                     (\( login, status ) ->
                         column [ spacing (Styles.paddingScale 1) ]
                             [ column [ spacing (Styles.paddingScale 1) ]
-                                [ Elements.inputText [] Nothing { label = "Login", placeholder = "" } login
+                                [ Elements.inputText [ Styles.selectable ] Nothing { label = "Login", placeholder = "" } login
                                 , if state.editPw == Just ( siteName, login ) then
                                     empty
                                   else
@@ -435,7 +435,15 @@ viewStatus config sync accountId status =
     let
         entry showPw pw =
             column [ spacing (Styles.paddingScale 1) ]
-                [ Elements.password [] Nothing showPw pw
+                [ Elements.password
+                    (if showPw then
+                        [ Styles.selectable ]
+                     else
+                        []
+                    )
+                    Nothing
+                    showPw
+                    pw
                 , row [ spacing (Styles.paddingScale 0) ]
                     [ Elements.button (Just (config.onTogglePassword accountId))
                         (if showPw then

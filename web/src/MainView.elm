@@ -78,11 +78,10 @@ viewModel model =
         -- TODO: hack:
         -- I set the height here to get scroll behaviour to work, see
         -- https://github.com/mdgriffith/stylish-elephants/issues/30
-        column [ unselectable ]
+        column [ Styles.unselectable ]
             -- the nesting seems to be nececairy to get the correct centering + max width behaviour
             [ row
                 [ heightHack, height fill ]
-                -- TODO: display notification on top of other as popup, (card with high elevation)
                 [ column [ width fill, height fill, scrollbars ]
                     (if Notifications.count model.notifications > 0 then
                         [ cont
@@ -102,20 +101,6 @@ viewModel model =
                     )
                 ]
             ]
-
-
-unselectable : Attribute msg
-unselectable =
-    htmlAttribute
-        (HtmlAttr.style
-            [ ( "-webkit-touch-callout", "none" )
-            , ( "-webkit-user-select", "none" )
-            , ( "-khtml-user-select", "none" )
-            , ( "-moz-user-select", "none" )
-            , ( "-ms-user-select", "none" )
-            , ( "user-select", "none" )
-            ]
-        )
 
 
 viewTitle : Page -> Model.Toast -> Element Msg

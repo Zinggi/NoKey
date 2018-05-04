@@ -17,7 +17,7 @@ type alias State =
     , length : Int
     , requirements : PwReq.State
     , seed : Seed
-    , pw : String
+    , pw : Maybe String
     }
 
 
@@ -44,7 +44,7 @@ update msg state =
             { state | showMore = b }
 
         SetPw pw ->
-            { state | pw = pw }
+            { state | pw = Just pw }
 
         NextPw ->
             nextPassword state
@@ -55,14 +55,14 @@ update msg state =
 
 init : Seed -> State
 init seed =
-    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first, pw = "" }
+    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first, pw = Nothing }
 
 
 nextPassword : State -> State
 nextPassword state =
     { state
         | seed = PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.second
-        , pw = ""
+        , pw = Nothing
     }
 
 
@@ -82,10 +82,12 @@ view onAcceptPw canAdd toMsg state =
                     ( False, "", e )
 
         pw =
-            if String.isEmpty state.pw then
-                pass
-            else
-                state.pw
+            case state.pw of
+                Just p ->
+                    p
+
+                Nothing ->
+                    pass
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ if isOk then

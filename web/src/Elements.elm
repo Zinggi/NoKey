@@ -535,7 +535,7 @@ avatar : List (Attribute msg) -> Data.Device -> Element msg
 avatar attrs { id, name, postFix } =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
-        , paragraph [ alignLeft, width fill, spacing (Styles.scaled -2) ]
+        , paragraph [ Styles.selectable, alignLeft, width fill, spacing (Styles.scaled -2) ]
             [ helperMayName name, helperMayIdPart postFix ]
         ]
 

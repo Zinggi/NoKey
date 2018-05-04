@@ -28,7 +28,7 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
   * Possibly increment version in `server/mix.exs`
   * Compile `MIX_ENV=prod mix compile`
   * (optional) test if it works: `sudo PORT=4001 SSL_PORT=4443 MIX_ENV=prod mix phx.server`
-    + If there is an error, maybe cleaning elm-stuff helps?
+    + If there is an error, maybe cleaning elm-stuff helps? `rm -r elm-stuff/build-artifacts/*`
   * Build release:
     
     - if first time:
