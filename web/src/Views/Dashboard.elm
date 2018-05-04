@@ -6,7 +6,7 @@ import Elements
 import Route
 import Model exposing (Msg(..), Model)
 import Data.Sync
-import Data.Options exposing (Options)
+import Data.Settings exposing (Settings)
 import Route exposing (Page(..))
 import Styles
 import Views.Passwords
@@ -30,14 +30,14 @@ view passwordsConfig model =
             [ Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             , viewSummery model
             , Maybe.withDefault empty h.tutorial
-            , Maybe.withDefault empty h.needsPairing
+            , Tuple.second h.needsPairing
             , Views.Passwords.tasks passwordsConfig model.passwordsView (Data.Sync.getTasks model.syncData)
             ]
 
 
 type alias Hints =
     { tutorial : Maybe (Element Msg)
-    , needsPairing : Maybe (Element Msg)
+    , needsPairing : ( Bool, Element Msg )
     }
 
 
@@ -54,12 +54,25 @@ hints model =
     }
 
 
-needsPairingHint : { a | syncData : Data.Sync.SyncData, options : Options } -> Maybe (Element Msg)
-needsPairingHint { syncData, options } =
-    if Data.Sync.numberOfKnownDevices syncData < Data.Options.minSecurityLevel options then
-        Just viewPairingHint
-    else
-        Nothing
+{-| The bool indicates if it should be rendered inside the passwords view
+-}
+needsPairingHint : { a | syncData : Data.Sync.SyncData } -> ( Bool, Element Msg )
+needsPairingHint { syncData } =
+    let
+        ( numDev, minSec, maxLevel ) =
+            ( Data.Sync.numberOfKnownDevices syncData
+            , Data.Sync.minSecurityLevel syncData
+            , Data.Sync.maxUsedSecurityLevel syncData
+            )
+    in
+        if numDev < minSec then
+            ( True, viewPairingHint )
+        else if numDev == maxLevel then
+            ( False, viewPairMoreHint numDev maxLevel )
+            -- TODO: add hint for when we lose access to a group.
+            -- this could offer solutions for recovery, maybe we made a backup somewhere?
+        else
+            ( False, empty )
 
 
 viewTutorial =
@@ -74,10 +87,25 @@ viewTutorial =
         ]
 
 
+viewPairMoreHint numDev maxLevel =
+    Elements.card 1
+        []
+        [ Elements.b "Pair at least one more device"
+        , Elements.p
+            ("If you would lose a device now, you would lose access to the passwords saved with security level "
+                ++ toString maxLevel
+                ++ ", since you only have "
+                ++ toString numDev
+                ++ " paired devices."
+            )
+        , Elements.button (Just (NavigateTo Pairing)) "Pair a device"
+        ]
+
+
 viewPairingHint =
     Elements.card 1
         []
-        [ Elements.text "Pair your first device to get started"
+        [ Elements.p "Pair your first device to get started"
         , Elements.button (Just (NavigateTo Pairing)) "Pair a device"
         ]
 
@@ -85,9 +113,16 @@ viewPairingHint =
 viewSummery model =
     -- TODO: show this in the header
     -- TODO: show things like number of (recent) devices online
-    column []
-        [ row []
-            [ Elements.b "Devices"
-            , Elements.text (toString (Data.Sync.numberOfKnownDevices model.syncData))
-            ]
-        ]
+    let
+        numDev =
+            Data.Sync.numberOfKnownDevices model.syncData
+    in
+        if numDev > 1 then
+            column []
+                [ row [ spacing (Styles.paddingScale 2) ]
+                    [ Elements.text (toString numDev)
+                    , Elements.b "Devices"
+                    ]
+                ]
+        else
+            empty

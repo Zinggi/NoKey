@@ -15,9 +15,9 @@ import Elements
 import Data.Sync
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications
-import Data.Options
+import Data.Settings
 import Views.Dashboard
-import Views.Options
+import Views.Settings
 import Views.Pairing
 import Views.Notifications
 import Views.PasswordGenerator
@@ -64,7 +64,7 @@ viewModel model =
             Data.Sync.numberOfKnownDevices model.syncData
 
         minSecLevel =
-            Data.Options.minSecurityLevel model.options
+            Data.Sync.minSecurityLevel model.syncData
 
         cont =
             column
@@ -233,7 +233,7 @@ viewActionButton page model =
             Views.Passwords.actionButton passwordsConfig model
 
         Devices ->
-            Views.Devices.actionButton
+            Views.Devices.actionButton devicesConfig
 
         _ ->
             empty
@@ -247,21 +247,19 @@ viewPage page model =
 
         Passwords ->
             case Views.Dashboard.needsPairingHint model of
-                Just hint ->
+                ( True, hint ) ->
                     hint
 
-                Nothing ->
+                _ ->
                     Views.Passwords.view passwordsConfig model
 
         Devices ->
-            Views.Devices.view model.uniqueIdentifyier (Data.Sync.knownDevices model.syncData)
+            Views.Devices.view devicesConfig model model.devicesView
 
         Options ->
-            Views.Options.view model
+            Views.Settings.view settingsConfig model model.settingsView
 
         Pairing ->
-            -- , -- TODO: consider if we should just automatically request a pairing code
-            --   -- upon navigating to this view. This way a user doesn't have to decide what to press
             Views.Pairing.view pairingConfig (Data.Sync.isAndroid model.syncData) model.pairingDialogue
 
         Tutorial ->
@@ -269,6 +267,16 @@ viewPage page model =
 
         NewPassword ->
             Views.NewPassword.view model
+
+
+devicesConfig : Views.Devices.Config Msg
+devicesConfig =
+    { toMsg = UpdateDevicesView, onSetDeviceName = SetDeviceName, onGoToPairing = NavigateTo Pairing, onRemoveDevice = RemoveDevice }
+
+
+settingsConfig : Views.Settings.Config Msg
+settingsConfig =
+    { toMsg = UpdateSettingsView, onShowTutorial = NavigateTo Tutorial, onSetSettings = SetSettings, onReset = ResetDevice }
 
 
 pairingConfig : Views.Pairing.Config Msg
@@ -284,6 +292,9 @@ passwordsConfig =
     , onTogglePassword = TogglePassword
     , onLockGroupsPressed = LockGroups
     , onAddNewPassword = NavigateTo NewPassword
+    , addPassword = UpdatePassword
+    , onNewPasswordRequirements = NewPasswordRequirements
+    , movePw = MovePassword
     , onCopyToClipboard = ShowToast "Copied to clipboard"
     }
 

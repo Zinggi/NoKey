@@ -7,7 +7,7 @@ import Json.Decode as JD exposing (Decoder)
 import Json.Decode.Extra as JD
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
-import Json.Decode.Pipeline exposing (decode, required)
+import Json.Decode.Pipeline exposing (decode, required, optional)
 import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Time exposing (Time)
@@ -24,6 +24,7 @@ import Crdt.SingleVersionRegister as SingleVersionRegister exposing (SingleVersi
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.VClock as VClock exposing (VClock)
 import Crdt.GSet as GSet exposing (GSet)
+import Data.Settings exposing (Settings)
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
@@ -106,6 +107,9 @@ type alias SharedData =
 
     -- here we store all passwords, encrypted with the group password
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
+
+    -- We need to sync the settings
+    , settings : Data.Settings.SharedSettings
     , version : VClock
     }
 
@@ -125,6 +129,16 @@ isAndroid sync =
     sync.deviceType == Android
 
 
+getSettings : SyncData -> Settings
+getSettings sync =
+    Data.Settings.get sync.shared.settings
+
+
+setSettings : Time -> Settings -> SyncData -> SyncData
+setSettings time settings sync =
+    updateShared (\s -> { s | settings = Data.Settings.set sync.id time settings s.settings }) sync
+
+
 sharesToDistribute : SyncData -> Dict GroupId (Dict DeviceId Value)
 sharesToDistribute sync =
     ORDict.getWith TimestampedVersionRegister.get sync.shared.sharesToDistribute
@@ -141,12 +155,70 @@ accounts sync =
         |> Dict.map (\key ( groupId, _ ) -> groupId)
 
 
-groups : SyncData -> List GroupId
-groups sync =
+allGroups : SyncData -> List GroupId
+allGroups sync =
     accounts sync
         |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
         |> (\s -> Dict.foldl (\groupId _ acc -> Set.insert groupId acc) s (ORDict.get sync.shared.distributedShares))
         |> Set.toList
+
+
+{-| This is different to allGroups, as it will only contain the groups that are actually in use
+-}
+groups : SyncData -> List GroupId
+groups sync =
+    accounts sync
+        |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
+        |> Set.toList
+
+
+{-| Gets all the groups, and a string containing a postfix to distinguish groups of the same level.
+-}
+namedGroups : SyncData -> List Group
+namedGroups sync =
+    groups sync
+        |> Dict.groupBy Tuple.first
+        -- Now we have a Dict Level (List GroupId)
+        |> Dict.map
+            (\level groupIds ->
+                List.map Tuple.second groupIds
+                    |> (\ids -> List.map2 (\id post -> ( ( level, id ), post )) ids (Helper.findNonEqualBeginning ids))
+            )
+        -- Now we have a Dict Level (List (GroupId, PostFix))
+        |> Dict.foldl (\_ inner acc -> acc ++ inner) []
+
+
+namedGroupsWithLevel : (Int -> Bool) -> SyncData -> List Group
+namedGroupsWithLevel f sync =
+    namedGroups sync
+        |> List.filter (\( ( l, _ ), _ ) -> f l)
+
+
+namedGroupsDict : SyncData -> Dict GroupId String
+namedGroupsDict sync =
+    Dict.fromList (namedGroups sync)
+
+
+getPostFixFromDict : GroupId -> Dict GroupId String -> String
+getPostFixFromDict g dict =
+    Dict.get g dict |> Maybe.withDefault ""
+
+
+maxUsedSecurityLevel : SyncData -> Int
+maxUsedSecurityLevel sync =
+    accounts sync
+        |> Dict.foldl (\acid ( l, _ ) acc -> max acc l) 0
+
+
+minUsedSecurityLevel : SyncData -> Int
+minUsedSecurityLevel sync =
+    accounts sync
+        |> Dict.foldl (\acid ( l, _ ) acc -> min acc l) 2
+
+
+minSecurityLevel : SyncData -> Int
+minSecurityLevel sync =
+    min (Data.Settings.minSecurityLevel sync.shared.settings) (minUsedSecurityLevel sync)
 
 
 getShare : GroupId -> SyncData -> Maybe SecretSharing.Share
@@ -201,6 +273,7 @@ initShared seed encryptionKey signingKey devType uuid =
     , sharesToDistribute = ORDict.init seed
     , distributedShares = ORDict.init seed
     , passwords = ORDict.init seed
+    , settings = Data.Settings.init
     , version = VClock.init
     }
 
@@ -382,9 +455,22 @@ knownOtherIds sync =
     ORDict.get sync.shared.knownIds |> Dict.remove sync.id |> Dict.keys
 
 
-removeDevice : String -> SyncData -> SyncData
-removeDevice uuid sync =
-    updateShared (\s -> { s | knownIds = ORDict.remove uuid s.knownIds }) sync
+removeDevice : Time -> String -> SyncData -> SyncData
+removeDevice time uuid sync =
+    -- Remove uuid from everywhere, except from distributedShares.
+    -- We don't remove it from distributedShares, as there is no guarantee if the deleted device
+    -- actually deletes their shares.
+    updateShared
+        (\s ->
+            { s
+                | knownIds = ORDict.remove uuid s.knownIds
+                , sharesToDistribute =
+                    ORDict.updateIf (\_ val -> TimestampedVersionRegister.get val |> Dict.member uuid)
+                        (\_ val -> TimestampedVersionRegister.update sync.id time (Dict.remove uuid) val)
+                        s.sharesToDistribute
+            }
+        )
+        sync
 
 
 getName : SyncData -> ( String, String )
@@ -482,7 +568,7 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                         { sync | tasks = Tasks.insertPwToStash reason groupId accountId pw sync.tasks }
             in
                 -- if groupId already exists then
-                if List.member groupId (groups sync) then
+                if List.member groupId (allGroups sync) then
                     -- ask others for their shares/keys
                     ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId sync))
                         -- add password to stash (since the group is locked)
@@ -528,6 +614,56 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                                 |> updateGroupPasswordRequest (Request.cacheAccountPw accountId pw False >> Request.cacheGroupPw groupId groupPw)
                     in
                         ( newSync, seed3, False, onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers newSync) )
+
+
+doMovePassword : Time -> AccountId -> GroupPassword -> GroupId -> SyncData -> SyncData
+doMovePassword time accountId toPw to sync =
+    case getPassword accountId sync of
+        Just pw ->
+            -- get pw, then insert pw. we dont have to delete the password from the old place,
+            -- as there can only be one accountId
+            sync
+                |> insertToStorage time toPw accountId to pw
+                |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) Dict.empty s.tasks })
+
+        Nothing ->
+            Debug.log "This should never happen: We have the group password, but we can't read the password??" ()
+                |> always sync
+
+
+movePassword : Time -> AccountId -> GroupId -> GroupId -> SyncData -> ( SyncData, List GroupId )
+movePassword time accountId from to sync =
+    let
+        getGroupPw g =
+            Request.getGroupPassword g sync.groupPasswordRequestsState
+
+        addToTasks s groups =
+            { s | tasks = Tasks.moveAccountFromTo accountId from to s.tasks }
+                |> (\s ->
+                        -- indicate we are waiting for group to unlock
+                        List.foldl
+                            (\groupId acc ->
+                                updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId acc)) acc
+                            )
+                            s
+                            groups
+                   )
+                |> (\s -> ( s, groups ))
+    in
+        case ( getGroupPw from, getGroupPw to ) of
+            ( Just fromPw, Just toPw ) ->
+                -- We can move the password
+                ( doMovePassword time accountId toPw to sync, [] )
+
+            -- add to task if we can't do it right now
+            ( Just _, Nothing ) ->
+                addToTasks sync [ to ]
+
+            ( Nothing, Just _ ) ->
+                addToTasks sync [ from ]
+
+            ( Nothing, Nothing ) ->
+                addToTasks sync [ from, to ]
 
 
 getEncryptionKeyOf : DeviceId -> SyncData -> Maybe Value
@@ -583,12 +719,15 @@ addNewShares time groupId shares sync =
 insertToStorage : Time -> GroupPassword -> AccountId -> GroupId -> Password -> SyncData -> SyncData
 insertToStorage timestamp groupPw accountId groupId pw sync =
     let
+        newReq =
+            Request.invalidatePwCacheIfExists accountId sync.groupPasswordRequestsState
+
         updateFn p fn =
             fn sync.id timestamp ( groupId, p )
     in
         case AES.encryptPassword timestamp groupPw pw of
             Ok encPw ->
-                sync
+                { sync | groupPasswordRequestsState = newReq }
                     |> updateShared
                         (\s ->
                             { s
@@ -601,8 +740,7 @@ insertToStorage timestamp groupPw accountId groupId pw sync =
                         )
 
             Err str ->
-                Debug.log
-                    "Encrypting a password failed? But why???\n(err, groupPw, accountId, groupId, pw)"
+                Debug.log "Encrypting a password failed? But why???\n(err, groupPw, accountId, groupId, pw)"
                     ( str, groupPw, accountId, groupId, pw )
                     |> always sync
 
@@ -638,33 +776,37 @@ getDevice id sync =
         |> Maybe.withDefault { id = id, name = "", postFix = "" }
 
 
-mapGroups : (GroupId -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
+mapGroups : (Group -> Int -> Status -> Dict String (Dict String PasswordStatus) -> a) -> SyncData -> List a
 mapGroups f sync =
-    encryptedPasswords sync
-        |> Dict.foldl
-            (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
-                let
-                    status =
-                        Request.getPwStatus accountId groupId sync.groupPasswordRequestsState
+    let
+        postFixDict =
+            namedGroupsDict sync
+    in
+        encryptedPasswords sync
+            |> Dict.foldl
+                (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
+                    let
+                        status =
+                            Request.getPwStatus accountId groupId sync.groupPasswordRequestsState
 
-                    inner =
-                        Dict.singleton userName status
-                in
-                    Helper.insertOrUpdate groupId
-                        (Dict.singleton siteName inner)
-                        (Helper.insertOrUpdate siteName inner (Dict.insert userName status))
-                        acc
-            )
-            Dict.empty
-        |> Dict.foldl
-            (\groupId dict acc ->
-                f groupId
-                    (Tasks.getProgress groupId (distributedShares sync))
-                    (Request.getStatus groupId sync.groupPasswordRequestsState)
-                    dict
-                    :: acc
-            )
-            []
+                        inner =
+                            Dict.singleton userName status
+                    in
+                        Helper.insertOrUpdate groupId
+                            (Dict.singleton siteName inner)
+                            (Helper.insertOrUpdate siteName inner (Dict.insert userName status))
+                            acc
+                )
+                Dict.empty
+            |> Dict.foldl
+                (\groupId dict acc ->
+                    f ( groupId, getPostFixFromDict groupId postFixDict )
+                        (Tasks.getProgress groupId (distributedShares sync))
+                        (Request.getStatus groupId sync.groupPasswordRequestsState)
+                        dict
+                        :: acc
+                )
+                []
 
 
 addShares : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> List ( GroupId, SecretSharing.Share ) -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
@@ -679,6 +821,27 @@ addShares onShouldAddNewShares time shares sync =
         )
         ( sync, Nothing, Cmd.none )
         shares
+        |> (\( s, mAcc, cmd ) ->
+                -- Move passwords that can be moved
+                let
+                    getGroupPw g =
+                        Request.getGroupPassword g s.groupPasswordRequestsState
+
+                    newSync =
+                        Tasks.processMoveFromTo
+                            (\accountId from to acc ->
+                                case ( getGroupPw from, getGroupPw to ) of
+                                    ( Just fromPw, Just toPw ) ->
+                                        doMovePassword time accountId toPw to acc
+
+                                    _ ->
+                                        acc
+                            )
+                            s.tasks
+                            s
+                in
+                    ( newSync, mAcc, cmd )
+           )
 
 
 addShare : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SecretSharing.Share -> SyncData -> ( SyncData, Maybe AccountId, Cmd msg )
@@ -709,7 +872,7 @@ createNewSharesIfPossible onShouldAddNewShares time sync =
                 ( newSync, cmd :: cmds )
         )
         ( sync, [] )
-        (groups sync)
+        (allGroups sync)
         |> (\( s, cs ) -> ( s, Cmd.batch cs ))
 
 
@@ -733,25 +896,25 @@ createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
                     -- Generate new shares for those that need them
                     SecretSharing.createMoreShares
                         (getXValuesFor (devicesNeedingSharesFor groupId sync2) sync2)
-                        (Request.getAllShares groupId sync.myShares sync.groupPasswordRequestsState)
+                        (Request.getAllShares groupId sync2.myShares sync2.groupPasswordRequestsState)
 
                 -- take out our share
                 ( myShares, sharesForOthers, newDistributedShares ) =
                     case newShares of
                         Ok shares ->
-                            case Dict.get sync.id shares of
+                            case Dict.get sync2.id shares of
                                 Just share ->
-                                    ( Dict.insert groupId share sync.myShares
-                                    , Dict.remove sync.id shares
-                                    , addIdToDistributedShares sync.id groupId sync.shared.distributedShares
+                                    ( Dict.insert groupId share sync2.myShares
+                                    , Dict.remove sync2.id shares
+                                    , addIdToDistributedShares sync2.id groupId sync2.shared.distributedShares
                                     )
 
                                 Nothing ->
-                                    ( sync.myShares, shares, sync.shared.distributedShares )
+                                    ( sync2.myShares, shares, sync2.shared.distributedShares )
 
                         Err e ->
                             Debug.log "Failed to create more shares" e
-                                |> always ( sync.myShares, Dict.empty, sync.shared.distributedShares )
+                                |> always ( sync2.myShares, Dict.empty, sync2.shared.distributedShares )
 
                 -- Call encryptShares port here
                 cmd =
@@ -788,18 +951,23 @@ requestPasswordPressed groupIds mayAccount sync =
         ( newSync, mayFill )
 
 
+getWaitingGroups : SyncData -> List GroupId
+getWaitingGroups sync =
+    Request.getWaiting sync.groupPasswordRequestsState
+
+
 unlockGroup1IfExists : SyncData -> SyncData
 unlockGroup1IfExists sync =
     let
         ( newSync, _ ) =
-            requestPasswordPressed (groups sync |> List.filter (\( l, _ ) -> l == 1)) Nothing sync
+            requestPasswordPressed (allGroups sync |> List.filter (\( l, _ ) -> l == 1)) Nothing sync
     in
         newSync
 
 
 getTasks : SyncData -> List Task
 getTasks sync =
-    Tasks.getTasks sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) sync.tasks
+    Tasks.getTasks sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) (namedGroupsDict sync) sync.tasks
 
 
 distributedShares : SyncData -> Dict GroupId (Set DeviceId)
@@ -864,6 +1032,10 @@ merge onShouldDecryptMyShares timestamp other my =
                 mergedDistributedShares
                 sharesITook
 
+        shouldIncrement =
+            -- If we modified the shared data in any way, we have to increment the version!
+            not (Set.isEmpty sharesITook)
+
         cmd =
             if Dict.isEmpty myEncryptedShares then
                 Cmd.none
@@ -879,13 +1051,15 @@ merge onShouldDecryptMyShares timestamp other my =
                     ORDict.updateWithDict (TimestampedVersionRegister.set my.id timestamp)
                         sharesForOthers
                         newSharesToDistribute
+                , settings = Data.Settings.merge other.shared.settings my.shared.settings
                 , version = VClock.merge other.shared.version my.shared.version
                 }
           }
             |> receiveVersion other.id other.shared.version
             -- if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash).
-            |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (ORDict.getWith GSet.get newDistributedShares) s.tasks })
-            |> incrementIf (not (Set.isEmpty sharesITook))
+            |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) (ORDict.getWith GSet.get newDistributedShares) s.tasks })
+            |> updateGroupPasswordRequest Request.invalidatePwCaches
+            |> incrementIf shouldIncrement
         , cmd
         )
 
@@ -938,7 +1112,15 @@ getMyShares id sharesToDistribute =
                     )
 
                 Nothing ->
-                    ( myShares, other, sharesITook )
+                    -- Don't update this group!
+                    -- That's why we remove this group id here from the
+                    -- shares to distribute, as afterwards (in merge)
+                    -- all entries of this dict will be used to update the
+                    -- sharesToDistribute ORDict.
+                    --
+                    -- In a previous version I forgot to do that and it cause massive headaches as
+                    -- this caused the devices to de-sync!
+                    ( myShares, Dict.remove groupId other, sharesITook )
         )
         ( Dict.empty, sharesToDistribute, Set.empty )
         sharesToDistribute
@@ -994,6 +1176,7 @@ encodeShared shared =
                         shared.sharesToDistribute
                   )
                 , ( "distributedShares", ORDict.encode2 encodeGroupId GSet.encode shared.distributedShares )
+                , ( "settings", Data.Settings.encode shared.settings )
                 , ( "version", VClock.encode shared.version )
                 ]
           )
@@ -1005,26 +1188,28 @@ encodeShared shared =
 
 sharedDecoderV1 : Decoder SharedData
 sharedDecoderV1 =
-    JD.map5
-        (\knownIds passwords sharesToDistribute distributedShares version ->
+    decode
+        (\knownIds passwords sharesToDistribute distributedShares settings version ->
             { knownIds = knownIds
             , passwords = passwords
             , sharesToDistribute = sharesToDistribute
             , distributedShares = distributedShares
+            , settings = settings
             , version = version
             }
         )
-        (JD.field "knownIds" <| ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo))
-        (JD.field "passwords" <|
-            ORDict.decoder2 accountIdDecoder
+        |> required "knownIds" (ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo))
+        |> required "passwords"
+            (ORDict.decoder2 accountIdDecoder
                 (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
-        )
-        (JD.field "sharesToDistribute" <|
-            ORDict.decoder2 groupIdDecoder
+            )
+        |> required "sharesToDistribute"
+            (ORDict.decoder2 groupIdDecoder
                 (TimestampedVersionRegister.decoder (JD.dict JD.value))
-        )
-        (JD.field "distributedShares" <| ORDict.decoder2 groupIdDecoder GSet.decoder)
-        (JD.field "version" VClock.decoder)
+            )
+        |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder)
+        |> optional "settings" Data.Settings.decoder Data.Settings.init
+        |> required "version" VClock.decoder
 
 
 sharedDecoder : Decoder SharedData
@@ -1066,7 +1251,7 @@ encodeComplete s =
 appVersion : String
 appVersion =
     -- TODO!: change if a new version is released
-    "0.1.3"
+    "0.2.0"
 
 
 completeDecoder : Decoder SyncData

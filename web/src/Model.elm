@@ -18,7 +18,7 @@ import PortUtils
 
 import Helper exposing (withCmds)
 import Data exposing (GroupId, AccountId, Password, DeviceId)
-import Data.Options exposing (Options)
+import Data.Settings exposing (Settings)
 import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications exposing (Notifications, ShareRequest, SiteEntry)
 import Data.Sync exposing (SyncData)
@@ -27,7 +27,9 @@ import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
 import Views.Pairing
 import Views.Notifications
+import Views.Devices
 import Views.Passwords
+import Views.Settings
 import Ports
 import Route exposing (Page)
 
@@ -36,7 +38,7 @@ import Route exposing (Page)
 
 
 type Msg
-    = AddPassword String String
+    = AddPassword String
     | SiteNameChanged String
     | SecurityLevelChanged Int
     | NewPasswordRequirements PW.State
@@ -46,6 +48,7 @@ type Msg
     | TokenSubmitted
     | DoTokenSubmitted Time
     | RemoveDevice String
+    | DoRemoveDevice String Time
     | SetDeviceName String
     | InsertSite AccountId GroupId Password Time
     | RequestPasswordPressed (List GroupId) (Maybe AccountId)
@@ -60,6 +63,7 @@ type Msg
     | UpdateNotifications Views.Notifications.State
     | UpdatePasswordView Views.Passwords.Msg
     | SaveEntry Notifications.Id String SiteEntry
+    | UpdatePassword GroupId AccountId String
     | DismissNotification Notifications.Id
     | FillForm AccountId
     | ProtocolMsg Protocol.Msg
@@ -75,8 +79,13 @@ type Msg
     | ToastyMsg (Toasty.Msg String)
     | ScanQR
     | OnGotQR String
+    | MovePassword AccountId GroupId GroupId
+    | DoMovePassword AccountId GroupId GroupId Time
     | ShowToast String
-    | SetOptions Options
+    | SetSettings Settings
+    | UpdateSettingsView Views.Settings.State
+    | UpdateDevicesView Views.Devices.State
+    | DoSetSettings Settings Time
 
 
 
@@ -101,6 +110,8 @@ type alias Model =
     , notifications : Notifications
     , notificationsView : Views.Notifications.State
     , passwordsView : Views.Passwords.State
+    , settingsView : Views.Settings.State
+    , devicesView : Views.Devices.State
     , protocolState : Protocol.State
     , currentPage : Page
     , toasties : Toast
@@ -111,7 +122,6 @@ type alias Model =
     -- These ones should be serialized:
     , uniqueIdentifyier : String
     , isFirstTimeUser : Bool
-    , options : Options
 
     -- CRDT for synchronisation
     , syncData : SyncData
@@ -156,13 +166,12 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         ( indepSeed, _ ) =
             Random.step Random.independentSeed (Random.initialSeed base)
 
-        { syncData, uniqueIdentifyier, isFirstTimeUser, options } =
+        { syncData, uniqueIdentifyier, isFirstTimeUser } =
             mayState
                 |> Maybe.withDefault
                     { syncData = Data.Sync.init indepSeed encryptionKey signingKey devType uuid
                     , uniqueIdentifyier = uuid
                     , isFirstTimeUser = True
-                    , options = Data.Options.defaults
                     }
     in
         { newSiteEntry = Data.PasswordMeta.default
@@ -173,13 +182,14 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         , pairingDialogue = Views.Pairing.init
         , notifications = Notifications.init
         , notificationsView = Views.Notifications.init
+        , settingsView = Views.Settings.init
+        , devicesView = Views.Devices.init
         , passwordsView = Views.Passwords.init
         , protocolState = Protocol.init
         , currentSite = Nothing
         , isFirstTimeUser = isFirstTimeUser
         , currentPage = Maybe.map Route.fromLocation location |> Maybe.withDefault Route.Home
         , toasties = Toasty.initialState
-        , options = options
         }
 
 

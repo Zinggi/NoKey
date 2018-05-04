@@ -153,6 +153,11 @@ maybeToEverySet ma =
 -- Dict
 
 
+dictGetWithDefault : a -> comparable -> Dict comparable a -> a
+dictGetWithDefault a key dict =
+    Dict.get key dict |> Maybe.withDefault a
+
+
 dictGroupValues : Dict comparable1 comparable2 -> Dict comparable2 (List comparable1)
 dictGroupValues dict =
     Dict.foldl

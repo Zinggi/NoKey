@@ -21,6 +21,7 @@ import Data.Notifications
 type Msg
     = Server ServerMsg
     | Authenticated String Time AuthenticatedMsg
+    | StartFinishPairing String Time String
     | FinishPairing String Time String Data.Sync.OtherSharedData
       -- We get this when we receive an authenticated msg.
       -- We first have to check if the data matches the signature and only then will it become an AuthenticatedMsg
@@ -78,6 +79,7 @@ type CollectSharesState
 type PairingState
     = Init
     | WaitForPaired Time String
+    | BeforeWaitForFinished Time String String
     | WaitForFinished Time String String
 
 

@@ -177,7 +177,12 @@ siteLogo : String -> Element msg
 siteLogo siteName =
     let
         letter =
-            String.left 1 siteName
+            (if String.startsWith "www." (String.toLower siteName) then
+                String.dropLeft 4 siteName
+             else
+                siteName
+            )
+                |> String.left 1
                 |> String.toUpper
     in
         -- TODO: maybe use a service to get nice logos.
@@ -412,6 +417,18 @@ customPrimaryButton attrs onPress txt =
         }
 
 
+customSelect : (Maybe a -> msg) -> (Bool -> a -> Element msg) -> (a -> Bool) -> List a -> List (Element msg)
+customSelect onSelect renderElement isSelected elements =
+    List.map
+        (\a ->
+            if isSelected a then
+                customButton [ Background.color Styles.accentColor ] (Just (onSelect Nothing)) (renderElement True a)
+            else
+                customButton [] (Just (onSelect (Just a))) (renderElement False a)
+        )
+        elements
+
+
 button : Maybe msg -> String -> Element msg
 button onPress txt =
     Input.button []
@@ -440,8 +457,22 @@ delete onPress =
         }
 
 
-customButton : Maybe msg -> Element msg -> Element msg
-customButton onPress inner =
+deleteDanger onPress =
+    Input.button []
+        { label =
+            el (padding (Styles.paddingScale 1) :: Styles.borderStyle ++ Styles.dangerStyle)
+                (row [ spacing (Styles.paddingScale 0) ] [ Icons.small Icons.delete, text "Delete" ])
+        , onPress = Just onPress
+        }
+
+
+dangerButton : Maybe msg -> String -> Element msg
+dangerButton onPress txt =
+    customButton Styles.dangerStyle onPress (text txt)
+
+
+customButton : List (Attribute msg) -> Maybe msg -> Element msg -> Element msg
+customButton attrs onPress inner =
     Input.button []
         { label =
             el
@@ -453,6 +484,7 @@ customButton onPress inner =
                             Just _ ->
                                 Styles.borderStyle
                        )
+                    ++ attrs
                 )
                 inner
         , onPress = onPress
@@ -484,10 +516,14 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
         }
 
 
-groupIcon : Bool -> GroupId -> Element msg
-groupIcon isLocked ( level, _ ) =
+groupIcon : Bool -> Group -> Element msg
+groupIcon isLocked ( ( level, _ ), post ) =
     row [ width shrink ]
         [ h3 (toString level)
+        , if post == "" then
+            empty
+          else
+            p ("(" ++ post ++ ")")
         , if isLocked then
             Icons.small Icons.locked
           else
@@ -560,8 +596,11 @@ clampedNumberInput onChange label ( min, default, max ) n =
         length =
             max - min
 
+        numInp =
+            inp [ width (px (14 + 14 * String.length (toString m))) ] "number" 5
+
         btn inc txt =
-            customButton (Just (onChange (clamp min max (m + inc)))) (el [ width (px 24), Font.size (Styles.scaled 3) ] (text txt))
+            customButton [] (Just (onChange (clamp min max (m + inc)))) (el [ width (px 24), Font.size (Styles.scaled 3) ] (text txt))
     in
         column [ height shrink ]
             [ el
@@ -575,15 +614,10 @@ clampedNumberInput onChange label ( min, default, max ) n =
 
                 -- , width (fillBetween { min = Nothing, max = Just 500 })
                 ]
-                ((if length >= 3 then
-                    [ inp [ width fill ] "range" 0 ]
-                  else
-                    []
-                 )
-                    ++ [ inp [ width (px (14 + 14 * String.length (toString m))) ] "number" 5
-                       , btn 1 "+"
-                       , btn -1 "-"
-                       ]
+                (if length >= 6 then
+                    [ inp [ width fill ] "range" 0, numInp ]
+                 else
+                    [ numInp, btn 1 "+", btn -1 "-" ]
                 )
             ]
 

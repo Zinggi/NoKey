@@ -10,6 +10,8 @@
 
 ## Develop
 
+* Add 'unsafe-eval' to manifest.
+
 * watch files:
     `yarn watch`
     `web-ext run -s addon/` ([web-ext](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Getting_started_with_web-ext))

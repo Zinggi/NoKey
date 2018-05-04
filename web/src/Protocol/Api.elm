@@ -122,9 +122,9 @@ connectPrivateSocket uuid =
 --
 
 
-removeDevice : DeviceId -> SyncData -> ( SyncData, Cmd Model.Msg )
-removeDevice uuid sync =
-    ( Data.Sync.removeDevice uuid sync
+removeDevice : Time -> DeviceId -> SyncData -> ( SyncData, Cmd Model.Msg )
+removeDevice time uuid sync =
+    ( Data.Sync.removeDevice time uuid sync
     , informOfRemove uuid
     )
 
@@ -274,7 +274,7 @@ update model msg =
             ( Server (PairedWith res), WaitForPaired t0 token ) ->
                 (case res of
                     Ok otherId ->
-                        ( { state | pairingState = WaitForFinished t0 token otherId }, finishPairing otherId token sync )
+                        ( { state | pairingState = BeforeWaitForFinished t0 token otherId }, startFinishPairing otherId token sync )
 
                     Err e ->
                         Debug.log "Got PairedWith, but with an error" e
@@ -288,13 +288,23 @@ update model msg =
                     |> always ( model, Cmd.none )
 
             --
-            ( FinishPairing otherId time otherToken otherSync, WaitForPaired t0 token ) ->
+            ( StartFinishPairing otherId time otherToken, WaitForPaired t0 token ) ->
+                receiveStartFinishPairing token otherToken otherId model
+
+            ( StartFinishPairing otherId time otherToken, BeforeWaitForFinished t0 token _ ) ->
+                receiveStartFinishPairing token otherToken otherId model
+
+            ( StartFinishPairing _ _ _, _ ) ->
+                Debug.log "got StartFinishPairing, but we were not expecting it now" ( msg, state )
+                    |> always ( model, Cmd.none )
+
+            ( FinishPairing otherId time otherToken otherSync, BeforeWaitForFinished t0 token _ ) ->
                 receiveFinishPairing token time otherToken otherId otherSync model
 
             ( FinishPairing otherId time otherToken otherSync, WaitForFinished t0 token _ ) ->
                 receiveFinishPairing token time otherToken otherId otherSync model
 
-            ( FinishPairing otherId time otherToken otherSync, Init ) ->
+            ( FinishPairing otherId time otherToken otherSync, _ ) ->
                 -- This happens when we are already paired, beacause finishPairing is sent multiple times
                 ( model, Cmd.none )
 
@@ -334,7 +344,7 @@ update model msg =
                     else
                         model
                             |> updateNotifications (always notifications)
-                            |> andThenUpdate (startTimer (ShareRequest nId) (60 * Time.second))
+                            |> andThenUpdate (startTimer (ShareRequest nId) (10 * Time.second))
 
             ( Authenticated otherId time (GrantedShareRequest ids shares), _ ) ->
                 model
@@ -427,6 +437,9 @@ update model msg =
                 case id of
                     Pairing ->
                         case state.pairingState of
+                            BeforeWaitForFinished _ token otherId ->
+                                model |> withCmds [ startFinishPairing otherId token sync ]
+
                             WaitForFinished _ token otherId ->
                                 model |> withCmds [ finishPairing otherId token sync ]
 
@@ -519,9 +532,17 @@ grantedShareRequest { shares, time, otherId, ids } model =
                 ( newSync, mayForm, cmd ) =
                     Data.Sync.addShares encryptNewShares time decodedShares model.syncData
 
+                waitingGroups =
+                    Data.Sync.getWaitingGroups newSync
+
                 newModel =
-                    -- stop asking the ones that already gave us a share
-                    { state | collectShares = stopAskingDevice (Set.fromList ids) otherId state.collectShares }
+                    -- stop asking the ones that already gave us a share or
+                    -- if the request is done
+                    { state
+                        | collectShares =
+                            stopAskingDevice (Set.fromList ids) otherId state.collectShares
+                                |> removeFinishedGroups (Set.fromList waitingGroups)
+                    }
                         |> updateState { model | syncData = newSync }
             in
                 case mayForm of
@@ -538,6 +559,28 @@ grantedShareRequest { shares, time, otherId, ids } model =
 
         Err e ->
             Debug.log ("Failed to decode received shares:\n" ++ e) (model |> noCmd)
+
+
+receiveStartFinishPairing : String -> String -> String -> Model -> ( Model, Cmd Model.Msg )
+receiveStartFinishPairing token otherToken otherId model =
+    let
+        state =
+            model.protocolState
+    in
+        if token == otherToken then
+            case state.pairingState of
+                BeforeWaitForFinished t0 _ _ ->
+                    ( { state | pairingState = WaitForFinished t0 token otherId }, finishPairing otherId token model.syncData )
+                        |> toModel model
+
+                WaitForPaired t0 token ->
+                    ( { state | pairingState = WaitForFinished t0 token otherId }, startFinishPairing otherId token model.syncData )
+                        |> toModel model
+
+                _ ->
+                    ( model, Cmd.none )
+        else
+            ( model, Cmd.none )
 
 
 receiveFinishPairing : String -> Time -> String -> String -> OtherSharedData -> Model -> ( Model, Cmd Model.Msg )
@@ -604,8 +647,13 @@ backToInit model =
 We start the process with initPairing. This sends our Id to the server, which replies with a random token.
 We enter the token on another client and send it to the server. (pairWith)
 The server sends both devices the id of the other device back. (PairedWith)
-On receiving PairedWith, they send (FinishPairing token sync) to each other.
+On receiving PairedWith, they send (TODO) (StartFinishPairing) to each other.
+when receiving this, they send
+(FinishPairing token sync) to each other.
 On receiving (FinishPairing token sync), check if the token matches, if yes pair.
+
+We have two rounds of StartFinishPairing/FinishPairing messages, because of <https://github.com/Zinggi/NoKey/issues/7>
+
 -}
 initPairing : String -> Model -> ( Model, Cmd Model.Msg )
 initPairing uuid model =
@@ -665,6 +713,11 @@ pairWith myId time model =
                     |> Cmd.map (protocolMsg << Server)
                 ]
             |> andThenUpdate (startTimer Pairing (60 * Time.second))
+
+
+startFinishPairing : String -> String -> SyncData -> Cmd Model.Msg
+startFinishPairing otherId token sync =
+    sendNotAuthenticatedMsgTo sync.id otherId "StartFinishPairing" [ ( "token", JE.string token ) ]
 
 
 finishPairing : String -> String -> SyncData -> Cmd Model.Msg
@@ -732,6 +785,36 @@ stopAskingDevice ids otherId collectShares =
                 Set.foldl (\id -> Dict.update id (Maybe.map (\( devs, gs ) -> ( Set.remove otherId devs, gs ))))
                     dict
                     ids
+
+        Start ->
+            Start
+
+
+removeFinishedGroups : Set GroupId -> CollectSharesState -> CollectSharesState
+removeFinishedGroups waitingGroups state =
+    case state of
+        WaitForShares dict ->
+            let
+                newDict =
+                    Dict.foldl
+                        (\id ( devices, groups ) acc ->
+                            -- remove ones that aren't waiting, if empty, remove whole entry
+                            let
+                                newWaiting =
+                                    Set.intersect (Set.fromList groups) waitingGroups
+                            in
+                                if Set.isEmpty newWaiting then
+                                    acc
+                                else
+                                    Dict.insert id ( devices, Set.toList newWaiting ) acc
+                        )
+                        Dict.empty
+                        dict
+            in
+                if Dict.isEmpty newDict then
+                    Start
+                else
+                    WaitForShares newDict
 
         Start ->
             Start
@@ -862,6 +945,10 @@ serverResponseDecoder time =
                         JD.map2 (FinishPairing id time)
                             (JD.field "token" JD.string)
                             (JD.field "sync" (Data.Sync.otherSharedDecoder id))
+
+                    "StartFinishPairing" ->
+                        JD.map (StartFinishPairing id time)
+                            (JD.field "token" JD.string)
 
                     "Authenticated" ->
                         JD.map2 (Unverified id time)

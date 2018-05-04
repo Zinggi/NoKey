@@ -18,13 +18,13 @@ try {
         document.getElementsByTagName('body')[0].appendChild(div);
         let btn = document.getElementById('newUpdateButton');
         btn.addEventListener('click', () => {
-            console.log("Refresh clicked!");
+            // console.log("Refresh clicked!");
             location.reload();
         });
     });
 
     setup(Elm.Main.fullscreen, (app) => {
-            console.log("setup complete");
+            // console.log("setup complete");
             // remove splash screen
             const el = document.getElementById('splash');
             el.parentNode.removeChild(el);

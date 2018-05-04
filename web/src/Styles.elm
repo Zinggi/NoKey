@@ -85,6 +85,12 @@ borderStyle =
     ]
 
 
+dangerStyle =
+    [ Font.color altBackgroundColor
+    , Background.color errorColor
+    ]
+
+
 titleHighlight =
     [ Background.color accentColor, Font.color white ]
 

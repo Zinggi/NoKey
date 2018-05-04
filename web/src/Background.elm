@@ -16,7 +16,7 @@ import Data.PasswordMeta
 import Data.Notifications as Notifications exposing (SiteEntry)
 import Data.Sync
 import Data.Storage
-import Data.Options
+import Data.Settings
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
@@ -143,23 +143,38 @@ update msg model =
             -- Since we send our state out on every update, we don't need to do anything here
             model |> noCmd
 
-        AddPassword groupId pw ->
+        UpdatePassword ( level, groupId ) ( siteName, userName ) pw ->
+            { model | passwordsView = Views.Passwords.finishEdit model.passwordsView }
+                |> saveEntry groupId { login = userName, site = siteName, password = pw, securityLevel = level }
+                |> mapModel updateSeed
+
+        MovePassword accountId from to ->
+            model |> withCmds [ Helper.withTimestamp (DoMovePassword accountId from to) ]
+
+        DoMovePassword accountId from to time ->
             let
+                ( newSync, groupsToRequest ) =
+                    Data.Sync.movePassword time accountId from to model.syncData
+            in
+                { model | syncData = newSync }
+                    |> Api.syncToOthers
+                    |> andThenUpdate (Api.requestShares groupsToRequest)
+
+        AddPassword pw ->
+            let
+                group =
+                    Data.Sync.currentGroupId model.newSiteEntry.securityLevel model.syncData
+
                 { userName, siteName, securityLevel } =
                     model.newSiteEntry
             in
-                saveEntry groupId { login = userName, site = siteName, password = pw, securityLevel = securityLevel } model
+                saveEntry group { login = userName, site = siteName, password = pw, securityLevel = securityLevel } model
                     |> mapModel updateSeed
                     |> addCmds [ Navigation.back 1 ]
 
         SaveEntry id groupId entry ->
             saveEntry groupId entry model
                 |> andThenUpdate (updateNotifications (Notifications.remove id))
-                |> addCmds [ Ports.closePopup () ]
-
-        DismissNotification id ->
-            model
-                |> updateNotifications (Notifications.remove id)
                 |> addCmds [ Ports.closePopup () ]
 
         InsertSite accountId groupId password timestamp ->
@@ -175,6 +190,11 @@ update msg model =
                     |> Api.syncToOthers
                     |> addCmds [ cmd ]
                     |> andThenUpdateIf shouldRequestShare (Api.requestShares [ groupId ])
+
+        DismissNotification id ->
+            model
+                |> updateNotifications (Notifications.remove id)
+                |> addCmds [ Ports.closePopup () ]
 
         SiteNameChanged s ->
             { model
@@ -199,7 +219,6 @@ update msg model =
                 |> noCmd
 
         DeletePassword key ->
-            -- TODO: first require confirmation
             { model | syncData = Data.Sync.deletePassword key model.syncData }
                 |> Api.syncToOthers
 
@@ -223,10 +242,12 @@ update msg model =
                 |> withCmds [ Helper.withTimestamp DoTokenSubmitted ]
 
         RemoveDevice uuid ->
-            -- TODO: require confirmation
+            model |> withCmds [ Helper.withTimestamp (DoRemoveDevice uuid) ]
+
+        DoRemoveDevice uuid time ->
             let
                 ( sync, removeCmd ) =
-                    Api.removeDevice uuid model.syncData
+                    Api.removeDevice time uuid model.syncData
             in
                 { model | syncData = sync }
                     |> Api.syncToOthers
@@ -277,9 +298,12 @@ update msg model =
                 |> addCmds [ Ports.closePopup (), Api.rejectShareRequest req.deviceId req.reqIds ]
 
         ResetDevice ->
-            -- TODO: require confirmation
             Model.reset model
                 |> withCmds [ resetStorage (Model.reset model) ]
+
+        UpdateSettingsView state ->
+            { model | settingsView = state }
+                |> noCmd
 
         SendOutAccountsFor site ->
             { model | currentSite = Just site }
@@ -289,7 +313,7 @@ update msg model =
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials
             -- LogIn can be ignored if we already have an entry for it,
             -- TODO: unless the group is unlocked and the entered password differs from the one we saved.
-            if Data.Sync.numberOfKnownDevices model.syncData < Data.Options.minSecurityLevel model.options then
+            if Data.Sync.numberOfKnownDevices model.syncData < Data.Sync.minSecurityLevel model.syncData then
                 model |> noCmd
             else if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
@@ -297,18 +321,22 @@ update msg model =
                 -- add new password entry
                 model |> updateNotifications (Notifications.newSiteEntry entry True)
 
-        SetOptions options ->
-            let
-                newM =
-                    { model | options = options }
-            in
-                newM |> withCmds [ storeState newM ]
+        SetSettings options ->
+            model
+                |> withCmds [ Helper.withTimestamp (DoSetSettings options) ]
+
+        DoSetSettings options time ->
+            { model | syncData = Data.Sync.setSettings time options model.syncData }
+                |> Api.syncToOthers
 
         UpdateNotifications n ->
             { model | notificationsView = n } |> noCmd
 
         UpdatePasswordView m ->
             { model | passwordsView = Views.Passwords.update m model.passwordsView } |> noCmd
+
+        UpdateDevicesView m ->
+            { model | devicesView = m } |> noCmd
 
         FillForm (( siteName, userName ) as accountId) ->
             case Data.Sync.getPassword accountId model.syncData of
@@ -362,7 +390,7 @@ saveEntry groupId entry model =
             Data.Sync.numberOfKnownDevices model.syncData
 
         minSecLevel =
-            Data.Options.minSecurityLevel model.options
+            Data.Sync.minSecurityLevel model.syncData
     in
         { model | newSiteEntry = Data.PasswordMeta.reset model.newSiteEntry }
             |> withCmds [ Helper.withTimestamp (InsertSite ( entry.site, entry.login ) ( clamp minSecLevel (min 5 n) entry.securityLevel, groupId ) entry.password) ]

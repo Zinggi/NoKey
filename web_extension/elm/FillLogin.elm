@@ -69,9 +69,22 @@ labled l rest =
     row [] (el [ width fill ] (Elements.text l) :: rest)
 
 
+viewError : String -> Html msg
+viewError err =
+    (case err of
+        "not loaded yet" ->
+            Element.empty
+
+        other ->
+            Elements.p other
+    )
+        |> Element.layout Styles.background
+
+
 main =
     ExternalStateView.program
         { view = view
+        , viewError = viewError
         , subs = Background.subs
         , decodeModel = Model.decode
         , encodeMsg = Model.encodeMsg

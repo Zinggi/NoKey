@@ -16,12 +16,12 @@
   You can report issues <a href="https://github.com/Zinggi/NoKey/issues">here on GitHub</a>.
 </p>
 <div class="row">
-  <div class="col-lg-4">
-    <h4>Web app</h4>
-    <p>
-      Try it right now in your browser: <a href="<%= page_path(@conn, :webApp) %>">Start the web app</a>
-    </p>
-  </div>
+  <%# <div class="col-lg-4"> %>
+  <%#   <h4>Web app</h4> %>
+  <%#   <p> %>
+  <%#     Try it right now in your browser: <a href="<%= page_path(@conn, :webApp) % >">Start the web app</a> %>
+  <%#   </p> %>
+  <%# </div> %>
   <div class="col-lg-4">
     <h4>Android</h4>
     <p>
@@ -41,3 +41,12 @@
     </p>
   </div>
 </div>
+
+<p>
+  If none of these options work for you, you can try the <a href="<%= page_path(@conn, :webApp) %>">web app</a>.
+  For Safari, there is currently no option that works.
+</p>
+<p>
+  <b>Don't use multiple clients on the same device.</b>
+<p/>
+

@@ -34,6 +34,15 @@ type alias GroupId =
     ( Int, String )
 
 
+type alias Group =
+    ( GroupId, String )
+
+
+getLevel : Group -> Int
+getLevel ( ( l, _ ), _ ) =
+    l
+
+
 encodeGroupId : GroupId -> Value
 encodeGroupId id =
     encodeTuple2 JE.int JE.string id

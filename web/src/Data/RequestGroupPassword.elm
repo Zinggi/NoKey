@@ -16,10 +16,14 @@ module Data.RequestGroupPassword
         , removeWaiting
         , removeWaitingGroups
         , cacheAccountPw
+        , invalidatePwCache
+        , invalidatePwCaches
+        , invalidatePwCacheIfExists
         , getAllShares
         , cacheGroupPw
         , getGroupPassword
         , lockGroups
+        , statusToComparable
         )
 
 import Dict exposing (Dict)
@@ -45,6 +49,16 @@ type Status
     | Waiting Int Int
     | Done (Maybe AccountId) GroupPassword
     | Error String
+
+
+statusToComparable : Status -> String
+statusToComparable st =
+    case st of
+        Done _ _ ->
+            "Done"
+
+        other ->
+            toString other
 
 
 init : State
@@ -288,6 +302,24 @@ tryGetAccountPassword accountId mayEncPw mayPw shouldShow state =
 cacheAccountPw : AccountId -> Password -> Bool -> State -> State
 cacheAccountPw accountId pw shouldShow (State ({ pws } as state)) =
     State { state | pws = Dict.insert accountId ( pw, shouldShow ) pws }
+
+
+invalidatePwCache : AccountId -> State -> State
+invalidatePwCache accountId (State ({ pws } as state)) =
+    State { state | pws = Dict.remove accountId pws }
+
+
+invalidatePwCaches : State -> State
+invalidatePwCaches (State ({ pws } as state)) =
+    State { state | pws = Dict.empty }
+
+
+invalidatePwCacheIfExists : AccountId -> State -> State
+invalidatePwCacheIfExists accountId (State ({ pws } as state)) =
+    if Dict.member accountId pws then
+        invalidatePwCache accountId (State state)
+    else
+        State state
 
 
 cacheGroupPw : GroupId -> GroupPassword -> State -> State

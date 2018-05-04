@@ -24,7 +24,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
     // TODO: this is a very primitive way to check if we are running on firefox.
     // It stops working as soon as chrome adds this api too
     const isFirefox = (browser.contentScripts && browser.contentScripts.register) ? true : false;
-    console.log("Is Firefox:", isFirefox);
+    // console.log("Is Firefox:", isFirefox);
 
     chrome.runtime.onConnect.addListener(function(port) {
         // console.log("(background) port connected", port.name);
@@ -96,10 +96,10 @@ setup(Elm.MainBackground.fullscreen, (app) => {
                 });
 
                 browser.windows.onRemoved.addListener((id) => {
-                    console.log("on remove window");
+                    // console.log("on remove window");
                     if (id == win.id) {
                         hasPopupOpen = false;
-                        console.log("close popup window");
+                        // console.log("close popup window");
                     }
                 });
             }, (err) => {
