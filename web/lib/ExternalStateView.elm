@@ -50,21 +50,23 @@ subs subs model =
         |> Sub.batch
 
 
-view : (model -> Html msg) -> Model model -> Html (Msg msg)
-view viewFn model =
+{-| onError is used at the very beginning and is called with "not loaded yet"
+-}
+view : (String -> Html msg) -> (model -> Html msg) -> Model model -> Html (Msg msg)
+view onError viewFn model =
     case model of
         Ok m ->
             Html.map BackgroundMsg (viewFn m)
 
         Err e ->
-            -- TODO: display loading icon (or nothing?) instead of this
-            Html.text e
+            Html.map BackgroundMsg (onError e)
 
 
 type alias Config model msg =
     { decodeModel : Value -> Result String model
     , encodeMsg : msg -> Value
     , view : model -> Html msg
+    , viewError : String -> Html msg
     , subs : model -> Sub msg
     }
 
@@ -74,6 +76,6 @@ program config =
     Html.program
         { init = init
         , update = update config.encodeMsg config.decodeModel
-        , view = view config.view
+        , view = view config.viewError config.view
         , subscriptions = subs config.subs
         }

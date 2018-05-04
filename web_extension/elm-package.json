@@ -19,6 +19,7 @@
         "Zinggi/elm-hash-icon": "2.0.2 <= v < 3.0.0",
         "Zinggi/elm-random-pcg-extended": "2.0.0 <= v < 3.0.0",
         "Zinggi/elm-uuid": "1.0.0 <= v < 2.0.0",
+        "Zinggi/toasty": "1.0.5 <= v < 2.0.0",
         "billstclair/elm-crypto-string": "2.1.0 <= v < 3.0.0",
         "elm-community/dict-extra": "2.3.0 <= v < 3.0.0",
         "elm-community/json-extra": "2.6.0 <= v < 3.0.0",
@@ -26,6 +27,7 @@
         "elm-lang/html": "2.0.0 <= v < 3.0.0",
         "elm-lang/http": "1.0.0 <= v < 2.0.0",
         "elm-lang/navigation": "2.1.0 <= v < 3.0.0",
+        "elm-lang/svg": "2.0.0 <= v < 3.0.0",
         "evancz/url-parser": "2.0.1 <= v < 3.0.0",
         "gilbertkennen/bigint": "1.0.1 <= v < 2.0.0",
         "jinjor/elm-debounce": "2.1.2 <= v < 3.0.0",
@@ -34,14 +36,10 @@
         "mdgriffith/stylish-elephants": "5.0.0 <= v < 6.0.0",
         "mgold/elm-random-pcg": "5.0.2 <= v < 6.0.0",
         "ohanhi/remotedata-http": "2.1.0 <= v < 3.0.0",
-        "Zinggi/toasty": "1.0.5 <= v < 2.0.0",
         "pablohirafuji/elm-qrcode": "2.2.0 <= v < 3.0.0",
         "saschatimme/elm-phoenix": "0.3.0 <= v < 1.0.0",
         "spisemisu/elm-bytes": "1.1.0 <= v < 2.0.0",
         "zwilias/elm-utf-tools": "1.0.1 <= v < 2.0.0"
-    },
-    "dependency-sources": {
-        "Zinggi/toasty": "git@github.com:Zinggi/toasty"
     },
     "elm-version": "0.18.0 <= v < 0.19.0"
 }

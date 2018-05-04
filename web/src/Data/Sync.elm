@@ -740,8 +740,7 @@ insertToStorage timestamp groupPw accountId groupId pw sync =
                         )
 
             Err str ->
-                Debug.log
-                    "Encrypting a password failed? But why???\n(err, groupPw, accountId, groupId, pw)"
+                Debug.log "Encrypting a password failed? But why???\n(err, groupPw, accountId, groupId, pw)"
                     ( str, groupPw, accountId, groupId, pw )
                     |> always sync
 
@@ -1252,7 +1251,7 @@ encodeComplete s =
 appVersion : String
 appVersion =
     -- TODO!: change if a new version is released
-    "0.1.3"
+    "0.2.0"
 
 
 completeDecoder : Decoder SyncData

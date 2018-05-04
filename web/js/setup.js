@@ -293,7 +293,7 @@ const setup = (startFn, onStart, onError) => {
         } else if (runsInsideExtension()) {
             deviceType = "WebExtension";
         }
-        console.log("device type:", deviceType);
+        // console.log("device type:", deviceType);
 
         const flags = {
             initialSeed: [rands[0], rands.slice(1)],

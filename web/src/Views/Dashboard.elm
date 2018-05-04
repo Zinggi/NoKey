@@ -113,9 +113,16 @@ viewPairingHint =
 viewSummery model =
     -- TODO: show this in the header
     -- TODO: show things like number of (recent) devices online
-    column []
-        [ row [ spacing (Styles.paddingScale 2) ]
-            [ Elements.text (toString (Data.Sync.numberOfKnownDevices model.syncData))
-            , Elements.b "Devices"
-            ]
-        ]
+    let
+        numDev =
+            Data.Sync.numberOfKnownDevices model.syncData
+    in
+        if numDev > 1 then
+            column []
+                [ row [ spacing (Styles.paddingScale 2) ]
+                    [ Elements.text (toString numDev)
+                    , Elements.b "Devices"
+                    ]
+                ]
+        else
+            empty
