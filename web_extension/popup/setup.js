@@ -1,6 +1,10 @@
 import Elm from '../elm/elm.js';
 
 const app = Elm.Popup.fullscreen();
+const {setupDom} = require('../../web/js/setup.js');
+
+setupDom();
+
 
 const port = browser.runtime.connect({name: "popup" + Math.random() });
 port.onMessage.addListener((msg) => {

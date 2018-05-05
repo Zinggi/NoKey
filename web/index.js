@@ -29,7 +29,7 @@ try {
             const el = document.getElementById('splash');
             el.parentNode.removeChild(el);
             // window.elmApp = app;
-        }, err => onError("", "", "", "", err)
+        }, err => handleErrors.onError("", "", "", "", err)
     );
 } catch (error) {
     // This seems useless, but only this way will we see what error

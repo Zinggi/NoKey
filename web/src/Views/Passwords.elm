@@ -451,7 +451,7 @@ viewStatus config sync accountId status =
                          else
                             "Show"
                         )
-                    , Elements.copyToClipboard config.onCopyToClipboard (\() -> Data.Sync.getPassword accountId sync |> Maybe.withDefault "")
+                    , Elements.copyToClipboard config.onCopyToClipboard (Data.Sync.getPassword accountId sync |> Maybe.withDefault "")
                     ]
                 ]
     in

@@ -20,6 +20,8 @@ const getRandom53bitInt = () => {
 };*/
 
 
+const copyToClipboard = require('./copyToClipboard.js');
+const createObserver = require('./createObserver.js');
 //--------------------------------------------------------------------------------
 // Util lib
 //--------------------------------------------------------------------------------
@@ -276,6 +278,28 @@ const setupAndroid = (app) => {
     };
 };
 
+
+const setupDom = () => {
+    console.log("register mutation observer");
+    const observer = createObserver({
+        selector: '.copy-to-clipboard',
+        onMount(node) {
+            console.log("mount btn", node);
+            node.addEventListener('click', () => {
+                console.log("copy to clipboard");
+                const txt = node.getAttribute('data-txt');
+                copyToClipboard(txt);
+            });
+        },
+        onUnmount(node) {
+            console.log("unmount btn", node);
+        }
+    });
+
+    return observer;
+};
+
+
 const setup = (startFn, onStart, onError) => {
     if (crypto === undefined) {
         throw Error("window.crypto not available");
@@ -424,6 +448,9 @@ const setup = (startFn, onStart, onError) => {
             });
         });
 
+        // make copyToClipboard work.
+        setupDom();
+
         if (deviceType === "Android") {
             setupAndroid(app);
         }
@@ -438,6 +465,7 @@ const setup = (startFn, onStart, onError) => {
 
 module.exports = {
     setup: setup,
+    setupDom: setupDom,
     getRandomInts: getRandomInts,
     runsInsideExtension: runsInsideExtension
 };

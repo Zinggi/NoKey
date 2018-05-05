@@ -244,9 +244,12 @@ floatingButton msg txt =
     customPrimaryButton (Styles.cardShadow 3) (Just msg) txt
 
 
-copyToClipboard : msg -> (() -> String) -> Element msg
+copyToClipboard : msg -> String -> Element msg
 copyToClipboard msg txt =
-    Input.button [ htmlAttribute (Attr.attribute "onClick" (copyToClipboardHack ++ ";copyToClipboard(" ++ toString (txt ()) ++ ");")) ]
+    Input.button
+        [ htmlAttribute (Attr.class "copy-to-clipboard")
+        , htmlAttribute (Attr.attribute "data-txt" txt)
+        ]
         { label =
             el
                 (padding (Styles.paddingScale 1)
@@ -255,32 +258,6 @@ copyToClipboard msg txt =
                 (text "Copy to clipboard")
         , onPress = Just msg
         }
-
-
-copyToClipboardHack =
-    """
-function copyToClipboard(text) {
-    if (window.clipboardData && window.clipboardData.setData) {
-        // IE specific code path to prevent textarea being shown while dialog is visible.
-        return clipboardData.setData("Text", text);
-
-    } else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
-        var textarea = document.createElement("textarea");
-        textarea.textContent = text;
-        textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in MS Edge.
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-            return document.execCommand("copy");  // Security exception may be thrown by some browsers.
-        } catch (ex) {
-            console.warn("Copy to clipboard failed.", ex);
-            return false;
-        } finally {
-            document.body.removeChild(textarea);
-        }
-    }
-}
-"""
 
 
 box : List (Attribute msg)
