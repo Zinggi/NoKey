@@ -317,7 +317,8 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                         ]
                                 else if state.deletePressed == Just ( siteName, login ) then
                                     column [ spacing (Styles.paddingScale 1) ]
-                                        [ Elements.p "Are you sure you want to delete that password?"
+                                        [ Elements.b "Are you sure?"
+                                        , Elements.p "Do you really want to delete this password?"
                                         , row [ spacing (Styles.paddingScale 0) ]
                                             [ Elements.button (Just (config.toMsg CancelEdit)) "Cancel"
                                             , Elements.deleteDanger (config.onDeletePassword ( siteName, login ))

@@ -46,11 +46,11 @@ view config { syncData } state =
                 in
                     column [ spacing (Styles.paddingScale 1) ]
                         [ Elements.b "Are you sure?"
-                        , Elements.p "This will delete all saved passwords and secret shares on this device."
+                        , Elements.p "This will delete all saved passwords and group keys on this device."
                         , if numDevAfter < Data.Sync.maxUsedSecurityLevel syncData then
                             paragraph []
                                 [ Elements.b "WARNING"
-                                , Elements.p "When you reset this device, the passwords saved in "
+                                , Elements.p "If you reset this device, the passwords saved in "
                                 , Data.Sync.namedGroupsWithLevel (\l -> l > numDevAfter) syncData
                                     |> Elements.enumeration (Elements.groupIcon True)
                                     |> row []

@@ -280,19 +280,19 @@ const setupAndroid = (app) => {
 
 
 const setupDom = () => {
-    console.log("register mutation observer");
+    // console.log("register mutation observer");
     const observer = createObserver({
         selector: '.copy-to-clipboard',
         onMount(node) {
-            console.log("mount btn", node);
+            // console.log("mount btn", node);
             node.addEventListener('click', () => {
-                console.log("copy to clipboard");
+                // console.log("copy to clipboard");
                 const txt = node.getAttribute('data-txt');
                 copyToClipboard(txt);
             });
         },
         onUnmount(node) {
-            console.log("unmount btn", node);
+            // console.log("unmount btn", node);
         }
     });
 
@@ -446,6 +446,12 @@ const setup = (startFn, onStart, onError) => {
                 // console.log("requested shares decrypted", decShares);
                 app.ports.onDidDecryptRequestedShares.send({ shares: decShares, time: msg.time, otherId: msg.otherId, ids: msg.ids });
             });
+        });
+
+        // when we reconnect, ask others if there is a new version
+        window.addEventListener('online', (e) => {
+            // console.log('online');
+            app.ports.onGotOnline.send(null);
         });
 
         // make copyToClipboard work.

@@ -111,6 +111,10 @@ update msg model =
                     _ ->
                         ret
 
+        OnGotOnline ->
+            -- The browser tells us we are online, lets ask other devices for their version
+            model |> withCmds [ Api.askForNewVersion model.syncData ]
+
         NavigateTo page ->
             let
                 doNothing model =
@@ -450,6 +454,7 @@ subs state =
             , Ports.onDidEncryptShares SharesReadyToSend
             , Ports.onDidDecryptRequestedShares DidDecryptRequestedShares
             , Ports.onGotQR OnGotQR
+            , Ports.onGotOnline (always OnGotOnline)
             ]
 
         _ ->

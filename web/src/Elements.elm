@@ -378,6 +378,7 @@ customPrimaryButton attrs onPress txt =
         { label =
             el
                 (padding (Styles.paddingScale 1)
+                    :: Font.color Styles.white
                     :: (Background.color <|
                             case onPress of
                                 Nothing ->

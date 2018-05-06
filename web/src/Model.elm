@@ -41,6 +41,7 @@ type Msg
     = AddPassword String
     | SiteNameChanged String
     | SecurityLevelChanged Int
+    | OnGotOnline
     | NewPasswordRequirements PW.State
     | UserNameChanged String
     | GetTokenClicked

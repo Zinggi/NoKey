@@ -69,6 +69,7 @@ viewDeviceEntry config sync state myId uuid ( name, idPart ) =
                 in
                     column [ spacing (Styles.paddingScale 1) ]
                         [ Elements.b "Are you sure?"
+                        , Elements.p "Do you really want to remove this device?"
 
                         -- TODO: this is not true, as when a device gets removed, we delete all its shares.
                         -- Should we keep them?

@@ -18,6 +18,9 @@ port scanQR : () -> Cmd msg
 port onGotQR : (String -> msg) -> Sub msg
 
 
+port onGotOnline : (() -> msg) -> Sub msg
+
+
 {-| the js side is expected to reset the storage and store the newly provided state instead
 -}
 port resetStorage : Value -> Cmd msg
