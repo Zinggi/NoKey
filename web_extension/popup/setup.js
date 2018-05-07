@@ -5,29 +5,45 @@ const {setupDom} = require('../../web/js/setup.js');
 
 setupDom();
 
-const isPopup = !window.menubar.visible;
+const getParams = () => {
+    const query = window.location.search;
+    if (!query) return { };
+    return (/^[?#]/.test(query) ? query.slice(1) : query)
+        .split('&')
+        .reduce((params, param) => {
+            let [ key, value ] = param.split('=');
+            params[key] = value ? decodeURIComponent(value.replace(/\+/g, ' ')) : '';
+            return params;
+        }, { });
+};
+const isPopup = (() => {
+    const p = getParams();
+    if (p.popup === 'true')
+        return true;
+    return false;
+})();
+
 
 const port = browser.runtime.connect({name: "popup" + Math.random() });
 port.onMessage.addListener((msg) => {
-    // console.log("(popup) got new state", state);
+    // console.log("(popup) got new msg", msg);
     if (msg.type === "onNewState") {
-        // console.log("(content) got new state", state);
         app.ports.onNewState.send(msg.data);
-    } else if (msg.type === "setSize" && isPopup) {
-        window.document.documentElement.setAttribute("style", "");
-        window.document.body.setAttribute("style", "");
     } else if (msg.type === "closePopup" && isPopup) {
-        window.document.body.setAttribute("style", "width: 780px; height: 580px;");
         window.close();
     }
 });
 
+if (isPopup) {
+    window.document.documentElement.setAttribute("style", "");
+    window.document.body.setAttribute("style", "");
+}
+
 app.ports.getState.subscribe(() => {
-    // console.log("(popup) getState");
     port.postMessage({type: "onStateRequest", data: {}});
 });
+
 app.ports.sendMsgToBackground.subscribe((msg) =>{
-    // console.log("(popup) sendMsgToBackground", msg);
     port.postMessage({type: "onReceiveMsg", data: msg});
 });
 

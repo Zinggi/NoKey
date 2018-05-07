@@ -88,16 +88,11 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             hasPopupOpen = true;
             const popupUrl = browser.extension.getURL("popup/main.html");
             browser.windows.create({
-                url: popupUrl,
+                url: popupUrl+"?popup=true",
                 width: 601,
                 height: 401,
                 type: 'popup'
             }).then((win) => {
-                // This hack tries to resize the popup to the correct size.
-                // This is crazy, but everything else I tried failed..
-                [100, 500, 1000, 2000, 5000, 10000].map((t) => {
-                    setTimeout(() => { sendMsgToAll({ type: "setSize" }, ports); }, t);
-                });
                 // TODO: This is a workaround for this firefox bug:
                 // https://discourse.mozilla.org/t/ff57-browser-windows-create-displays-blank-panel-detached-panel-popup/23644/5
                 // This can hopefully be removed at some point
