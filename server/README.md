@@ -23,7 +23,7 @@ Now visit [`localhost:4000`](http://localhost:4000) from your browser.
 
   * Build elm and assets:
     + (first time) `cd ../web/`, `elm-github-install`, `cd ../server`
-    + `cd assets`, `yarn build`, `cd ..`
+    + `cd assets`, `yarn build` (can take a while..), `cd ..`
   * Digest assets `MIX_ENV=prod mix phx.digest`
   * Possibly increment version in `server/mix.exs`
   * Compile `MIX_ENV=prod mix compile`
