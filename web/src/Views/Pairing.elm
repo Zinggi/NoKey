@@ -16,6 +16,7 @@ import Element exposing (..)
 import Html.Attributes as Attr
 import RemoteData exposing (WebData, RemoteData(..))
 import Http exposing (Error(..))
+import Json.Decode as JD
 import QRCode
 import Elements
 import Helper exposing (boolToMaybe)
@@ -121,7 +122,7 @@ view config isAndroid diag =
                         empty
                     ]
                 , column [ width shrink, centerX, spacing (Styles.paddingScale 1) ]
-                    (rest ++ [ Elements.button (Just config.onGetTokenClicked) "Get a new code" ])
+                    (rest ++ [ Elements.button (Just config.onGetTokenClicked) "Get a new token" ])
                 ]
     in
         -- TODO: Scan QR code, I could probably use https://github.com/felipenmoura/qr-code-scanner
@@ -134,7 +135,20 @@ view config isAndroid diag =
                     inp True [ Elements.p ("Wait on confirmation from: " ++ a) ]
 
                 ( _, Answer (Err e) ) ->
-                    inp True [ Elements.p ("Error: " ++ toString e) ]
+                    case e of
+                        BadPayload _ { body } ->
+                            case JD.decodeString (JD.field "error" JD.string) body of
+                                Ok "token expired" ->
+                                    inp True [ Elements.p ("Error: Unknown token. You probably made a spelling mistake") ]
+
+                                Ok errStr ->
+                                    inp True [ Elements.p ("Error: " ++ errStr) ]
+
+                                _ ->
+                                    inp True [ Elements.p ("Error: " ++ toString e) ]
+
+                        _ ->
+                            inp True [ Elements.p ("Error: " ++ toString e) ]
 
                 ( NotAsked, _ ) ->
                     inp True []

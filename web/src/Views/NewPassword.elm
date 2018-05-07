@@ -19,8 +19,8 @@ view model =
 newSiteForm : Views.PasswordGenerator.State -> PasswordMetaData -> ( Int, Int ) -> Element Msg
 newSiteForm requirementsState entry ( minSecLevel, maxSecurityLevel ) =
     column [ spacing (Styles.paddingScale 3) ]
-        [ Elements.inputText [] (Just SiteNameChanged) { placeholder = "example.com", label = "Site" } entry.siteName
-        , Elements.inputText [] (Just UserNameChanged) { placeholder = "", label = "Login" } entry.userName
+        [ Elements.keyedInputText (toString entry.counter) [] (Just SiteNameChanged) { placeholder = "example.com", label = "Site" } entry.siteName
+        , Elements.keyedInputText ("a" ++ toString entry.counter) [] (Just UserNameChanged) { placeholder = "", label = "Login" } entry.userName
 
         -- TODO: offer to create a named group
         , Elements.clampedNumberInput SecurityLevelChanged "Security Level" ( minSecLevel, 2, min 5 maxSecurityLevel ) entry.securityLevel

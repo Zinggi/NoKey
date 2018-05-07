@@ -9,6 +9,7 @@ import Element.Input as Input
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Element.Keyed as Keyed
 import Styles
 import HashIcon
 import Icons
@@ -613,11 +614,6 @@ spacer =
     el [ width fill ] empty
 
 
-search : (String -> msg) -> String -> Element msg
-search onChange value =
-    inputHelper Input.search [] (Just onChange) "search" value
-
-
 
 -- passwordEntry : Maybe (String -> msg) -> String -> Bool -> String -> Element msg
 -- passwordEntry onChange label shouldShow value =
@@ -666,33 +662,75 @@ password attr onChange shouldShow value =
         }
 
 
-inputHelper fn attr onChange placeholder value =
-    fn
-        (attr
-            ++ [ padding 0
-               , htmlAttribute (Attr.disabled (onChange == Nothing))
-               , htmlAttribute (Attr.size (max 15 (String.length value)))
-               ]
-        )
-        { onChange = onChange
-        , text = value
-        , label = Input.labelLeft [ padding 0 ] empty
-        , placeholder =
-            if placeholder == "" then
-                Nothing
-            else
-                Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text placeholder)
-        }
-
-
 inputText : List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
-inputText attrs onMsg { placeholder, label } txt =
-    Input.text (textInputAttrs ++ attrs)
-        { label = textLabel label
-        , onChange = onMsg
-        , placeholder = Just (Input.placeholder [] (text placeholder))
-        , text = txt
-        }
+inputText =
+    inputTextHack "" []
+
+
+{-| since this is quite hacked together to work around cursor jumping around issues,
+you have to provide a key to this function. If you set the value not directely via userinput,
+you have to use a different key, otherwise the UI won't update!
+-}
+keyedInputText : String -> List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
+keyedInputText key =
+    inputTextHack key []
+
+
+inputTextHack : String -> List (Html.Attribute msg) -> List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
+inputTextHack key htmlAttrs attrs onMsg { placeholder, label } txt =
+    Keyed.column [ height shrink ]
+        [ -- Input.text (textInputAttrs ++ attrs)
+          --     { label = textLabel label
+          --     , onChange = onMsg
+          --     , placeholder = Just (Input.placeholder [] (text placeholder))
+          --     , text = txt
+          --     }
+          -- TODO: this is a hack to work around
+          -- https://github.com/elm-lang/html/issues/105
+          --
+          -- This empty el is part of the hack: without it, the classes we use below do not exist
+          ( key ++ "_", el (textInputAttrs ++ [ hackInLineStyle "display" "none", Border.color Styles.thinLineColor ]) empty )
+        , ( key
+          , Html.input
+                ([ Attr.type_ "text"
+                 , Attr.defaultValue txt
+                 , Attr.class "se focusable border-color-0-0-0-25 spacing-3-3 bg-0-0-0-0 border-0-02-0 border-radius-0 pad-0-0-0-0 width-fill"
+                 , Attr.placeholder placeholder
+                 , Attr.style [ ( "min-width", "0px" ), ( "width", "100%" ) ]
+                 ]
+                    ++ case onMsg of
+                        Nothing ->
+                            [ Attr.disabled True ]
+
+                        Just onInp ->
+                            [ Events.onInput onInp ]
+                                ++ htmlAttrs
+                )
+                []
+                |> html
+                |> (\i ->
+                        column [ height shrink, spacing (Styles.paddingScale 1), width fill ]
+                            [ el
+                                ([ Font.size (Styles.scaled 1)
+                                 , Font.bold
+                                 ]
+                                    ++ attrs
+                                )
+                                (if String.isEmpty label then
+                                    empty
+                                 else
+                                    text label
+                                )
+                            , el [ width fill ] i
+                            ]
+                   )
+          )
+        ]
+
+
+search : (String -> msg) -> String -> Element msg
+search onChange value =
+    inputTextHack "s" [ Attr.type_ "search" ] [] (Just onChange) { placeholder = "Search", label = "" } value
 
 
 textInputAttrs =

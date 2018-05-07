@@ -258,7 +258,7 @@ const postMsg = (msg) => {
     try {
         port.postMessage(msg);
     } catch (err) {
-        console.log("tried to post msg, but couldn't. msg", msg, "err", err);
+        // console.log("tried to post msg, but couldn't. msg", msg, "err", err);
     }
 };
 

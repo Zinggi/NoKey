@@ -141,7 +141,9 @@ atLeastOneOf state =
                 state.allowedSets
             )
             state.atLeastOneOf
-        , Elements.inputText [] (Just SetCustom) { label = "Custom", placeholder = "" } state.custom
+
+        -- This was too confusing, so I just removed it
+        -- , Elements.inputText "" [] (Just SetCustom) { label = "Custom", placeholder = "" } state.custom
         ]
 
 

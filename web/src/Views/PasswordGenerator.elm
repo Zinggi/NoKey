@@ -18,6 +18,7 @@ type alias State =
     , requirements : PwReq.State
     , seed : Seed
     , pw : Maybe String
+    , counter : Int
     }
 
 
@@ -55,7 +56,7 @@ update msg state =
 
 init : Seed -> State
 init seed =
-    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first, pw = Nothing }
+    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first, pw = Nothing, counter = 0 }
 
 
 nextPassword : State -> State
@@ -63,6 +64,7 @@ nextPassword state =
     { state
         | seed = PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.second
         , pw = Nothing
+        , counter = state.counter + 1
     }
 
 
@@ -91,7 +93,7 @@ view onAcceptPw canAdd toMsg state =
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ if isOk then
-                Elements.inputText [] (Just SetPw) { label = "Password", placeholder = "" } pw
+                Elements.keyedInputText (toString state.counter) [] (Just SetPw) { label = "Password", placeholder = "" } pw
                     |> Element.map (\msg -> update msg state |> toMsg)
               else
                 Elements.p error

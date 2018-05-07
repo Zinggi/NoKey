@@ -315,7 +315,7 @@ update msg model =
             let
                 newSiteEntry =
                     if model.newSiteEntry.siteName == "" || Just model.newSiteEntry.siteName == model.currentSite then
-                        (\e -> { e | siteName = site }) model.newSiteEntry
+                        Data.PasswordMeta.setSiteName site model.newSiteEntry
                     else
                         model.newSiteEntry
             in
