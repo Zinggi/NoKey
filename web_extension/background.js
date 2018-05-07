@@ -6,7 +6,11 @@ const sendMsgToAll = (msg, ports) => {
     // console.log("send msg:", msg, "to:", ports);
     for (let key in ports) {
         if (ports[key]) {
-            ports[key].postMessage(msg);
+            try {
+                ports[key].postMessage(msg);
+            } catch (err) {
+                console.log("couldn't post msg to", key, "err", err);
+            }
         }
     }
 };
@@ -53,16 +57,10 @@ setup(Elm.MainBackground.fullscreen, (app) => {
     });
 
     app.ports.accountsForSite.subscribe((accounts) => {
-        if (!lastPort) return;
-        ports[lastPort].postMessage({
+        sendMsgToAll({
             type: "onGetAccountsForSite",
             data: accounts
-        });
-        // TODO: why does this not work???
-        // sendMsgToAll({
-        //     type: "onGetAccountsForSite",
-        //     data: accounts
-        // });
+        }, ports);
     });
 
     // fillForm : { login : String, site : String, password : String } -> Cmd msg
@@ -89,17 +87,21 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             }
             hasPopupOpen = true;
             const popupUrl = browser.extension.getURL("popup/main.html");
-            browser.windows.create(Object.assign({
+            browser.windows.create({
                 url: popupUrl,
-                width: 600,
-                height: 400,
+                width: 601,
+                height: 401,
                 type: 'popup'
-            }, isFirefox && { allowScriptsToClose: true })).then((win) => {
+            }).then((win) => {
                 // This hack tries to resize the popup to the correct size.
                 // This is crazy, but everything else I tried failed..
                 [100, 500, 1000, 2000, 5000, 10000].map((t) => {
                     setTimeout(() => { sendMsgToAll({ type: "setSize" }, ports); }, t);
                 });
+                // TODO: This is a workaround for this firefox bug:
+                // https://discourse.mozilla.org/t/ff57-browser-windows-create-displays-blank-panel-detached-panel-popup/23644/5
+                // This can hopefully be removed at some point
+                browser.windows.update(win.id, { width: 600, height: 400 });
 
                 browser.windows.onRemoved.addListener((id) => {
                     // console.log("on remove window");

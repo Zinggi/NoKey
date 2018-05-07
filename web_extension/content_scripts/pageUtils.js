@@ -51,7 +51,7 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
             return;
         }
 
-        const addIcon = isSignUp || (accounts.length !== 0);
+        const addIcon = true; //isSignUp || (accounts.length !== 0);
 
         if (addIcon) {
             const iconPath = browser.extension.getURL('icons/logo.svg');
@@ -67,10 +67,10 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
             // input.addEventListener("mousemove", onIconHover);
             input.addEventListener("click", (event) => {
                 // console.log("on icon click", event);
-                openPopup(event.target, isPw, isSignUp);
+                openPopup(event.target, isPw, isSignUp, accounts);
             });
             input.addEventListener("focus", (event) => {
-                openPopup(event.target, isPw, isSignUp);
+                openPopup(event.target, isPw, isSignUp, accounts);
             });
         }
     };
@@ -94,7 +94,7 @@ const onNodeAdded = (accounts) => () => {
     const hijackedOnSubmit = (group) => (event) => {
         const entry = getFormData(group);
         const data = { entry: entry, isSignUp: group.isSignUp };
-        port.postMessage({ type: "didSubmit", data: data });
+        postMsg({ type: "didSubmit", data: data });
     };
 
 
@@ -158,24 +158,24 @@ const closePopup = () => {
     actionOutsidePopup.listen(false);
 };
 
-const openPopup = (elem, isPw, isSignUp) => {
+const openPopup = (elem, isPw, isSignUp, accounts) => {
     if (!popupLoaded) return;
 
     // Don't allow to immediately close again:
     setTimeout(() => { actionOutsidePopup.listen(true); }, 1000);
-    showContainer(elem, popupContainer, isPw, isSignUp);
+    showContainer(elem, popupContainer, isPw, isSignUp, accounts);
 
     const rect = elem.getBoundingClientRect();
     moveContainer(rect.bottom, rect.left);
 };
 
-const showContainer = (elem, popupContainer, isPw, isSignUp) => {
+const showContainer = (elem, popupContainer, isPw, isSignUp, accounts) => {
     popupContainer.style.display = '';
 
     const selectElement = () => {
         if (isSignUp && isPw) {
             return "newPassword";
-        } else if (!isSignUp) {
+        } else if (!isSignUp && accounts.length > 0) {
             return "fillForm";
         }
     };
@@ -183,8 +183,10 @@ const showContainer = (elem, popupContainer, isPw, isSignUp) => {
     for (let child of popupContainer.children) {
         if (elementToShow === child.myId) {
             child.style.display = '';
+            popupContainer.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
         } else {
             child.style.display = 'none';
+            popupContainer.style.boxShadow = "";
         }
     }
 
@@ -251,10 +253,23 @@ const getCurrentSite = () => {
     return document.location.hostname;
 };
 
+const postMsg = (msg) => {
+    if (!port) return;
+    try {
+        port.postMessage(msg);
+    } catch (err) {
+        console.log("tried to post msg, but couldn't. msg", msg, "err", err);
+    }
+};
+
 const onWindowLoad = () => {
     port = browser.runtime.connect({name: window.location.href + Math.random() });
-    port.postMessage({type: "getAccountsForSite", data: getCurrentSite()});
+    window.addEventListener("focus", (event) => {
+        // console.log("onfocus");
+        postMsg({type: "getAccountsForSite", data: getCurrentSite()});
+    }, false);
     port.onMessage.addListener((msg) => {
+        // console.log("got msg:", msg);
         if (msg.type == "onGetAccountsForSite") {
             const accounts = msg.data;
             // console.log("known accounts:", accounts);
@@ -295,6 +310,7 @@ const onWindowLoad = () => {
             }
         }
     });
+    postMsg({type: "getAccountsForSite", data: getCurrentSite()});
 };
 
 

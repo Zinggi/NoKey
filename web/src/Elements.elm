@@ -57,8 +57,11 @@ onKey desiredCode msg =
 
 inputGroup : String -> List (Element msg) -> Element msg
 inputGroup heading contents =
-    column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 2), alignLeft ]
-        (el Styles.groupHeading (h4 heading) :: contents)
+    if List.isEmpty contents then
+        empty
+    else
+        column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 2), alignLeft ]
+            (el Styles.groupHeading (h4 heading) :: contents)
 
 
 container : List (Element msg) -> Element msg
