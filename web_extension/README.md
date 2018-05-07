@@ -28,6 +28,7 @@ https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
  * TODO!: Remove 'unsafe-eval' from manifest. It's only needed because of how webpack works in dev mode
  * `yarn build`
  * `web-ext build -s addon/`
+ * test in chrome
 
 ## Publish
 ### Firefox

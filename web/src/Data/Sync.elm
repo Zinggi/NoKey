@@ -1251,7 +1251,7 @@ encodeComplete s =
 appVersion : String
 appVersion =
     -- TODO!: change if a new version is released
-    "0.2.0"
+    "0.2.1"
 
 
 completeDecoder : Decoder SyncData

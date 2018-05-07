@@ -9,7 +9,7 @@ const sendMsgToAll = (msg, ports) => {
             try {
                 ports[key].postMessage(msg);
             } catch (err) {
-                console.log("couldn't post msg to", key, "err", err);
+                // console.log("couldn't post msg to", key, "err", err);
             }
         }
     }
