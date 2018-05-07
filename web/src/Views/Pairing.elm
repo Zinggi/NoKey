@@ -125,7 +125,6 @@ view config isAndroid diag =
                     (rest ++ [ Elements.button (Just config.onGetTokenClicked) "Get a new token" ])
                 ]
     in
-        -- TODO: Scan QR code, I could probably use https://github.com/felipenmoura/qr-code-scanner
         column [ height shrink, spacing (Styles.paddingScale 2) ]
             [ case ( diag.token, diag.tokenSubmitStatus ) of
                 ( _, Submitted ) ->

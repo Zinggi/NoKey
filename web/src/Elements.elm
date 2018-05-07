@@ -193,13 +193,14 @@ siteLogo siteName =
         -- For now just use the first letter on a nice background
         el
             [ Border.rounded 20
-            , width (px 28)
-            , height (px 28)
-            , Background.color Styles.foregroundColor
+            , Font.color Styles.backgroundColor
+            , width (px 34)
+            , height (px 34)
+            , Background.color (Helper.randomColorFromString siteName)
             , Font.size 24
             , Font.center
             ]
-            (Element.text letter)
+            (el [ centerY ] (Element.text letter))
 
 
 hashIcon : String -> Element msg

@@ -16,6 +16,8 @@ import Json.Encode as JE exposing (Value)
 import Uuid
 import Time exposing (Time)
 import Task exposing (Task)
+import Murmur3
+import Color exposing (Color)
 
 
 -- Update
@@ -427,6 +429,17 @@ encodeSet valueEncoder set =
 
 
 -- Random
+
+
+randomColorFromString : String -> Color
+randomColorFromString str =
+    let
+        c =
+            Random.initialSeed (Murmur3.hashString 42 str)
+                |> Random.step (Random.float 0 (2 * pi))
+                |> Tuple.first
+    in
+        Color.hsl c 0.77 0.43
 
 
 pcgToCore : RandomP.Seed -> Random.Seed
