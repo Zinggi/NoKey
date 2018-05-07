@@ -47,6 +47,11 @@ mapModel fn ( a, c ) =
     ( fn a, c )
 
 
+andThenCmd : (model -> Cmd msg) -> ( model, Cmd msg ) -> ( model, Cmd msg )
+andThenCmd fn ( m, c ) =
+    ( m, Cmd.batch [ fn m, c ] )
+
+
 andThenUpdate : (model -> ( model, Cmd msg )) -> ( model, Cmd msg ) -> ( model, Cmd msg )
 andThenUpdate fn ( m, cmd1 ) =
     let

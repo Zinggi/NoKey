@@ -32,6 +32,13 @@ view passwordsConfig model =
             , Maybe.withDefault empty h.tutorial
             , Tuple.second h.needsPairing
             , Views.Passwords.tasks passwordsConfig model.passwordsView (Data.Sync.getTasks model.syncData)
+            , if Tuple.first h.needsPairing then
+                empty
+              else
+                column [ spacing (Styles.scaled 1) ]
+                    [ pairButton
+                    , addPasswordButton
+                    ]
             ]
 
 
@@ -43,8 +50,6 @@ type alias Hints =
 
 hints : Model -> Hints
 hints model =
-    -- TODO: show dynamic hints, such as if there is a group with level 2 and you only have two devices,
-    -- warn user to pair more.
     { tutorial =
         if model.isFirstTimeUser then
             Just viewTutorial
@@ -98,7 +103,7 @@ viewPairMoreHint numDev maxLevel =
                 ++ toString numDev
                 ++ " paired devices."
             )
-        , Elements.button (Just (NavigateTo Pairing)) "Pair a device"
+        , pairButton
         ]
 
 
@@ -106,8 +111,16 @@ viewPairingHint =
     Elements.card 1
         []
         [ Elements.p "Pair your first device to get started"
-        , Elements.button (Just (NavigateTo Pairing)) "Pair a device"
+        , pairButton
         ]
+
+
+pairButton =
+    Elements.button (Just (NavigateTo Pairing)) "Pair a device"
+
+
+addPasswordButton =
+    Elements.button (Just (NavigateTo NewPassword)) "Add a new password"
 
 
 viewSummery model =

@@ -9,7 +9,7 @@ import Timer
 
 --
 
-import Helper exposing (withCmds, noCmd, andThenUpdate, andThenUpdateIf, addCmds, mapModel)
+import Helper exposing (withCmds, noCmd, andThenUpdate, andThenUpdateIf, addCmds, mapModel, andThenCmd)
 import Ports
 import Route exposing (Page(..))
 import Data.PasswordMeta
@@ -179,7 +179,7 @@ update msg model =
         SaveEntry id groupId entry ->
             saveEntry groupId entry model
                 |> andThenUpdate (updateNotifications (Notifications.remove id))
-                |> addCmds [ Ports.closePopup () ]
+                |> andThenCmd closePopup
 
         InsertSite accountId groupId password timestamp ->
             let
@@ -198,7 +198,7 @@ update msg model =
         DismissNotification id ->
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Ports.closePopup () ]
+                |> andThenCmd closePopup
 
         SiteNameChanged s ->
             { model
@@ -293,13 +293,15 @@ update msg model =
         GrantShareRequest id req ->
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Api.grantRequest req model.syncData, Ports.closePopup () ]
+                |> addCmds [ Api.grantRequest req model.syncData ]
+                |> andThenCmd closePopup
 
         RejectShareRequest id req ->
             -- inform other such that they stop asking
             model
                 |> updateNotifications (Notifications.remove id)
-                |> addCmds [ Ports.closePopup (), Api.rejectShareRequest req.deviceId req.reqIds ]
+                |> addCmds [ Api.rejectShareRequest req.deviceId req.reqIds ]
+                |> andThenCmd closePopup
 
         ResetDevice ->
             Model.reset model
@@ -310,8 +312,15 @@ update msg model =
                 |> noCmd
 
         SendOutAccountsFor site ->
-            { model | currentSite = Just site }
-                |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
+            let
+                newSiteEntry =
+                    if model.newSiteEntry.siteName == "" || Just model.newSiteEntry.siteName == model.currentSite then
+                        (\e -> { e | siteName = site }) model.newSiteEntry
+                    else
+                        model.newSiteEntry
+            in
+                { model | currentSite = Just site, newSiteEntry = newSiteEntry }
+                    |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
 
         AddSiteEntry { isSignUp, entry } ->
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials
@@ -385,6 +394,14 @@ getToken model =
     model
         |> updatePairingDialogue Views.Pairing.getTockenClicked
         |> Api.initPairing model.uniqueIdentifyier
+
+
+closePopup : Model -> Cmd Msg
+closePopup model =
+    if Notifications.count model.notifications <= 0 then
+        Ports.closePopup ()
+    else
+        Cmd.none
 
 
 saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )

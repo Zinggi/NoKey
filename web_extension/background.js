@@ -20,6 +20,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
     let ports = {};
     let lastPort = null;
     let hasPopupOpen = false;
+    let previousNotificationsCount = 0;
 
     // TODO: this is a very primitive way to check if we are running on firefox.
     // It stops working as soon as chrome adds this api too
@@ -57,6 +58,11 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             type: "onGetAccountsForSite",
             data: accounts
         });
+        // TODO: why does this not work???
+        // sendMsgToAll({
+        //     type: "onGetAccountsForSite",
+        //     data: accounts
+        // });
     });
 
     // fillForm : { login : String, site : String, password : String } -> Cmd msg
@@ -78,7 +84,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             // this is the tooltip
             browser.browserAction.setTitle({title: "NoKey: User interaction required"});
 
-            if (hasPopupOpen) {
+            if (hasPopupOpen || count == previousNotificationsCount ) {
                 return;
             }
             hasPopupOpen = true;
@@ -109,6 +115,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             browser.browserAction.setBadgeText({text: ""});
             browser.browserAction.setTitle({title: "NoKey"});
         }
+        previousNotificationsCount = count;
     });
 
     app.ports.sendOutNewState.subscribe((state) => {

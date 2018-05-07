@@ -5,6 +5,7 @@ const {setupDom} = require('../../web/js/setup.js');
 
 setupDom();
 
+const isPopup = !window.menubar.visible;
 
 const port = browser.runtime.connect({name: "popup" + Math.random() });
 port.onMessage.addListener((msg) => {
@@ -12,10 +13,10 @@ port.onMessage.addListener((msg) => {
     if (msg.type === "onNewState") {
         // console.log("(content) got new state", state);
         app.ports.onNewState.send(msg.data);
-    } else if (msg.type === "setSize") {
+    } else if (msg.type === "setSize" && isPopup) {
         window.document.documentElement.setAttribute("style", "");
         window.document.body.setAttribute("style", "");
-    } else if (msg.type === "closePopup") {
+    } else if (msg.type === "closePopup" && isPopup) {
         window.document.body.setAttribute("style", "width: 780px; height: 580px;");
         window.close();
     }
