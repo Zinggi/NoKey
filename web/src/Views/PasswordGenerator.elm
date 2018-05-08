@@ -117,5 +117,5 @@ view onAcceptPw canAdd toMsg state =
                 PwReq.view PwReq state.requirements
                     |> Element.map (\msg -> update msg state |> toMsg)
               else
-                empty
+                none
             ]

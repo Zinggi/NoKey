@@ -122,7 +122,8 @@ cardShadow depth =
     in
         [ Border.shadow { offset = ( 0, off1 ), blur = blur1, size = 0, color = Color.rgba 0 0 0 alpha1 }
         , Border.shadow { offset = ( 0, off2 ), blur = blur2, size = 0, color = Color.rgba 0 0 0 alpha2 }
-        , htmlAttribute (Attr.style [ ( "z-index", toString depth ) ])
+
+        -- , htmlAttribute (Attr.style [ ( "z-index", toString depth ) ])
         ]
 
 

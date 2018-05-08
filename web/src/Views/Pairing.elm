@@ -115,11 +115,11 @@ view config isAndroid diag =
                     , if shouldShowPairButton diag.inputToken then
                         Elements.primaryButton (boolToMaybe isEnabled config.onSubmitToken) "Pair"
                       else
-                        empty
+                        none
                     , if isAndroid then
                         Elements.primaryButton (Just config.onScanQR) "Scan"
                       else
-                        empty
+                        none
                     ]
                 , column [ width shrink, centerX, spacing (Styles.paddingScale 1) ]
                     (rest ++ [ Elements.button (Just config.onGetTokenClicked) "Get a new token" ])

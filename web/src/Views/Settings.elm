@@ -57,7 +57,7 @@ view config { syncData } state =
                                 , Elements.p "will no longer be accessible. Better pair one more device and then reset!"
                                 ]
                           else
-                            empty
+                            none
                         , row [ spacing (Styles.paddingScale 0) ]
                             [ Elements.button (Just (config.toMsg { state | showConfirmReset = False })) "Cancel"
                             , Elements.dangerButton (Just config.onReset) "Reset"
@@ -65,7 +65,7 @@ view config { syncData } state =
                         ]
               else
                 Elements.button (Just (config.toMsg { state | showConfirmReset = True })) "Reset Device"
-            , el [ height (px 30) ] empty
+            , el [ height (px 30) ] none
             ]
 
 

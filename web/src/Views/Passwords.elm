@@ -107,7 +107,7 @@ view config ({ syncData, passwordsView, requirementsState } as model) =
             , search config hasPasswords passwordsView.search
             , passwords config passwordsView requirementsState syncData
             , -- This is here such that we can scroll below the action button
-              el [ height (px 30) ] empty
+              el [ height (px 30) ] none
             ]
 
 
@@ -116,7 +116,7 @@ actionButton config model =
     if Data.Sync.numberOfKnownDevices model.syncData >= Data.Sync.minSecurityLevel model.syncData then
         Elements.floatingButton config.onAddNewPassword "Add new"
     else
-        empty
+        none
 
 
 search : Config msg -> Bool -> String -> Element msg
@@ -126,13 +126,13 @@ search config hasPasswords searchValue =
         -- add clear filter!
         el [ padding (Styles.paddingScale 1), width fill ] (Elements.search (config.toMsg << UpdateSearch) searchValue)
     else
-        empty
+        none
 
 
 tasks : Config msg -> State -> List Task -> Element msg
 tasks config state ts =
     if List.isEmpty ts then
-        empty
+        none
     else
         Elements.container
             [ Elements.h3 "Tasks"
@@ -244,7 +244,7 @@ viewPw config requirementsState sync group disabled groupStatus state siteName u
                 (Dict.toList userNames)
     in
         if List.isEmpty filterd then
-            empty
+            none
         else
             Elements.expandable (config.toMsg (ToggleSite siteName))
                 (Set.member siteName state.expandedSites)
@@ -279,9 +279,12 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                     (\( login, status ) ->
                         column [ spacing (Styles.paddingScale 1) ]
                             [ column [ spacing (Styles.paddingScale 1) ]
-                                [ Elements.inputText [ Styles.selectable ] Nothing { label = "Login", placeholder = "" } login
+                                [ row [ spacing (Styles.paddingScale 0) ]
+                                    [ Elements.inputText [ Styles.selectable ] Nothing { label = "Login", placeholder = "" } login
+                                    , Elements.copyToClipboardIcon (Just config.onCopyToClipboard) login
+                                    ]
                                 , if state.editPw == Just ( siteName, login ) then
-                                    empty
+                                    none
                                   else
                                     viewStatus config sync ( siteName, login ) status
                                 ]
@@ -312,7 +315,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                                     Elements.primaryButton (Just (config.movePw ( siteName, login ) groupId g)) "Move"
 
                                                 Nothing ->
-                                                    empty
+                                                    none
                                             ]
                                         ]
                                 else if state.deletePressed == Just ( siteName, login ) then
@@ -330,7 +333,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                         , if List.length (Data.Sync.groups sync) >= 2 then
                                             Elements.button (Just (config.toMsg (MovePw ( siteName, login )))) "Move"
                                           else
-                                            empty
+                                            none
                                         , Elements.delete (config.toMsg (PressDelete ( siteName, login )))
                                         ]
                               else
@@ -358,7 +361,7 @@ groupsButtonHelper txt onPress groups =
                 |> List.filter (\( l, _ ) -> l /= 1)
     in
         if List.isEmpty groupIds then
-            empty
+            none
         else
             Elements.customButton []
                 (Just (onPress groupIds))
@@ -389,7 +392,7 @@ viewGroupsStatus config groups disabled =
                 |> List.filter (\( status, _ ) -> status /= "Done")
     in
         if List.isEmpty groupedByStatus then
-            empty
+            none
         else
             groupedByStatus
                 |> Elements.enumeration
@@ -399,7 +402,7 @@ viewGroupsStatus config groups disabled =
                                 viewGroupStatus config (List.map Tuple.first ids) disabled status
 
                             _ ->
-                                empty
+                                none
                     )
                 |> row [ spacing (Styles.paddingScale 0) ]
 
@@ -420,7 +423,7 @@ viewGroupStatus config groupIds disabled status =
 
             NotRequested ->
                 if disabled then
-                    empty
+                    none
                 else
                     unlockGroupsButton config.onRequestPasswordPressed idsWithStatus
 
@@ -435,33 +438,19 @@ viewStatus : Config msg -> SyncData -> AccountId -> PasswordStatus -> Element ms
 viewStatus config sync accountId status =
     let
         entry showPw pw =
-            column [ spacing (Styles.paddingScale 1) ]
-                [ Elements.password
-                    (if showPw then
-                        [ Styles.selectable ]
-                     else
-                        []
-                    )
-                    Nothing
-                    showPw
-                    pw
-                , row [ spacing (Styles.paddingScale 0) ]
-                    [ Elements.button (Just (config.onTogglePassword accountId))
-                        (if showPw then
-                            "Hide"
-                         else
-                            "Show"
-                        )
-                    , Elements.copyToClipboard config.onCopyToClipboard (Data.Sync.getPassword accountId sync |> Maybe.withDefault "")
-                    ]
-                ]
+            Elements.password []
+                { onCopyToClipboard = Just config.onCopyToClipboard
+                , onToggle = Just (config.onTogglePassword accountId)
+                , shouldShow = showPw
+                }
+                pw
     in
         case status of
             Unlocked pw ->
-                entry True pw
+                entry True (Just pw)
 
             UnlockedButHidden ->
-                entry False "*****"
+                entry False (Data.Sync.getPassword accountId sync)
 
             _ ->
-                Elements.password [] Nothing False "*****"
+                Elements.password [] { onCopyToClipboard = Nothing, onToggle = Nothing, shouldShow = False } Nothing

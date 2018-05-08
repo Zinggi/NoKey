@@ -59,7 +59,7 @@ onKey desiredCode msg =
 inputGroup : String -> List (Element msg) -> Element msg
 inputGroup heading contents =
     if List.isEmpty contents then
-        empty
+        none
     else
         column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 2), alignLeft ]
             (el Styles.groupHeading (h4 heading) :: contents)
@@ -238,7 +238,7 @@ checkBox onChange isDisabled label checked =
                             []
                         ]
                     )
-                    empty
+                    none
         , checked = checked
         , label = Input.labelRight [] (text label)
         }
@@ -249,12 +249,16 @@ floatingButton msg txt =
     customPrimaryButton (Styles.cardShadow 3) (Just msg) txt
 
 
+copyToClipboardAttributes : String -> List (Attribute msg)
+copyToClipboardAttributes txt =
+    [ htmlAttribute (Attr.class "copy-to-clipboard")
+    , htmlAttribute (Attr.attribute "data-txt" txt)
+    ]
+
+
 copyToClipboard : msg -> String -> Element msg
 copyToClipboard msg txt =
-    Input.button
-        [ htmlAttribute (Attr.class "copy-to-clipboard")
-        , htmlAttribute (Attr.attribute "data-txt" txt)
-        ]
+    Input.button (copyToClipboardAttributes txt)
         { label =
             el
                 (padding (Styles.paddingScale 1)
@@ -263,6 +267,11 @@ copyToClipboard msg txt =
                 (text "Copy to clipboard")
         , onPress = Just msg
         }
+
+
+copyToClipboardIcon : Maybe msg -> String -> Element msg
+copyToClipboardIcon onClick txt =
+    customButton (copyToClipboardAttributes txt) onClick (Icons.normal Icons.clipboard)
 
 
 box : List (Attribute msg)
@@ -291,7 +300,7 @@ textWithCustomOverflow overflow txt =
 
 p : String -> Element msg
 p txt =
-    paragraph [] [ text txt ]
+    paragraph [ width (fill |> minimum 0) ] [ text txt ]
 
 
 italicText : String -> Element msg
@@ -340,7 +349,7 @@ pageButton onPress isActive page =
                 , if True || isActive then
                     el [ centerX ] (Route.pageToTitle page |> h4)
                   else
-                    empty
+                    none
                 ]
         }
 
@@ -369,7 +378,7 @@ pageToIcon page =
             Icons.normal Icons.options
 
         _ ->
-            empty
+            none
 
 
 primaryButton : Maybe msg -> String -> Element msg
@@ -454,9 +463,14 @@ dangerButton onPress txt =
     customButton Styles.dangerStyle onPress (text txt)
 
 
+noBorderButton : List (Attribute msg) -> Maybe msg -> Element msg -> Element msg
+noBorderButton attrs onPress inner =
+    Input.button (padding (Styles.paddingScale 1) :: attrs) { label = inner, onPress = onPress }
+
+
 customButton : List (Attribute msg) -> Maybe msg -> Element msg -> Element msg
 customButton attrs onPress inner =
-    Input.button []
+    Input.button attrs
         { label =
             el
                 (padding (Styles.paddingScale 1)
@@ -467,7 +481,7 @@ customButton attrs onPress inner =
                             Just _ ->
                                 Styles.borderStyle
                        )
-                    ++ attrs
+                 -- ++ attrs
                 )
                 inner
         , onPress = onPress
@@ -504,7 +518,7 @@ groupIcon isLocked ( ( level, _ ), post ) =
     row [ width shrink ]
         [ h3 (toString level)
         , if post == "" then
-            empty
+            none
           else
             p ("(" ++ post ++ ")")
         , if isLocked then
@@ -534,7 +548,7 @@ helperMayIdPart idPart =
     if idPart /= "" then
         italicText ("(" ++ idPart ++ ")")
     else
-        empty
+        none
 
 
 myAvatar : (String -> msg) -> String -> ( String, String ) -> List (Attribute msg) -> Element msg
@@ -570,7 +584,7 @@ clampedNumberInput onChange label ( min, default, max ) n =
                  ]
                     ++ att
                 )
-                { label = Input.labelAbove [] empty
+                { label = Input.labelAbove [] none
                 , onChange = Just toNumber
                 , placeholder = Nothing
                 , text = toString m
@@ -607,12 +621,12 @@ clampedNumberInput onChange label ( min, default, max ) n =
 
 line : Element msg
 line =
-    el [ height (px 1), Background.color Styles.black, width fill ] empty
+    el [ height (px 1), Background.color Styles.black, width fill ] none
 
 
 spacer : Element msg
 spacer =
-    el [ width fill ] empty
+    el [ width fill ] none
 
 
 
@@ -639,28 +653,57 @@ table headers data =
         }
 
 
-password attr onChange shouldShow value =
-    Input.currentPassword (attr ++ textInputAttrs)
-        -- (attr
-        --     ++ [ padding 0
-        --        , width shrink
-        --        , htmlAttribute
-        --             (Attr.size
-        --                 (if shouldShow then
-        --                     String.length value
-        --                  else
-        --                     5
-        --                 )
-        --             )
-        --        ]
-        -- )
-        { onChange = onChange
-        , text = value
-        , label = textLabel "Password"
-        , placeholder =
-            Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text "********")
-        , show = shouldShow
-        }
+{-| this is only used for a read only password
+-}
+password : List (Attribute msg) -> { onCopyToClipboard : Maybe msg, onToggle : Maybe msg, shouldShow : Bool } -> Maybe String -> Element msg
+password attr { onCopyToClipboard, shouldShow, onToggle } mValue =
+    let
+        renderIf onClick el =
+            if onClick == Nothing then
+                none
+            else
+                el
+
+        btns =
+            row [ width shrink, alignRight, alignBottom, spacing (Styles.paddingScale 0) ]
+                [ copyToClipboardIcon onCopyToClipboard (Maybe.withDefault "*****" mValue) |> renderIf onCopyToClipboard
+                , customButton []
+                    onToggle
+                    (Icons.normal <|
+                        if shouldShow then
+                            Icons.eyeOff
+                        else
+                            Icons.eye
+                    )
+                    |> renderIf onToggle
+                ]
+    in
+        Input.currentPassword
+            (attr
+                ++ textInputAttrs
+                ++ (if shouldShow then
+                        [ Styles.selectable ]
+                    else
+                        []
+                   )
+            )
+            { onChange = Nothing
+            , text =
+                if not shouldShow then
+                    "*****"
+                else
+                    mValue |> Maybe.withDefault "*****"
+            , label = textLabel "Password"
+            , placeholder =
+                Just <| Input.placeholder [ padding (Styles.paddingScale 1) ] (text "*****")
+            , show = shouldShow
+            }
+            |> (\i ->
+                    if mValue == Nothing then
+                        i
+                    else
+                        row [ width fill, spacing (Styles.paddingScale 0) ] [ i, btns ]
+               )
 
 
 inputText : List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
@@ -690,7 +733,7 @@ inputTextHack key htmlAttrs attrs onMsg { placeholder, label } txt =
           -- https://github.com/elm-lang/html/issues/105
           --
           -- This empty el is part of the hack: without it, the classes we use below do not exist
-          ( key ++ "_", el (textInputAttrs ++ [ hackInLineStyle "display" "none", Border.color Styles.thinLineColor ]) empty )
+          ( key ++ "_", el (textInputAttrs ++ [ hackInLineStyle "display" "none", Border.color Styles.thinLineColor ]) none )
         , ( key
           , Html.input
                 ([ Attr.type_ "text"
@@ -718,7 +761,7 @@ inputTextHack key htmlAttrs attrs onMsg { placeholder, label } txt =
                                     ++ attrs
                                 )
                                 (if String.isEmpty label then
-                                    empty
+                                    none
                                  else
                                     text label
                                 )
@@ -752,7 +795,7 @@ textLabel label =
         , Font.bold
         ]
         (if String.isEmpty label then
-            empty
+            none
          else
             text label
         )

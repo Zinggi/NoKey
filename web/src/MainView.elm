@@ -57,6 +57,17 @@ heightHack =
     htmlAttribute (HtmlAttr.style [ ( "max-height", "100vh" ) ])
 
 
+hackMinMaxWidthCentred : Int -> Int -> Attribute msg
+hackMinMaxWidthCentred min max =
+    htmlAttribute <|
+        HtmlAttr.style
+            [ ( "max-width", toString max ++ "px" )
+            , ( "min-width", toString min ++ "px" )
+            , ( "margin", "auto" )
+            , ( "width", "100%" )
+            ]
+
+
 viewModel : Model -> Element Msg
 viewModel model =
     let
@@ -69,7 +80,8 @@ viewModel model =
         cont =
             column
                 [ centerX
-                , width (fillBetween { min = Just 320, max = Just 1024 })
+                , width (fill |> minimum 320 |> maximum 1024)
+                , hackMinMaxWidthCentred 320 1024
                 , height fill
                 , padding (Styles.paddingScale 3)
                 , scrollbars
@@ -127,10 +139,10 @@ viewTitle page toasties =
                 [ Html.text txt ]
 
         attr =
-            [ below (html toast), width (fillBetween { min = Just 320, max = Just 1024 }), centerX ]
+            [ below (html toast), width (fill |> minimum 320 |> maximum 1024), centerX, hackMinMaxWidthCentred 320 1024 ]
     in
         (if Route.hasBackButton page then
-            row attr [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] empty ]
+            row attr [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] none ]
          else
             el attr title
         )
@@ -202,8 +214,9 @@ bottomNavigation page model =
                 row (width fill :: Styles.cardShadow 2)
                     [ column [ width fill ]
                         [ column
-                            [ width (fillBetween { min = Just 320, max = Just 1024 })
+                            [ width (fill |> minimum 320 |> maximum 1024)
                             , centerX
+                            , hackMinMaxWidthCentred 320 1024
                             ]
                             [ c ]
                         ]
@@ -221,7 +234,7 @@ viewActionButton page model =
             Views.Devices.actionButton devicesConfig
 
         _ ->
-            empty
+            none
 
 
 viewPage : Page -> Model -> Element Msg

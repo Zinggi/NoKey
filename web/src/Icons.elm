@@ -50,6 +50,18 @@ arrowDown =
     FeatherIcons.chevronsDown
 
 
+eye =
+    FeatherIcons.eye
+
+
+eyeOff =
+    FeatherIcons.eyeOff
+
+
+clipboard =
+    FeatherIcons.clipboard
+
+
 loading =
     el [] (Element.html <| Loader.loaderWithOptions { loaderOptions | color = Styles.black })
 

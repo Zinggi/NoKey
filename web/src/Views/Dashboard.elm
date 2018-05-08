@@ -29,11 +29,11 @@ view passwordsConfig model =
         column [ spacing (Styles.scaled 1), height shrink ]
             [ Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             , viewSummery model
-            , Maybe.withDefault empty h.tutorial
+            , Maybe.withDefault none h.tutorial
             , Tuple.second h.needsPairing
             , Views.Passwords.tasks passwordsConfig model.passwordsView (Data.Sync.getTasks model.syncData)
             , if Tuple.first h.needsPairing then
-                empty
+                none
               else
                 column [ spacing (Styles.scaled 1) ]
                     [ pairButton
@@ -77,7 +77,7 @@ needsPairingHint { syncData } =
             -- TODO: add hint for when we lose access to a group.
             -- this could offer solutions for recovery, maybe we made a backup somewhere?
         else
-            ( False, empty )
+            ( False, none )
 
 
 viewTutorial =
@@ -138,4 +138,4 @@ viewSummery model =
                     ]
                 ]
         else
-            empty
+            none

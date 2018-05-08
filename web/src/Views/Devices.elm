@@ -34,7 +34,7 @@ view config { syncData, uniqueIdentifyier } state =
         column [ spacing (Styles.paddingScale 1) ]
             (Elements.myAvatar config.onSetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
                 :: devicesMap (viewDeviceEntry config syncData state myId) knownIds
-                ++ [ el [ height (px 30) ] empty ]
+                ++ [ el [ height (px 30) ] none ]
             )
 
 
@@ -52,13 +52,13 @@ actionButton config =
 viewDeviceEntry : Config msg -> SyncData -> State -> String -> String -> ( String, String ) -> Element msg
 viewDeviceEntry config sync state myId uuid ( name, idPart ) =
     if myId == uuid then
-        empty
+        none
     else
         column [ height shrink, spacing (Styles.paddingScale 1) ]
             [ row []
                 [ Elements.avatar [ width fill ] { id = uuid, name = name, postFix = idPart }
                 , if state.confirmDelete == Just uuid then
-                    empty
+                    none
                   else
                     Elements.delete (config.toMsg { state | confirmDelete = Just uuid })
                 ]
@@ -84,14 +84,14 @@ viewDeviceEntry config sync state myId uuid ( name, idPart ) =
                                 , Elements.p "will no longer be accessible. Better pair one more device and remove it then"
                                 ]
                           else
-                            empty
+                            none
                         , row [ spacing (Styles.paddingScale 0) ]
                             [ Elements.button (Just (config.toMsg { state | confirmDelete = Nothing })) "Cancel"
                             , Elements.deleteDanger (config.onRemoveDevice uuid)
                             ]
                         ]
               else
-                empty
+                none
             ]
 
 

@@ -9,7 +9,7 @@ import Data.Sync exposing (SyncData)
 
 
 type alias State =
-    Int
+    ( Int, Bool )
 
 
 type alias Config msg =
@@ -23,7 +23,7 @@ type alias Config msg =
 
 init : State
 init =
-    2
+    ( 2, False )
 
 
 view : Config msg -> SyncData -> Notifications -> ( Int, Int ) -> State -> Element msg
@@ -33,11 +33,11 @@ view config sync ns ( minSecLevel, numberOfKnownDevices ) state =
             viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state
 
         Nothing ->
-            empty
+            none
 
 
 viewEntry : Config msg -> SyncData -> ( Int, Int ) -> Notification -> State -> Element msg
-viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state =
+viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n ( secLevel, shouldShow ) =
     let
         groups gs =
             let
@@ -68,8 +68,16 @@ viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state =
                         "Save updated password?"
                 , Elements.inputText [] Nothing { label = "Site", placeholder = "" } entry.site
                 , Elements.inputText [] Nothing { label = "Login", placeholder = "" } entry.login
-                , Elements.password [] Nothing False entry.password
-                , Elements.clampedNumberInput config.toMsg "Security Level" ( minSecLevel, 2, min 5 numberOfKnownDevices ) state
+                , Elements.password []
+                    { onCopyToClipboard = Nothing
+                    , onToggle = Just <| config.toMsg ( secLevel, not shouldShow )
+                    , shouldShow = shouldShow
+                    }
+                    (Just entry.password)
+                , Elements.clampedNumberInput (\l -> config.toMsg ( l, shouldShow ))
+                    "Security Level"
+                    ( minSecLevel, 2, min 5 numberOfKnownDevices )
+                    secLevel
                 , Elements.buttonRow []
                     [ Elements.primaryButton
                         (if numberOfKnownDevices < minSecLevel then
@@ -77,8 +85,8 @@ viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state =
                          else
                             Just
                                 (config.onSaveEntry n.id
-                                    (Data.Sync.currentGroupId state sync)
-                                    { entry | securityLevel = clamp minSecLevel 5 state }
+                                    (Data.Sync.currentGroupId secLevel sync)
+                                    { entry | securityLevel = clamp minSecLevel 5 secLevel }
                                 )
                         )
                         "Save"
