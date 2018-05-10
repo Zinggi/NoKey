@@ -28,6 +28,7 @@ import Data.Settings exposing (Settings)
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
+import Data.KeyBox as KeyBox exposing (KeyBoxes)
 
 
 {-| This represents the data that is shared + all the metadata we need to sync this to others + our own private shares
@@ -107,6 +108,9 @@ type alias SharedData =
 
     -- here we store all passwords, encrypted with the group password
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
+
+    -- keyBoxes contain one share for each group. The shares are encrypted using a a user password.
+    , keyBoxes : KeyBoxes
 
     -- We need to sync the settings
     , settings : Data.Settings.SharedSettings
@@ -272,6 +276,7 @@ initShared seed encryptionKey signingKey devType uuid =
                 )
     , sharesToDistribute = ORDict.init seed
     , distributedShares = ORDict.init seed
+    , keyBoxes = KeyBox.init seed
     , passwords = ORDict.init seed
     , settings = Data.Settings.init
     , version = VClock.init
@@ -1052,6 +1057,7 @@ merge onShouldDecryptMyShares timestamp other my =
                         sharesForOthers
                         newSharesToDistribute
                 , settings = Data.Settings.merge other.shared.settings my.shared.settings
+                , keyBoxes = KeyBox.merge other.shared.keyBoxes my.shared.keyBoxes
                 , version = VClock.merge other.shared.version my.shared.version
                 }
           }
@@ -1176,6 +1182,7 @@ encodeShared shared =
                         shared.sharesToDistribute
                   )
                 , ( "distributedShares", ORDict.encode2 encodeGroupId GSet.encode shared.distributedShares )
+                , ( "keyBoxes", KeyBox.encode shared.keyBoxes )
                 , ( "settings", Data.Settings.encode shared.settings )
                 , ( "version", VClock.encode shared.version )
                 ]
@@ -1189,11 +1196,12 @@ encodeShared shared =
 sharedDecoderV1 : Decoder SharedData
 sharedDecoderV1 =
     decode
-        (\knownIds passwords sharesToDistribute distributedShares settings version ->
+        (\knownIds passwords sharesToDistribute distributedShares keyBoxes settings version ->
             { knownIds = knownIds
             , passwords = passwords
             , sharesToDistribute = sharesToDistribute
             , distributedShares = distributedShares
+            , keyBoxes = keyBoxes
             , settings = settings
             , version = version
             }
@@ -1208,6 +1216,7 @@ sharedDecoderV1 =
                 (TimestampedVersionRegister.decoder (JD.dict JD.value))
             )
         |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder)
+        |> optional "keyBoxes" KeyBox.decoder (KeyBox.init (Random.initialSeed 42))
         |> optional "settings" Data.Settings.decoder Data.Settings.init
         |> required "version" VClock.decoder
 

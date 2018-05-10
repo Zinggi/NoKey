@@ -2,6 +2,7 @@ module SecretSharing exposing (..)
 
 import BigInt exposing (BigInt)
 import Json.Decode as JD
+import Json.Decode.Pipeline as JD exposing (optional, required)
 import Json.Encode as JE
 import Dict exposing (Dict)
 import Random.Pcg.Extended as Random exposing (Seed)
@@ -14,6 +15,7 @@ import FiniteField
     exposing
         ( Prime
         , makeField
+        , bigPrime
         , primeBiggerThan
         , secretPolynom
         , getPolynomialPointsFor
@@ -34,13 +36,54 @@ type alias Share =
     { requiredParts : Int, x : Int, y : BigInt, prime : BigInt }
 
 
+type alias EncryptedShare =
+    { requiredParts : Int, x : Int, y : String, prime : BigInt }
+
+
+encryptedShareDecoder : JD.Decoder EncryptedShare
+encryptedShareDecoder =
+    JD.decode (\ps x y p -> { requiredParts = ps, x = x, y = y, prime = p })
+        |> required "requiredParts" JD.int
+        |> required "x" JD.int
+        |> required "y" JD.string
+        |> optional "prime" bigIntDecoder bigPrime
+
+
 shareDecoder : JD.Decoder Share
 shareDecoder =
-    JD.map4 Share
-        (JD.at [ "requiredParts" ] JD.int)
-        (JD.at [ "x" ] JD.int)
-        (JD.at [ "y" ] bigIntDecoder)
-        (JD.at [ "prime" ] bigIntDecoder)
+    JD.decode (\ps x y p -> { requiredParts = ps, x = x, y = y, prime = p })
+        |> required "requiredParts" JD.int
+        |> required "x" JD.int
+        |> required "y" bigIntDecoder
+        |> optional "prime" bigIntDecoder bigPrime
+
+
+encodeEncryptedShare : EncryptedShare -> JE.Value
+encodeEncryptedShare s =
+    JE.object
+        ([ ( "requiredParts", JE.int s.requiredParts )
+         , ( "x", JE.int s.x )
+         , ( "y", JE.string s.y )
+         ]
+            ++ if s.prime /= bigPrime then
+                [ ( "prime", bigIntEncoder s.prime ) ]
+               else
+                []
+        )
+
+
+encodeShare : Share -> JE.Value
+encodeShare s =
+    JE.object
+        ([ ( "requiredParts", JE.int s.requiredParts )
+         , ( "x", JE.int s.x )
+         , ( "y", bigIntEncoder s.y )
+         ]
+            ++ if s.prime /= bigPrime then
+                [ ( "prime", bigIntEncoder s.prime ) ]
+               else
+                []
+        )
 
 
 shareToJson : Share -> String
@@ -66,16 +109,6 @@ bigIntDecoder =
                     Nothing ->
                         JD.fail "Couldn't convert String to BigInt!"
             )
-
-
-encodeShare : Share -> JE.Value
-encodeShare s =
-    JE.object
-        [ ( "requiredParts", JE.int s.requiredParts )
-        , ( "x", JE.int s.x )
-        , ( "y", bigIntEncoder s.y )
-        , ( "prime", bigIntEncoder s.prime )
-        ]
 
 
 bigIntEncoder : BigInt -> JE.Value

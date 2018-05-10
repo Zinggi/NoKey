@@ -14,6 +14,7 @@ type Page
     | Pairing
     | NewPassword
     | Tutorial
+    | CreateKeyBox
 
 
 route : Parser (Page -> a) a
@@ -25,6 +26,7 @@ route =
         , Url.map Options (s "options")
         , Url.map Pairing (s "pairing")
         , Url.map Tutorial (s "tutorial")
+        , Url.map CreateKeyBox (s "createkeybox")
         , Url.map NewPassword (s "newpassword")
         ]
 
@@ -59,6 +61,9 @@ hasBackButton page =
         NewPassword ->
             True
 
+        CreateKeyBox ->
+            True
+
         _ ->
             False
 
@@ -77,6 +82,9 @@ pageToTitle page =
 
         Passwords ->
             "Vault"
+
+        CreateKeyBox ->
+            "Create Key Box"
 
         other ->
             toString other

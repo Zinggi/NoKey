@@ -7,6 +7,10 @@ import Loader
 import Icons.Svg
 
 
+type alias Icon =
+    FeatherIcons.Icon
+
+
 home =
     -- .home, .grid
     FeatherIcons.home
@@ -60,6 +64,14 @@ eyeOff =
 
 clipboard =
     FeatherIcons.clipboard
+
+
+more =
+    FeatherIcons.plus
+
+
+close =
+    FeatherIcons.x
 
 
 loading =

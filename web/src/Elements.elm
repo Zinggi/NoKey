@@ -12,7 +12,7 @@ import Element.Font as Font
 import Element.Keyed as Keyed
 import Styles
 import HashIcon
-import Icons
+import Icons exposing (Icon)
 import Data exposing (..)
 import Route exposing (Page(..))
 import Helper
@@ -244,9 +244,17 @@ checkBox onChange isDisabled label checked =
         }
 
 
-floatingButton : msg -> String -> Element msg
-floatingButton msg txt =
-    customPrimaryButton (Styles.cardShadow 3) (Just msg) txt
+floatingButton : List (Attribute msg) -> msg -> String -> Element msg
+floatingButton attrs msg txt =
+    customPrimaryButton (Styles.cardShadow 3 ++ attrs) (Just msg) txt
+
+
+floatingIconButton : List (Attribute msg) -> msg -> Icon -> Element msg
+floatingIconButton attrs msg icon =
+    Input.button ([ Background.color Styles.accentColor, Border.rounded 100 ] ++ Styles.cardShadow 3 ++ attrs)
+        { label = el [ padding (Styles.paddingScale 3), Font.color Styles.white ] (Icons.normal icon)
+        , onPress = Just msg
+        }
 
 
 copyToClipboardAttributes : String -> List (Attribute msg)
@@ -388,22 +396,25 @@ primaryButton =
 
 customPrimaryButton : List (Attribute msg) -> Maybe msg -> String -> Element msg
 customPrimaryButton attrs onPress txt =
-    Input.button []
+    Input.button
+        ((Background.color <|
+            case onPress of
+                Nothing ->
+                    Styles.disabledColor
+
+                Just _ ->
+                    Styles.accentColor
+         )
+            :: Styles.borderStyle
+            ++ attrs
+        )
         { label =
             el
-                (padding (Styles.paddingScale 1)
-                    :: Font.color Styles.white
-                    :: (Background.color <|
-                            case onPress of
-                                Nothing ->
-                                    Styles.disabledColor
+                [ padding (Styles.paddingScale 1)
+                , Font.color Styles.white
 
-                                Just _ ->
-                                    Styles.accentColor
-                       )
-                    :: Styles.borderStyle
-                    ++ attrs
-                )
+                -- ++ attrs
+                ]
                 (text txt)
         , onPress = onPress
         }
@@ -720,8 +731,8 @@ keyedInputText key =
     inputTextHack key []
 
 
-inputTextHack : String -> List (Html.Attribute msg) -> List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
-inputTextHack key htmlAttrs attrs onMsg { placeholder, label } txt =
+inputTextHackHelper : String -> String -> List (Html.Attribute msg) -> List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
+inputTextHackHelper key type_ htmlAttrs attrs onMsg { placeholder, label } txt =
     Keyed.column [ height shrink ]
         [ -- Input.text (textInputAttrs ++ attrs)
           --     { label = textLabel label
@@ -736,7 +747,7 @@ inputTextHack key htmlAttrs attrs onMsg { placeholder, label } txt =
           ( key ++ "_", el (textInputAttrs ++ [ hackInLineStyle "display" "none", Border.color Styles.thinLineColor ]) none )
         , ( key
           , Html.input
-                ([ Attr.type_ "text"
+                ([ Attr.type_ type_
                  , Attr.defaultValue txt
                  , Attr.class "se focusable border-color-0-0-0-25 spacing-3-3 bg-0-0-0-0 border-0-02-0 border-radius-0 pad-0-0-0-0 width-fill"
                  , Attr.placeholder placeholder
@@ -770,6 +781,15 @@ inputTextHack key htmlAttrs attrs onMsg { placeholder, label } txt =
                    )
           )
         ]
+
+
+newPasswordInput =
+    inputTextHackHelper "" "password" [ Attr.autocomplete False ]
+
+
+inputTextHack : String -> List (Html.Attribute msg) -> List (Attribute msg) -> Maybe (String -> msg) -> { label : String, placeholder : String } -> String -> Element msg
+inputTextHack key =
+    inputTextHackHelper key "text"
 
 
 search : (String -> msg) -> String -> Element msg

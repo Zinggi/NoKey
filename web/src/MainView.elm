@@ -25,6 +25,7 @@ import Views.Devices
 import Views.Tutorial
 import Views.Passwords
 import Views.NewPassword
+import Views.CreateKeyBox
 import Model exposing (Msg(..), ModelState(..), Model)
 import Route exposing (Page(..))
 
@@ -207,7 +208,7 @@ bottomNavigation page model =
         |> row
             ([ padding (Styles.paddingScale 1)
              , alignBottom
-             , above (el [ alignRight, paddingXY (Styles.paddingScale 3) (Styles.paddingScale 5) ] (viewActionButton page model))
+             , above (el [ alignRight, paddingXY (Styles.paddingScale 4) (Styles.paddingScale 5) ] (viewActionButton page model))
              ]
             )
         |> (\c ->
@@ -231,7 +232,7 @@ viewActionButton page model =
             Views.Passwords.actionButton passwordsConfig model
 
         Devices ->
-            Views.Devices.actionButton devicesConfig
+            Views.Devices.actionButton devicesConfig model.devicesView
 
         _ ->
             none
@@ -266,10 +267,23 @@ viewPage page model =
         NewPassword ->
             Views.NewPassword.view model
 
+        CreateKeyBox ->
+            Views.CreateKeyBox.view keyBoxConfig model model.createKeyBoxView
+
+
+keyBoxConfig : Views.CreateKeyBox.Config Msg
+keyBoxConfig =
+    { toMsg = UpdateCreateKeyBox, onCreateKeyBox = DoCreateKeyBox, onCancel = NavigateBack }
+
 
 devicesConfig : Views.Devices.Config Msg
 devicesConfig =
-    { toMsg = UpdateDevicesView, onSetDeviceName = SetDeviceName, onGoToPairing = NavigateTo Pairing, onRemoveDevice = RemoveDevice }
+    { toMsg = UpdateDevicesView
+    , onSetDeviceName = SetDeviceName
+    , onGoToPairing = NavigateTo Pairing
+    , onRemoveDevice = RemoveDevice
+    , onCreateKeyBox = NavigateTo CreateKeyBox
+    }
 
 
 settingsConfig : Views.Settings.Config Msg

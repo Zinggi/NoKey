@@ -114,7 +114,7 @@ view config ({ syncData, passwordsView, requirementsState } as model) =
 actionButton : Config msg -> { m | syncData : SyncData } -> Element msg
 actionButton config model =
     if Data.Sync.numberOfKnownDevices model.syncData >= Data.Sync.minSecurityLevel model.syncData then
-        Elements.floatingButton config.onAddNewPassword "Add new"
+        Elements.floatingButton [] config.onAddNewPassword "Add new"
     else
         none
 

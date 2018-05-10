@@ -6,15 +6,16 @@ import Elements
 import Styles
 import Data.Sync exposing (SyncData)
 import Route exposing (Page(..))
+import Icons
 
 
 type alias State =
-    { confirmDelete : Maybe String }
+    { confirmDelete : Maybe String, isActionButtonOpen : Bool }
 
 
 init : State
 init =
-    { confirmDelete = Nothing }
+    { confirmDelete = Nothing, isActionButtonOpen = False }
 
 
 type alias Config msg =
@@ -22,6 +23,7 @@ type alias Config msg =
     , onSetDeviceName : String -> msg
     , onGoToPairing : msg
     , onRemoveDevice : String -> msg
+    , onCreateKeyBox : msg
     }
 
 
@@ -38,9 +40,16 @@ view config { syncData, uniqueIdentifyier } state =
             )
 
 
-actionButton : Config msg -> Element msg
-actionButton config =
-    Elements.floatingButton config.onGoToPairing "Pair new device"
+actionButton : Config msg -> State -> Element msg
+actionButton config state =
+    if state.isActionButtonOpen then
+        column [ spacing (Styles.paddingScale 3) ]
+            [ Elements.floatingButton [ alignRight ] config.onCreateKeyBox "Create key box"
+            , Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
+            , Elements.floatingIconButton [ alignRight ] (config.toMsg { state | isActionButtonOpen = False }) Icons.close
+            ]
+    else
+        Elements.floatingIconButton [] (config.toMsg { state | isActionButtonOpen = True }) Icons.more
 
 
 {-| TODO: fix input lag on input fields. Workaround:

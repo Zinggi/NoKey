@@ -9,6 +9,7 @@ module FiniteField
         , secretPolynom
         , evalPolynom
         , getPolynomialPointsFor
+        , bigPrime
         )
 
 import BigInt exposing (BigInt)

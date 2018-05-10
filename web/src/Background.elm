@@ -383,6 +383,16 @@ update msg model =
         ScanQR ->
             model |> withCmds [ Ports.scanQR () ]
 
+        -- AddDrivePressed ->
+        --     -- TODO:
+        --     model |> withCmds [ Navigation.load "https://www.googleapis.com/auth/drive.appfolder" ]
+        UpdateCreateKeyBox state ->
+            { model | createKeyBoxView = state } |> noCmd
+
+        DoCreateKeyBox { password, name } ->
+            -- TODO!
+            model |> noCmd
+
         OnGotQR code ->
             model
                 |> updatePairingDialogue (Views.Pairing.setInputToken code)

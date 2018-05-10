@@ -30,6 +30,7 @@ import Views.Notifications
 import Views.Devices
 import Views.Passwords
 import Views.Settings
+import Views.CreateKeyBox
 import Ports
 import Route exposing (Page)
 
@@ -87,6 +88,9 @@ type Msg
     | UpdateSettingsView Views.Settings.State
     | UpdateDevicesView Views.Devices.State
     | DoSetSettings Settings Time
+      -- | AddDrivePressed
+    | UpdateCreateKeyBox Views.CreateKeyBox.State
+    | DoCreateKeyBox { password : String, name : String }
 
 
 
@@ -113,6 +117,7 @@ type alias Model =
     , passwordsView : Views.Passwords.State
     , settingsView : Views.Settings.State
     , devicesView : Views.Devices.State
+    , createKeyBoxView : Views.CreateKeyBox.State
     , protocolState : Protocol.State
     , currentPage : Page
     , toasties : Toast
@@ -186,6 +191,7 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         , settingsView = Views.Settings.init
         , devicesView = Views.Devices.init
         , passwordsView = Views.Passwords.init
+        , createKeyBoxView = Views.CreateKeyBox.init
         , protocolState = Protocol.init
         , currentSite = Nothing
         , isFirstTimeUser = isFirstTimeUser
