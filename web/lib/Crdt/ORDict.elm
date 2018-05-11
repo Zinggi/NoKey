@@ -8,6 +8,7 @@ module Crdt.ORDict
         , encode
         , encode2
         , decoder
+        , keys
         , get
         , update
         , equal
@@ -26,7 +27,7 @@ module Crdt.ORDict
         )
 
 import Dict exposing (Dict)
-import Set
+import Set exposing (Set)
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
 import Json.Decode as JD exposing (Decoder)
@@ -52,6 +53,11 @@ resetExceptOne key dict =
     }
 
 
+keys : ORDict comparable v -> Set comparable
+keys dict =
+    ORSet.get dict.keys
+
+
 reset : ORDict comparable value -> ORDict comparable value
 reset dict =
     { keys = ORSet.reset dict.keys, store = Dict.empty }
@@ -62,10 +68,10 @@ equal a b =
     a.store == b.store && ORSet.equal a.keys b.keys
 
 
-decoder : Decoder value -> Decoder (ORDict String value)
-decoder valueDecoder =
+decoder : Decoder value -> Seed -> Decoder (ORDict String value)
+decoder valueDecoder seed =
     JD.map2 ORDict
-        (JD.field "keys" ORSet.decoder)
+        (JD.field "keys" (ORSet.decoder seed))
         (JD.field "store" (JD.dict valueDecoder))
 
 
@@ -76,10 +82,10 @@ completeDecoder valueDecoder =
         (JD.field "store" (JD.dict valueDecoder))
 
 
-decoder2 : Decoder comparable -> Decoder value -> Decoder (ORDict comparable value)
-decoder2 keyDecoder valueDecoder =
+decoder2 : Decoder comparable -> Decoder value -> Seed -> Decoder (ORDict comparable value)
+decoder2 keyDecoder valueDecoder seed =
     JD.map2 ORDict
-        (JD.field "keys" (ORSet.customDecoder keyDecoder))
+        (JD.field "keys" (ORSet.customDecoder keyDecoder seed))
         (JD.field "store" (JD.dict2 keyDecoder valueDecoder))
 
 

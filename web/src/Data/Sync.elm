@@ -1161,7 +1161,7 @@ syncWithOthers sync =
 
 otherSharedDecoder : String -> Decoder OtherSharedData
 otherSharedDecoder id =
-    sharedDecoder
+    (sharedDecoder (Random.initialSeed 42))
         |> JD.map (\shared -> { id = id, shared = shared })
 
 
@@ -1193,8 +1193,8 @@ encodeShared shared =
         ]
 
 
-sharedDecoderV1 : Decoder SharedData
-sharedDecoderV1 =
+sharedDecoderV1 : Seed -> Decoder SharedData
+sharedDecoderV1 seed =
     decode
         (\knownIds passwords sharesToDistribute distributedShares keyBoxes settings version ->
             { knownIds = knownIds
@@ -1206,29 +1206,31 @@ sharedDecoderV1 =
             , version = version
             }
         )
-        |> required "knownIds" (ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo))
+        |> required "knownIds" (ORDict.decoder (SingleVersionRegister.decoder decodeDeviceInfo) seed)
         |> required "passwords"
             (ORDict.decoder2 accountIdDecoder
                 (TimestampedVersionRegister.decoder (decodeTuple2 groupIdDecoder encryptedPasswordDecoder))
+                seed
             )
         |> required "sharesToDistribute"
             (ORDict.decoder2 groupIdDecoder
                 (TimestampedVersionRegister.decoder (JD.dict JD.value))
+                seed
             )
-        |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder)
-        |> optional "keyBoxes" KeyBox.decoder (KeyBox.init (Random.initialSeed 42))
+        |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder seed)
+        |> optional "keyBoxes" (KeyBox.decoder seed) (KeyBox.init seed)
         |> optional "settings" Data.Settings.decoder Data.Settings.init
         |> required "version" VClock.decoder
 
 
-sharedDecoder : Decoder SharedData
-sharedDecoder =
+sharedDecoder : Seed -> Decoder SharedData
+sharedDecoder seed =
     JD.field "dataVersion" JD.int
         |> JD.andThen
             (\v ->
                 case v of
                     1 ->
-                        JD.field "data" sharedDecoderV1
+                        JD.field "data" (sharedDecoderV1 seed)
 
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
@@ -1263,22 +1265,22 @@ appVersion =
     "0.2.1"
 
 
-completeDecoder : Decoder SyncData
-completeDecoder =
+completeDecoder : Seed -> Decoder SyncData
+completeDecoder seed =
     JD.field "dataVersion" JD.int
         |> JD.andThen
             (\v ->
                 case v of
                     1 ->
-                        JD.field "data" completeDecoderV1
+                        JD.field "data" (completeDecoderV1 seed)
 
                     _ ->
                         JD.fail ("cannot decode version " ++ toString v)
             )
 
 
-completeDecoderV1 : Decoder SyncData
-completeDecoderV1 =
+completeDecoderV1 : Seed -> Decoder SyncData
+completeDecoderV1 seed =
     decode
         (\id encryptionKey signingKey deviceType shared myShares synchedWith tasks seed ->
             { id = id
@@ -1297,7 +1299,7 @@ completeDecoderV1 =
         |> required "encryptionKey" JD.value
         |> required "signingKey" JD.value
         |> required "deviceType" deviceTypeDecoder
-        |> required "shared" sharedDecoder
+        |> required "shared" (sharedDecoder seed)
         |> required "myShares" (JD.dict2 groupIdDecoder SecretSharing.shareDecoder)
         |> required "synchedWith" (JD.dict VClock.decoder)
         |> required "tasks" Tasks.decoder

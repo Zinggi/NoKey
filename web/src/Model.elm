@@ -143,9 +143,13 @@ type alias Flags =
     }
 
 
+getPcgSeed ( n, _ ) =
+    Random.initialSeed n
+
+
 init : Flags -> Location -> ModelState
 init { initialSeed, storedState, encryptionKey, signingKey, deviceType } location =
-    case ( Data.Storage.decode storedState, JD.decodeValue Data.Sync.deviceTypeDecoder deviceType ) of
+    case ( Data.Storage.decode (getPcgSeed initialSeed) storedState, JD.decodeValue Data.Sync.deviceTypeDecoder deviceType ) of
         ( Ok state, Ok devType ) ->
             Loaded <| initModel (Just state) (Just location) initialSeed encryptionKey signingKey devType
 

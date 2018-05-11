@@ -47,6 +47,28 @@ reset set =
     { set | data = Dict.empty }
 
 
+getUniqueId : ORSet comparable -> ( Int, Seed )
+getUniqueId set =
+    let
+        ( n, seed ) =
+            Random.step (Random.int Random.minInt Random.maxInt) set.seed
+
+        ids =
+            set.data
+                |> Dict.values
+                |> List.foldl
+                    (\( adds, removes ) acc ->
+                        Set.union (Set.union adds removes) acc
+                    )
+                    Set.empty
+    in
+        if Set.member n ids then
+            -- try again
+            getUniqueId { set | seed = seed }
+        else
+            ( n, seed )
+
+
 resetExceptOne : comparable -> ORSet comparable -> ORSet comparable
 resetExceptOne key set =
     { set | data = removeAllExcept key set.data }
@@ -57,15 +79,15 @@ equal a b =
     a.data == b.data
 
 
-decoder : Decoder (ORSet String)
-decoder =
-    JD.map (\d -> { data = d, seed = Random.initialSeed 0 })
+decoder : Seed -> Decoder (ORSet String)
+decoder seed =
+    JD.map (\d -> { data = d, seed = seed })
         (JD.dict (decodeTuple (decodeSet JD.int)))
 
 
-customDecoder : Decoder comparable -> Decoder (ORSet comparable)
-customDecoder keyDecoder =
-    JD.map (\d -> { data = d, seed = Random.initialSeed 0 })
+customDecoder : Decoder comparable -> Seed -> Decoder (ORSet comparable)
+customDecoder keyDecoder seed =
+    JD.map (\d -> { data = d, seed = seed })
         (JD.dict2 keyDecoder (decodeTuple (decodeSet JD.int)))
 
 
@@ -114,7 +136,7 @@ add : comparable -> ORSet comparable -> ORSet comparable
 add e set =
     let
         ( randInt, newSeed ) =
-            Random.step (Random.int Random.minInt Random.maxInt) set.seed
+            getUniqueId set
 
         newData =
             Dict.update e
