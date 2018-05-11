@@ -730,9 +730,9 @@ insertToStorage timestamp groupPw accountId groupId pw sync =
         updateFn p fn =
             fn sync.id timestamp ( groupId, p )
     in
-        case AES.encryptPassword timestamp groupPw pw of
-            Ok encPw ->
-                { sync | groupPasswordRequestsState = newReq }
+        case AES.encryptPassword sync.seed groupPw pw of
+            Ok ( encPw, seed ) ->
+                { sync | groupPasswordRequestsState = newReq, seed = seed }
                     |> updateShared
                         (\s ->
                             { s
