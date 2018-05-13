@@ -3,7 +3,9 @@ module Elements exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Html
+import Http
 import Json.Decode as JD
+import Json.Encode as JE exposing (Value)
 import Element exposing (..)
 import Element.Input as Input
 import Element.Background as Background
@@ -308,7 +310,28 @@ textWithCustomOverflow overflow txt =
 
 p : String -> Element msg
 p txt =
-    paragraph [ width (fill |> minimum 0) ] [ text txt ]
+    paragraph [] [ text txt ]
+
+
+paragraph : List (Attribute msg) -> List (Element msg) -> Element msg
+paragraph attrs children =
+    Element.paragraph (width (fill |> minimum 0) :: attrs) children
+
+
+downloadJsonButton : Value -> String -> Element msg
+downloadJsonButton val txt =
+    newTabLink [ htmlAttribute (Attr.attribute "download" "passwords.json") ]
+        { url = "data:application/json;charset=utf-8," ++ Http.encodeUri (JE.encode 4 val)
+        , label =
+            el
+                ([ Background.color Styles.accentColor
+                 , padding (Styles.paddingScale 1)
+                 , Font.color Styles.white
+                 ]
+                    ++ Styles.borderStyle
+                )
+                (text txt)
+        }
 
 
 italicText : String -> Element msg

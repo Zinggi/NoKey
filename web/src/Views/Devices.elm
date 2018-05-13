@@ -42,14 +42,15 @@ view config { syncData, uniqueIdentifyier } state =
 
 actionButton : Config msg -> State -> Element msg
 actionButton config state =
-    if state.isActionButtonOpen then
-        column [ spacing (Styles.paddingScale 3) ]
-            [ Elements.floatingButton [ alignRight ] config.onCreateKeyBox "Create key box"
-            , Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
-            , Elements.floatingIconButton [ alignRight ] (config.toMsg { state | isActionButtonOpen = False }) Icons.close
-            ]
-    else
-        Elements.floatingIconButton [] (config.toMsg { state | isActionButtonOpen = True }) Icons.more
+    -- if state.isActionButtonOpen then
+    --     column [ spacing (Styles.paddingScale 3) ]
+    --         [ Elements.floatingButton [ alignRight ] config.onCreateKeyBox "Create key box"
+    --         , Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
+    --         , Elements.floatingIconButton [ alignRight ] (config.toMsg { state | isActionButtonOpen = False }) Icons.close
+    --         ]
+    -- else
+    --     Elements.floatingIconButton [] (config.toMsg { state | isActionButtonOpen = True }) Icons.more
+    Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
 
 
 {-| TODO: fix input lag on input fields. Workaround:

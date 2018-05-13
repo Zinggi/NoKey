@@ -288,7 +288,12 @@ devicesConfig =
 
 settingsConfig : Views.Settings.Config Msg
 settingsConfig =
-    { toMsg = UpdateSettingsView, onShowTutorial = NavigateTo Tutorial, onSetSettings = SetSettings, onReset = ResetDevice }
+    { toMsg = UpdateSettingsView
+    , onShowTutorial = NavigateTo Tutorial
+    , onSetSettings = SetSettings
+    , onReset = ResetDevice
+    , onExportPasswords = ExportPasswords
+    }
 
 
 pairingConfig : Views.Pairing.Config Msg

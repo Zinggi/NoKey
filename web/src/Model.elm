@@ -91,6 +91,7 @@ type Msg
       -- | AddDrivePressed
     | UpdateCreateKeyBox Views.CreateKeyBox.State
     | DoCreateKeyBox { password : String, name : String }
+    | ExportPasswords
 
 
 

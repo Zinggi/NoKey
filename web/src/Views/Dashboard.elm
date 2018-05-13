@@ -31,7 +31,7 @@ view passwordsConfig model =
             , viewSummery model
             , Maybe.withDefault none h.tutorial
             , Tuple.second h.needsPairing
-            , Views.Passwords.tasks passwordsConfig model.passwordsView (Data.Sync.getTasks model.syncData)
+            , Views.Passwords.tasks passwordsConfig model.syncData model.passwordsView (Data.Sync.getTasks model.syncData)
             , if Tuple.first h.needsPairing then
                 none
               else

@@ -114,6 +114,7 @@ connectPrivateSocket uuid =
                 |> Channel.withDebug
                 |> Channel.withPayload (JE.object [ ( "uuid", JE.string uuid ) ])
                 |> Channel.onJoin (JoinedChannel >> Self >> protocolMsg)
+                |> Channel.onRejoin (JoinedChannel >> Self >> protocolMsg)
     in
         Phoenix.connect socket [ channel ]
 

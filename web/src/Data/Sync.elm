@@ -539,6 +539,53 @@ getXValuesFor devs _ =
             Dict.empty
 
 
+exportPasswords : SyncData -> SyncData
+exportPasswords sync =
+    addPasswordsToExport (groups sync |> List.filter (\( l, _ ) -> l == 1)) sync
+
+
+addPasswordsToExport : List GroupId -> SyncData -> SyncData
+addPasswordsToExport groups sync =
+    { sync | tasks = Tasks.addPasswordsToExport (getAllPasswordsFor groups sync) sync.tasks }
+
+
+exportReadyPasswords : SyncData -> Value
+exportReadyPasswords sync =
+    Tasks.getPasswordsReadyToExport sync.tasks
+        |> List.map
+            (\( ( siteName, userName ), pw ) ->
+                JE.object [ ( "password", JE.string pw ), ( "login", JE.string userName ), ( "site", JE.string siteName ) ]
+            )
+        |> JE.list
+
+
+getAllPasswordsFor : List GroupId -> SyncData -> Dict GroupId (List ( AccountId, Password ))
+getAllPasswordsFor groups sync =
+    List.foldl
+        (\gId acc ->
+            case getAllPasswordsForGroup gId sync of
+                [] ->
+                    acc
+
+                other ->
+                    Dict.insert gId other acc
+        )
+        Dict.empty
+        groups
+
+
+getAllPasswordsForGroup : GroupId -> SyncData -> List ( AccountId, Password )
+getAllPasswordsForGroup groupId sync =
+    let
+        encPws =
+            encryptedPasswords sync
+    in
+        Dict.filter (\accId ( gId, encPw ) -> gId == groupId) encPws
+            |> Dict.map (\accId _ -> getPassword accId sync)
+            |> Dict.filterMap (\accId mayPw -> mayPw)
+            |> Dict.toList
+
+
 type alias ShouldAddNewShares msg =
     Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg
 
@@ -860,10 +907,18 @@ addShare onShouldAddNewShares time groupId share sync =
         newSync =
             { sync | groupPasswordRequestsState = newReqState }
 
-        ( sync2, cmd ) =
-            createNewSharesForGroupIfPossible onShouldAddNewShares time groupId newSync
+        sync2 =
+            case Request.getGroupPassword groupId newReqState of
+                Just _ ->
+                    addPasswordsToExport [ groupId ] newSync
+
+                Nothing ->
+                    newSync
+
+        ( sync3, cmd ) =
+            createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync2
     in
-        ( sync2, mayForm, cmd )
+        ( sync3, mayForm, cmd )
 
 
 createNewSharesIfPossible : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> SyncData -> ( SyncData, Cmd msg )

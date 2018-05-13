@@ -116,29 +116,7 @@ update msg model =
             model |> withCmds [ Api.askForNewVersion model.syncData ]
 
         NavigateTo page ->
-            let
-                doNothing model =
-                    ( model, Cmd.none )
-
-                ( navFn, updateFn ) =
-                    case ( model.currentPage, page ) of
-                        ( _, Pairing ) ->
-                            ( Route.newUrl, getToken )
-
-                        ( Home, _ ) ->
-                            ( Route.newUrl, doNothing )
-
-                        ( from, destination ) ->
-                            if Route.hasBackButton destination then
-                                ( Route.newUrl, doNothing )
-                            else if Route.hasBackButton from then
-                                ( Route.modifyUrl, doNothing )
-                            else
-                                ( Route.modifyUrl, doNothing )
-            in
-                model
-                    |> withCmds [ navFn page ]
-                    |> andThenUpdate updateFn
+            navigateTo page model
 
         NavigateBack ->
             model |> withCmds [ Navigation.back 1 ]
@@ -393,10 +371,44 @@ update msg model =
             -- TODO!
             model |> noCmd
 
+        ExportPasswords ->
+            let
+                sync =
+                    Data.Sync.exportPasswords model.syncData
+            in
+                { model | syncData = sync } |> navigateTo Passwords
+
         OnGotQR code ->
             model
                 |> updatePairingDialogue (Views.Pairing.setInputToken code)
                 |> withCmds [ Helper.withTimestamp DoTokenSubmitted ]
+
+
+navigateTo : Page -> Model -> ( Model, Cmd Msg )
+navigateTo page model =
+    let
+        doNothing model =
+            ( model, Cmd.none )
+
+        ( navFn, updateFn ) =
+            case ( model.currentPage, page ) of
+                ( _, Pairing ) ->
+                    ( Route.newUrl, getToken )
+
+                ( Home, _ ) ->
+                    ( Route.newUrl, doNothing )
+
+                ( from, destination ) ->
+                    if Route.hasBackButton destination then
+                        ( Route.newUrl, doNothing )
+                    else if Route.hasBackButton from then
+                        ( Route.modifyUrl, doNothing )
+                    else
+                        ( Route.modifyUrl, doNothing )
+    in
+        model
+            |> withCmds [ navFn page ]
+            |> andThenUpdate updateFn
 
 
 getToken : Model -> ( Model, Cmd Msg )

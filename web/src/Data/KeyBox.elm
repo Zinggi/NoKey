@@ -18,6 +18,7 @@ import AES
 
 
 -- TODO:
+--  Make use of those functions + ports for web crypto
 -- Static:
 --      Verify a password - ok
 --

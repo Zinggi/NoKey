@@ -12,6 +12,9 @@ module Data.TaskList
         , init
         , getStashPw
         , insertGroupPw
+          -- , exportPasswords
+        , getPasswordsReadyToExport
+        , addPasswordsToExport
         , insertPwToStash
         , deletePwFromStash
         , togglePassword
@@ -34,7 +37,8 @@ import Helper exposing (encodeTuple3, decodeTuple3, encodeTuple, decodeTuple, en
 
 {-
 
-   This module should be able to handle things like:
+   This module handles things that require some user interaction and
+   other things that can't be immediately executed, like:
 
        Wait until GroupPasswords has been distributed
            => user has to use other devices
@@ -44,6 +48,8 @@ import Helper exposing (encodeTuple3, decodeTuple3, encodeTuple, decodeTuple, en
            => user needs to unlock both groups 1 and 2
        Create shares for Ids for GroupIds
            => user needs to unlock GroupIds
+       Export passwords
+           => user has to unlock every group he wants to export
 -}
 
 
@@ -52,12 +58,13 @@ type alias TaskList =
     , visiblePws : Set AccountId
     , groupPws : Dict GroupId GroupPassword
     , movePws : Dict ( GroupId, GroupId ) (Set AccountId)
+    , exportPws : Maybe (Dict GroupId (List ( AccountId, Password )))
     }
 
 
 init : TaskList
 init =
-    { stash = Dict.empty, groupPws = Dict.empty, visiblePws = Set.empty, movePws = Dict.empty }
+    { stash = Dict.empty, groupPws = Dict.empty, visiblePws = Set.empty, movePws = Dict.empty, exportPws = Nothing }
 
 
 encode : TaskList -> Value
@@ -71,10 +78,36 @@ encode tasks =
 
 decoder : Decoder TaskList
 decoder =
-    JD.decode (\stash groupPws movePws -> { stash = stash, groupPws = groupPws, visiblePws = Set.empty, movePws = movePws })
+    JD.decode (\stash groupPws movePws -> { stash = stash, groupPws = groupPws, visiblePws = Set.empty, movePws = movePws, exportPws = Nothing })
         |> required "stash" (JD.dict2 accountIdDecoder (decodeTuple3 groupIdDecoder reasonDecoder JD.string))
         |> required "groupPws" (JD.dict2 groupIdDecoder (JD.list JD.int))
         |> optional "movePws" (JD.dict2 (decodeTuple groupIdDecoder) (decodeSet accountIdDecoder)) Dict.empty
+
+
+
+-- exportPasswords : TaskList -> TaskList
+-- exportPasswords tasks =
+--     { tasks | exportPws = Just Dict.empty }
+
+
+addPasswordsToExport : Dict GroupId (List ( AccountId, Password )) -> TaskList -> TaskList
+addPasswordsToExport pws tasks =
+    case tasks.exportPws of
+        Just myPws ->
+            { tasks | exportPws = Just (Dict.union myPws pws) }
+
+        Nothing ->
+            { tasks | exportPws = Just pws }
+
+
+getPasswordsReadyToExport : TaskList -> List ( AccountId, Password )
+getPasswordsReadyToExport tasks =
+    case tasks.exportPws of
+        Just pws ->
+            Dict.values pws |> List.concat
+
+        Nothing ->
+            []
 
 
 {-| This type contains all relevant information for the UI
@@ -84,6 +117,7 @@ type Task
     | MoveFromStashToGroup { accounts : Dict String (Dict String ()), group : Group, status : Status }
     | WaitForKeysDistributed { accounts : Dict String (Dict String ()), group : Group, status : Status, progress : Int }
     | CreateMoreShares { for : List Device, group : Group, status : Status }
+    | ExportPws { done : List ( Group, Status ), toDo : List ( Group, Status ) }
 
 
 resolveWaitingTasks : Dict AccountId GroupId -> Dict GroupId (Set String) -> TaskList -> TaskList
@@ -174,6 +208,9 @@ getTasks request groupsNotFullyDistributed progress postFixDict tasks =
     let
         getGroup groupId =
             ( groupId, Helper.dictGetWithDefault "" groupId postFixDict )
+
+        getStatus groupId =
+            Request.getStatus groupId request
     in
         -- Collect all same groups into a single task
         Dict.foldl
@@ -204,7 +241,7 @@ getTasks request groupsNotFullyDistributed progress postFixDict tasks =
                         -- only add if not empty
                         []
                      else
-                        [ MoveFromStashToGroup { accounts = moveFromStashToGroup, group = getGroup groupId, status = Request.getStatus groupId request } ]
+                        [ MoveFromStashToGroup { accounts = moveFromStashToGroup, group = getGroup groupId, status = getStatus groupId } ]
                     )
                         ++ (if Dict.isEmpty waitForKeysDistributed then
                                 []
@@ -213,7 +250,7 @@ getTasks request groupsNotFullyDistributed progress postFixDict tasks =
                                     { accounts = waitForKeysDistributed
                                     , group = getGroup groupId
                                     , progress = getProgress groupId progress
-                                    , status = Request.getStatus groupId request
+                                    , status = getStatus groupId
                                     }
                                 ]
                            )
@@ -224,7 +261,7 @@ getTasks request groupsNotFullyDistributed progress postFixDict tasks =
             |> (\ts ->
                     Dict.foldl
                         (\groupId devices acc ->
-                            CreateMoreShares { group = getGroup groupId, status = Request.getStatus groupId request, for = devices } :: acc
+                            CreateMoreShares { group = getGroup groupId, status = getStatus groupId, for = devices } :: acc
                         )
                         ts
                         groupsNotFullyDistributed
@@ -248,14 +285,37 @@ getTasks request groupsNotFullyDistributed progress postFixDict tasks =
                                 MoveFromGroupToGroup
                                     { from = getGroup from
                                     , to = getGroup to
-                                    , fromStatus = Request.getStatus from request
-                                    , toStatus = Request.getStatus to request
+                                    , fromStatus = getStatus from
+                                    , toStatus = getStatus to
                                     , accounts = accounts
                                     }
                                     :: acc
                         )
                         ts
                         tasks.movePws
+               )
+            -- add exportPws
+            |> (\ts ->
+                    case tasks.exportPws of
+                        Just pws ->
+                            let
+                                done =
+                                    Dict.keys pws
+                                        |> Set.fromList
+
+                                todo =
+                                    Dict.keys postFixDict
+                                        |> Set.fromList
+                                        |> (\all -> Set.diff all done)
+
+                                toDisplay gs =
+                                    Set.toList gs
+                                        |> List.map (\g -> ( getGroup g, getStatus g ))
+                            in
+                                ExportPws { done = toDisplay done, toDo = toDisplay todo } :: ts
+
+                        Nothing ->
+                            ts
                )
 
 

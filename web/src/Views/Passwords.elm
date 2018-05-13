@@ -103,7 +103,7 @@ view config ({ syncData, passwordsView, requirementsState } as model) =
             Data.Sync.mapGroups (\_ _ _ _ -> 1) syncData |> (not << List.isEmpty)
     in
         column [ spacing (Styles.paddingScale 1) ]
-            [ tasks config passwordsView (Data.Sync.getTasks syncData)
+            [ tasks config syncData passwordsView (Data.Sync.getTasks syncData)
             , search config hasPasswords passwordsView.search
             , passwords config passwordsView requirementsState syncData
             , -- This is here such that we can scroll below the action button
@@ -129,19 +129,19 @@ search config hasPasswords searchValue =
         none
 
 
-tasks : Config msg -> State -> List Task -> Element msg
-tasks config state ts =
+tasks : Config msg -> SyncData -> State -> List Task -> Element msg
+tasks config sync state ts =
     if List.isEmpty ts then
         none
     else
         Elements.container
             [ Elements.h3 "Tasks"
-            , List.map (viewTask config state) ts |> column [ spacing (Styles.paddingScale 0) ]
+            , List.map (viewTask config sync state) ts |> column [ spacing (Styles.paddingScale 0) ]
             ]
 
 
-viewTask : Config msg -> State -> Task -> Element msg
-viewTask config state task =
+viewTask : Config msg -> SyncData -> State -> Task -> Element msg
+viewTask config sync state task =
     let
         card =
             Elements.card 1 []
@@ -180,6 +180,28 @@ viewTask config state task =
                         , Elements.text "to create keys for:"
                         ]
                     , column [ Styles.paddingLeft (Styles.scaled 1) ] (List.map (Elements.avatar []) for)
+                    ]
+
+            ExportPws { done, toDo } ->
+                card
+                    [ if List.isEmpty toDo then
+                        none
+                      else
+                        Elements.paragraph [ spacing (Styles.paddingScale 1) ]
+                            [ el [ alignLeft ] (viewGroupsStatus config toDo False)
+                            , Elements.text "to export passwords."
+                            ]
+                    , if List.isEmpty done then
+                        none
+                      else
+                        column []
+                            [ Elements.paragraph []
+                                [ Elements.text "Passwords in"
+                                , el [ alignLeft ] (viewGroups done)
+                                , Elements.text " are ready to export."
+                                ]
+                            , Elements.downloadJsonButton (Data.Sync.exportReadyPasswords sync) "Export ready passwords"
+                            ]
                     ]
 
 
@@ -404,7 +426,7 @@ viewGroupsStatus config groups disabled =
                             _ ->
                                 none
                     )
-                |> row [ spacing (Styles.paddingScale 0) ]
+                |> row [ spacing (Styles.paddingScale 0), width shrink ]
 
 
 viewGroupStatus : Config msg -> List Group -> Bool -> Status -> Element msg

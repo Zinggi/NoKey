@@ -22,6 +22,7 @@ type alias Config msg =
     , onSetSettings : Settings -> msg
     , onShowTutorial : msg
     , onReset : msg
+    , onExportPasswords : msg
     }
 
 
@@ -35,6 +36,9 @@ view config { syncData } state =
             [ Elements.button (Just config.onShowTutorial) "Show Tutorial"
             , Elements.line
             , Elements.text ("Version: " ++ Data.Sync.appVersion)
+            , Elements.line
+            , Elements.button (Just config.onExportPasswords) "Export Passwords"
+            , Elements.line
             , el [ paddingXY 0 (Styles.paddingScale 3) ] (Elements.h3 "Dangerous")
             , Elements.checkBox (\b -> setAllowLevel1 b options |> config.onSetSettings) False "Allow security level 1" options.allowLevel1
             , Elements.p allowLevel1Txt
