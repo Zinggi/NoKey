@@ -14,7 +14,7 @@ viewError : String -> Html msg
 viewError err =
     (case err of
         "not loaded yet" ->
-            Element.empty
+            Element.none
 
         other ->
             Elements.p other

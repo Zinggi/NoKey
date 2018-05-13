@@ -19,14 +19,14 @@ view model =
         Loaded m ->
             case m.currentSite of
                 Nothing ->
-                    empty
+                    none
 
                 Just site ->
                     Data.Sync.mapAccountsForSite site viewStatus m.syncData
                         |> Elements.inputGroup "Choose login"
 
         _ ->
-            empty
+            none
     )
         |> Element.layout (padding (Styles.paddingScale 3) :: Styles.background)
 
@@ -73,7 +73,7 @@ viewError : String -> Html msg
 viewError err =
     (case err of
         "not loaded yet" ->
-            Element.empty
+            none
 
         other ->
             Elements.p other
