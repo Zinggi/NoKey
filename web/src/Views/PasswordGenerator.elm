@@ -2,6 +2,7 @@ module Views.PasswordGenerator exposing (State, init, view, nextPassword)
 
 import Element exposing (..)
 import Random.Pcg.Extended as Random exposing (Seed)
+import Html.Attributes as Attr
 
 
 --
@@ -93,7 +94,17 @@ view onAcceptPw canAdd toMsg state =
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ if isOk then
-                Elements.keyedInputText (toString state.counter) [] (Just SetPw) { label = "Password", placeholder = "" } pw
+                Elements.inputTextHackHelper (toString state.counter)
+                    (if state.pw == Nothing then
+                        "text"
+                     else
+                        "password"
+                    )
+                    []
+                    []
+                    (Just SetPw)
+                    { label = "Password", placeholder = "" }
+                    pw
                     |> Element.map (\msg -> update msg state |> toMsg)
               else
                 Elements.p error
