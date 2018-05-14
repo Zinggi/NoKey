@@ -42,6 +42,7 @@ type SelfMsg
     | DecodeError String
     | FailedToVerifyAuthenticityOf String Time Value
     | JoinedChannel Value
+    | OnDisconnect
     | NewMsg Value
     | SyncToOthers Debounce.Msg
     | Timer Timer.Msg

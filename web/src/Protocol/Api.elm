@@ -115,6 +115,7 @@ connectPrivateSocket uuid =
                 |> Channel.withPayload (JE.object [ ( "uuid", JE.string uuid ) ])
                 |> Channel.onJoin (JoinedChannel >> Self >> protocolMsg)
                 |> Channel.onRejoin (JoinedChannel >> Self >> protocolMsg)
+                |> Channel.onDisconnect (OnDisconnect |> Self |> protocolMsg)
     in
         Phoenix.connect socket [ channel ]
 
@@ -384,8 +385,11 @@ update model msg =
                 --     _ =
                 --         Debug.log "(re)join channel" v
                 -- in
-                model
+                { model | connectedToServer = True }
                     |> withCmds [ askForNewVersion sync ]
+
+            ( Self OnDisconnect, _ ) ->
+                { model | connectedToServer = False } |> noCmd
 
             ( Self (NewMsg v), _ ) ->
                 model

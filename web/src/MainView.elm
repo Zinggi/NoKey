@@ -106,7 +106,7 @@ viewModel model =
                             ]
                         ]
                      else
-                        [ viewTitle model.currentPage model.toasties
+                        [ viewTitle model.connectedToServer model.currentPage model.toasties
                         , cont
                             [ viewPage model.currentPage model ]
                         , bottomNavigation model.currentPage model
@@ -116,8 +116,8 @@ viewModel model =
             ]
 
 
-viewTitle : Page -> Model.Toast -> Element Msg
-viewTitle page toasties =
+viewTitle : Bool -> Page -> Model.Toast -> Element Msg
+viewTitle connectedToServer page toasties =
     let
         title =
             el [ padding (Styles.paddingScale 3) ] (Elements.h2 (Route.pageToTitle page))
@@ -139,13 +139,16 @@ viewTitle page toasties =
                 ]
                 [ Html.text txt ]
 
+        onlineStatus =
+            el [ alignRight ] (Elements.onlineDot connectedToServer)
+
         attr =
             [ below (html toast), width (fill |> minimum 320 |> maximum 1024), centerX, hackMinMaxWidthCentred 320 1024 ]
     in
         (if Route.hasBackButton page then
-            row attr [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] none ]
+            row attr [ el [ alignLeft, width fill ] (Elements.backButton NavigateBack), title, el [ width fill ] onlineStatus ]
          else
-            el attr title
+            row attr [ title, onlineStatus ]
         )
             |> (\c -> row (width fill :: Styles.cardShadow 2 ++ Styles.titleHighlight) [ column [ width fill ] [ c ] ])
 

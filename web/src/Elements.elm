@@ -338,6 +338,14 @@ downloadJsonButton onClick val txt =
         }
 
 
+onlineDot : Bool -> Element msg
+onlineDot isOnline =
+    if isOnline then
+        none
+    else
+        el [ padding (Styles.paddingScale 1) ] (Icons.normal Icons.offline)
+
+
 fileUpload : Element msg
 fileUpload =
     Html.input

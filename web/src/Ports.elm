@@ -18,7 +18,7 @@ port scanQR : () -> Cmd msg
 port onGotQR : (String -> msg) -> Sub msg
 
 
-port onGotOnline : (() -> msg) -> Sub msg
+port onGotOnlineStatus : (Bool -> msg) -> Sub msg
 
 
 type alias FileData =

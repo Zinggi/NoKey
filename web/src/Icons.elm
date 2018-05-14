@@ -70,6 +70,10 @@ more =
     FeatherIcons.plus
 
 
+offline =
+    FeatherIcons.cloudOff
+
+
 close =
     FeatherIcons.x
 

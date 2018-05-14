@@ -112,9 +112,10 @@ update msg model =
                     _ ->
                         ret
 
-        OnGotOnline ->
+        OnGotOnlineStatus isOnline ->
             -- The browser tells us we are online, lets ask other devices for their version
-            model |> withCmds [ Api.askForNewVersion model.syncData ]
+            { model | connectedToServer = isOnline && model.connectedToServer }
+                |> withCmds [ Api.askForNewVersion model.syncData ]
 
         NavigateTo page ->
             navigateTo page model
@@ -542,7 +543,7 @@ subs state =
             , Ports.onDidEncryptShares SharesReadyToSend
             , Ports.onDidDecryptRequestedShares DidDecryptRequestedShares
             , Ports.onGotQR OnGotQR
-            , Ports.onGotOnline (always OnGotOnline)
+            , Ports.onGotOnlineStatus OnGotOnlineStatus
             , Ports.onFileContentRead OnImportPasswords
             ]
 

@@ -463,7 +463,11 @@ const setup = (startFn, onStart, onError) => {
         // when we reconnect, ask others if there is a new version
         window.addEventListener('online', (e) => {
             // console.log('online');
-            app.ports.onGotOnline.send(null);
+            app.ports.onGotOnlineStatus.send(true);
+        });
+        window.addEventListener('offline', (e) => {
+            // console.log('online');
+            app.ports.onGotOnlineStatus.send(false);
         });
 
         // make copyToClipboard work.

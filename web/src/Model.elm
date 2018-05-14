@@ -42,7 +42,7 @@ type Msg
     = AddPassword String
     | SiteNameChanged String
     | SecurityLevelChanged Int
-    | OnGotOnline
+    | OnGotOnlineStatus Bool
     | NewPasswordRequirements PW.State
     | UserNameChanged String
     | GetTokenClicked
@@ -126,6 +126,7 @@ type alias Model =
     , protocolState : Protocol.State
     , currentPage : Page
     , toasties : Toast
+    , connectedToServer : Bool
 
     -- Keep the current site, to provide site specific actions
     , currentSite : Maybe String
@@ -203,6 +204,7 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         , createKeyBoxView = Views.CreateKeyBox.init
         , protocolState = Protocol.init
         , currentSite = Nothing
+        , connectedToServer = False
         , isFirstTimeUser = isFirstTimeUser
         , currentPage = Maybe.map Route.fromLocation location |> Maybe.withDefault Route.Home
         , toasties = Toasty.initialState
