@@ -12,6 +12,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Keyed as Keyed
+import Element.Events
 import Styles
 import HashIcon
 import Icons exposing (Icon)
@@ -318,9 +319,12 @@ paragraph attrs children =
     Element.paragraph (width (fill |> minimum 0) :: attrs) children
 
 
-downloadJsonButton : Value -> String -> Element msg
-downloadJsonButton val txt =
-    newTabLink [ htmlAttribute (Attr.attribute "download" "passwords.json") ]
+downloadJsonButton : msg -> Value -> String -> Element msg
+downloadJsonButton onClick val txt =
+    newTabLink
+        [ htmlAttribute (Attr.attribute "download" "passwords.json")
+        , Element.Events.onClick onClick
+        ]
         { url = "data:application/json;charset=utf-8," ++ Http.encodeUri (JE.encode 4 val)
         , label =
             el
@@ -332,6 +336,17 @@ downloadJsonButton val txt =
                 )
                 (text txt)
         }
+
+
+fileUpload : Element msg
+fileUpload =
+    Html.input
+        [ Attr.type_ "file"
+        , Attr.class "file-upload"
+        ]
+        []
+        |> html
+        |> el []
 
 
 italicText : String -> Element msg

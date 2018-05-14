@@ -53,7 +53,7 @@
     }
   ],
 
-  "content_security_policy":            "script-src 'self'; object-src 'self';",
+  "content_security_policy":            "script-src 'self' 'unsafe-eval'; object-src 'self';",
   "content_security_policy_RELEASE":    "script-src 'self'; object-src 'self';",
   "content_security_policy_DEBUG":      "script-src 'self' 'unsafe-eval'; object-src 'self';"
 }

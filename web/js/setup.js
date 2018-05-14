@@ -22,12 +22,12 @@ const getRandom53bitInt = () => {
 
 const copyToClipboard = require('./copyToClipboard.js');
 const createObserver = require('./createObserver.js');
+const { registerFileUpload } = require('./fileUpload.js');
 //--------------------------------------------------------------------------------
 // Util lib
 //--------------------------------------------------------------------------------
 
 // check if we run inside an extension.
-// TODO: possibly extend to detect android as well
 const runsInsideExtension = () => {
     if (window.browser && browser.runtime && browser.runtime.id)
         return true;
@@ -279,22 +279,34 @@ const setupAndroid = (app) => {
 };
 
 
-const setupDom = () => {
+const setupDom = (app) => {
     // console.log("register mutation observer");
-    const observer = createObserver({
-        selector: '.copy-to-clipboard',
-        onMount(node) {
-            // console.log("mount btn", node);
-            node.addEventListener('click', () => {
-                // console.log("copy to clipboard");
-                const txt = node.getAttribute('data-txt');
-                copyToClipboard(txt);
-            });
-        },
-        onUnmount(node) {
-            // console.log("unmount btn", node);
+    const observer = createObserver([{
+            selector: '.copy-to-clipboard',
+            onMount(node) {
+                // console.log("mount btn", node);
+                node.addEventListener('click', () => {
+                    // console.log("copy to clipboard");
+                    const txt = node.getAttribute('data-txt');
+                    copyToClipboard(txt);
+                });
+            }
+            // onUnmount(node) {
+            //     console.log("unmount btn", node);
+            // }
+        }, {
+            selector: '.file-upload',
+            onMount(node) {
+                // console.log("should register file upload");
+                registerFileUpload(node, (data) => {
+                    app.ports.onFileContentRead.send(data);
+                });
+            }
+            // onUnmount(node) {
+            //     console.log("unmount file");
+            // }
         }
-    });
+    ]);
 
     return observer;
 };
@@ -455,7 +467,7 @@ const setup = (startFn, onStart, onError) => {
         });
 
         // make copyToClipboard work.
-        setupDom();
+        setupDom(app);
 
         if (deviceType === "Android") {
             setupAndroid(app);

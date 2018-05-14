@@ -51,7 +51,7 @@ update msg state =
             nextPassword state
 
         Reset ->
-            { state | requirements = PwReq.init }
+            nextPassword { state | requirements = PwReq.init }
 
 
 init : Seed -> State

@@ -77,6 +77,15 @@ lockGroups groupIds sync =
         { sync | groupPasswordRequestsState = Request.lockGroups groupsAccs sync.groupPasswordRequestsState }
 
 
+unlockedGroups : SyncData -> List GroupId
+unlockedGroups sync =
+    groups sync
+        |> List.filter
+            (\g ->
+                Request.isGroupUnlocked g sync.groupPasswordRequestsState
+            )
+
+
 {-| the data we receive on a sync update
 -}
 type alias OtherSharedData =
@@ -131,6 +140,11 @@ type DeviceType
 isAndroid : SyncData -> Bool
 isAndroid sync =
     sync.deviceType == Android
+
+
+isExtension : SyncData -> Bool
+isExtension sync =
+    sync.deviceType == WebExtension
 
 
 getSettings : SyncData -> Settings
@@ -541,12 +555,18 @@ getXValuesFor devs _ =
 
 exportPasswords : SyncData -> SyncData
 exportPasswords sync =
-    addPasswordsToExport (groups sync |> List.filter (\( l, _ ) -> l == 1)) sync
+    { sync | tasks = Tasks.exportPasswords sync.tasks }
+        |> addPasswordsToExport (unlockedGroups sync)
+
+
+cancelExportPassword : SyncData -> SyncData
+cancelExportPassword sync =
+    { sync | tasks = Tasks.cancelExportPassword sync.tasks }
 
 
 addPasswordsToExport : List GroupId -> SyncData -> SyncData
 addPasswordsToExport groups sync =
-    { sync | tasks = Tasks.addPasswordsToExport (getAllPasswordsFor groups sync) sync.tasks }
+    { sync | tasks = Tasks.addPasswordsToExport (\() -> getAllPasswordsFor groups sync) sync.tasks }
 
 
 exportReadyPasswords : SyncData -> Value
@@ -557,6 +577,23 @@ exportReadyPasswords sync =
                 JE.object [ ( "password", JE.string pw ), ( "login", JE.string userName ), ( "site", JE.string siteName ) ]
             )
         |> JE.list
+
+
+type alias ImportedPassword =
+    { password : String, login : String, site : String }
+
+
+parsePasswords : String -> Result String (List ImportedPassword)
+parsePasswords txt =
+    JD.decodeString (JD.list passwordsDecoder) txt
+
+
+passwordsDecoder : Decoder ImportedPassword
+passwordsDecoder =
+    decode (\pw s l -> { password = pw, site = s, login = l })
+        |> required "password" JD.string
+        |> required "site" JD.string
+        |> required "login" JD.string
 
 
 getAllPasswordsFor : List GroupId -> SyncData -> Dict GroupId (List ( AccountId, Password ))

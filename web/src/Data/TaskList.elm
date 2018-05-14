@@ -12,7 +12,8 @@ module Data.TaskList
         , init
         , getStashPw
         , insertGroupPw
-          -- , exportPasswords
+        , exportPasswords
+        , cancelExportPassword
         , getPasswordsReadyToExport
         , addPasswordsToExport
         , insertPwToStash
@@ -84,20 +85,30 @@ decoder =
         |> optional "movePws" (JD.dict2 (decodeTuple groupIdDecoder) (decodeSet accountIdDecoder)) Dict.empty
 
 
+{-| Initialize the export process
+-}
+exportPasswords : TaskList -> TaskList
+exportPasswords tasks =
+    { tasks | exportPws = Just Dict.empty }
 
--- exportPasswords : TaskList -> TaskList
--- exportPasswords tasks =
---     { tasks | exportPws = Just Dict.empty }
+
+cancelExportPassword : TaskList -> TaskList
+cancelExportPassword tasks =
+    { tasks | exportPws = Nothing }
 
 
-addPasswordsToExport : Dict GroupId (List ( AccountId, Password )) -> TaskList -> TaskList
+{-| Add passwords to export, if we are already collecting passwords.
+Otherwise the call is ignored.
+Since collecting the passwords is somewhat costly, the argument is passed as a lazy loaded value.
+-}
+addPasswordsToExport : (() -> Dict GroupId (List ( AccountId, Password ))) -> TaskList -> TaskList
 addPasswordsToExport pws tasks =
     case tasks.exportPws of
         Just myPws ->
-            { tasks | exportPws = Just (Dict.union myPws pws) }
+            { tasks | exportPws = Just (Dict.union myPws (pws ())) }
 
         Nothing ->
-            { tasks | exportPws = Just pws }
+            tasks
 
 
 getPasswordsReadyToExport : TaskList -> List ( AccountId, Password )

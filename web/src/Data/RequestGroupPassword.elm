@@ -6,6 +6,7 @@ module Data.RequestGroupPassword
         , init
         , getStatus
         , getPwStatus
+        , isGroupUnlocked
         , isUnlocked
         , togglePassword
         , getPassword
@@ -91,6 +92,16 @@ getGroupPassword groupId state =
 
         _ ->
             Nothing
+
+
+isGroupUnlocked : GroupId -> State -> Bool
+isGroupUnlocked groupId state =
+    case getStatus groupId state of
+        Done _ _ ->
+            True
+
+        _ ->
+            False
 
 
 {-| forget about all shares we already collected

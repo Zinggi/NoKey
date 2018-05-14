@@ -1,4 +1,4 @@
-module Views.Passwords exposing (Config, State, Msg, init, update, tasks, view, actionButton, finishEdit)
+module Views.Passwords exposing (Config, State, Msg, init, clear, update, tasks, view, actionButton, finishEdit)
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
@@ -38,6 +38,7 @@ type alias Config msg =
     , addPassword : GroupId -> AccountId -> String -> msg
     , movePw : AccountId -> GroupId -> GroupId -> msg
     , onNewPasswordRequirements : Views.PasswordGenerator.State -> msg
+    , onCancelExportPassword : msg
     }
 
 
@@ -49,6 +50,11 @@ type alias State =
     , deletePressed : Maybe AccountId
     , selectedGroup : Maybe GroupId
     }
+
+
+clear : State -> State
+clear state =
+    init
 
 
 type Msg
@@ -168,9 +174,18 @@ viewTask config sync state task =
 
             WaitForKeysDistributed { accounts, group, status, progress } ->
                 card
-                    [ Elements.p ("Wait until enough (" ++ toString progress ++ "/" ++ toString (getLevel group) ++ ") keys are distributed to save")
-                    , viewSitesListSimple config state accounts
-                    , niceRow [ Elements.p "into", viewGroup group status ]
+                    [ Elements.paragraph []
+                        [ Elements.text
+                            ("Wait until enough ("
+                                ++ toString progress
+                                ++ "/"
+                                ++ toString (getLevel group)
+                                ++ ") keys are distributed to finish creating group "
+                            )
+                        , viewGroup group status
+                        ]
+
+                    -- , viewSitesListSimple config state accounts
                     ]
 
             CreateMoreShares { for, group, status } ->
@@ -192,7 +207,7 @@ viewTask config sync state task =
                             , Elements.text "to export passwords."
                             ]
                     , if List.isEmpty done then
-                        none
+                        Elements.button (Just config.onCancelExportPassword) "Cancel"
                       else
                         column []
                             [ Elements.paragraph []
@@ -200,7 +215,10 @@ viewTask config sync state task =
                                 , el [ alignLeft ] (viewGroups done)
                                 , Elements.text " are ready to export."
                                 ]
-                            , Elements.downloadJsonButton (Data.Sync.exportReadyPasswords sync) "Export ready passwords"
+                            , niceRow
+                                [ Elements.button (Just config.onCancelExportPassword) "Cancel"
+                                , Elements.downloadJsonButton config.onCancelExportPassword (Data.Sync.exportReadyPasswords sync) "Export ready passwords"
+                                ]
                             ]
                     ]
 

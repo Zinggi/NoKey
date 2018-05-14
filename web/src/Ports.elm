@@ -21,6 +21,18 @@ port onGotQR : (String -> msg) -> Sub msg
 port onGotOnline : (() -> msg) -> Sub msg
 
 
+type alias FileData =
+    { contents : String
+    , filename : String
+    }
+
+
+port onFileContentRead : (FileData -> msg) -> Sub msg
+
+
+port openExtensionInTab : () -> Cmd msg
+
+
 {-| the js side is expected to reset the storage and store the newly provided state instead
 -}
 port resetStorage : Value -> Cmd msg

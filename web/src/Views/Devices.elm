@@ -42,6 +42,7 @@ view config { syncData, uniqueIdentifyier } state =
 
 actionButton : Config msg -> State -> Element msg
 actionButton config state =
+    -- TODO:
     -- if state.isActionButtonOpen then
     --     column [ spacing (Styles.paddingScale 3) ]
     --         [ Elements.floatingButton [ alignRight ] config.onCreateKeyBox "Create key box"
@@ -85,13 +86,13 @@ viewDeviceEntry config sync state myId uuid ( name, idPart ) =
                         -- Should we keep them?
                         -- , Elements.p "You can reverse this later by just pairing again."
                         , if numDevAfter < Data.Sync.maxUsedSecurityLevel sync then
-                            paragraph []
+                            Elements.paragraph []
                                 [ Elements.b "WARNING"
-                                , Elements.p "If you remove this device, the passwords saved in "
+                                , Elements.text "If you remove this device, the passwords saved in "
                                 , Data.Sync.namedGroupsWithLevel (\l -> l > numDevAfter) sync
                                     |> Elements.enumeration (Elements.groupIcon True)
                                     |> row []
-                                , Elements.p "will no longer be accessible. Better pair one more device and remove it then"
+                                , Elements.text "will no longer be accessible. Better pair one more device and remove it then"
                                 ]
                           else
                             none

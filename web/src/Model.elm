@@ -92,6 +92,10 @@ type Msg
     | UpdateCreateKeyBox Views.CreateKeyBox.State
     | DoCreateKeyBox { password : String, name : String }
     | ExportPasswords
+    | CancelExportPassword
+    | OnImportPasswords Ports.FileData
+    | ImportPasswords (List Data.Sync.ImportedPassword) GroupId Time
+    | OpenExtensionInTab
 
 
 

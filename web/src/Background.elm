@@ -21,6 +21,7 @@ import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
 import Views.Passwords
+import Views.Settings
 import MainView
 import Model exposing (..)
 
@@ -172,6 +173,28 @@ update msg model =
                     |> Api.syncToOthers
                     |> addCmds [ cmd ]
                     |> andThenUpdateIf shouldRequestShare (Api.requestShares [ groupId ])
+
+        ImportPasswords pws groupId timestamp ->
+            let
+                encryptShares time groupId_ shares =
+                    Ports.encryptNewShares { time = time, groupId = groupId_, shares = shares }
+
+                ( nSync, nSeed, nShouldRequestShare, nCmds ) =
+                    List.foldl
+                        (\{ site, login, password } ( sync, seed, shouldRequestShare, cmds ) ->
+                            let
+                                ( newSync, newSeed, newShouldRequestShare, cmd ) =
+                                    Data.Sync.insertSite encryptShares timestamp seed ( site, login ) groupId password sync
+                            in
+                                ( newSync, newSeed, newShouldRequestShare || shouldRequestShare, cmd :: cmds )
+                        )
+                        ( model.syncData, model.seed, False, [] )
+                        pws
+            in
+                { model | syncData = nSync, seed = nSeed }
+                    |> Api.syncToOthers
+                    |> addCmds nCmds
+                    |> andThenUpdateIf nShouldRequestShare (Api.requestShares [ groupId ])
 
         DismissNotification id ->
             model
@@ -378,10 +401,33 @@ update msg model =
             in
                 { model | syncData = sync } |> navigateTo Passwords
 
+        CancelExportPassword ->
+            { model | syncData = Data.Sync.cancelExportPassword model.syncData } |> noCmd
+
+        OnImportPasswords ({ contents, filename } as data) ->
+            let
+                mPws =
+                    Data.Sync.parsePasswords contents
+
+                groupId =
+                    Data.Sync.currentGroupId 2 model.syncData
+            in
+                case mPws of
+                    Ok pws ->
+                        model
+                            |> withCmds [ Helper.withTimestamp (ImportPasswords pws ( 2, groupId )) ]
+                            |> andThenUpdate (navigateTo Passwords)
+
+                    Err e ->
+                        { model | settingsView = Views.Settings.parseFileError e model.settingsView } |> noCmd
+
         OnGotQR code ->
             model
                 |> updatePairingDialogue (Views.Pairing.setInputToken code)
                 |> withCmds [ Helper.withTimestamp DoTokenSubmitted ]
+
+        OpenExtensionInTab ->
+            model |> withCmds [ Ports.openExtensionInTab () ]
 
 
 navigateTo : Page -> Model -> ( Model, Cmd Msg )
@@ -406,7 +452,10 @@ navigateTo page model =
                     else
                         ( Route.modifyUrl, doNothing )
     in
-        model
+        { model
+            | settingsView = Views.Settings.clear model.settingsView
+            , passwordsView = Views.Passwords.clear model.passwordsView
+        }
             |> withCmds [ navFn page ]
             |> andThenUpdate updateFn
 
@@ -494,6 +543,7 @@ subs state =
             , Ports.onDidDecryptRequestedShares DidDecryptRequestedShares
             , Ports.onGotQR OnGotQR
             , Ports.onGotOnline (always OnGotOnline)
+            , Ports.onFileContentRead OnImportPasswords
             ]
 
         _ ->

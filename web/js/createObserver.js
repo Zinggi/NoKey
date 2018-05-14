@@ -2,46 +2,51 @@
 const DEFAULT_ROOT_ELEMENT = document;
 const DEFAULT_OBSERVER_CONFIG = { childList: true, subtree: true };
 
-const createObserver = config => {
-  const {
-    observerConfig = DEFAULT_OBSERVER_CONFIG,
-    rootElement = DEFAULT_ROOT_ELEMENT,
-    selector,
-    onMount,
-    onUnmount
-  } = config;
+const createObserver = (reactors, config) => {
+    config = config || {};
+    const {
+        observerConfig = DEFAULT_OBSERVER_CONFIG,
+        rootElement = DEFAULT_ROOT_ELEMENT,
+    } = config;
 
-  const observer = new MutationObserver(mutations => {
-    mutations.forEach(mutation => {
-      // Handle added nodes
-      if (onMount) {
-        mutation.addedNodes.forEach(addedNode => {
-          const matchingElements = getMatchingElementsFromTree(addedNode, selector);
-          if (matchingElements.length < 1) return;
-          matchingElements.forEach(node => onMount(node));
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            // Handle added nodes
+            mutation.addedNodes.forEach(addedNode => {
+                doOnMount(true, addedNode, reactors);
+            });
+
+            mutation.removedNodes.forEach(removedNode => {
+                doOnMount(false, removedNode, reactors);
+
+            });
         });
-      }
-      // Handle removed nodes
-      if (onUnmount) {
-        mutation.removedNodes.forEach(removedNode => {
-          const matchingElements = getMatchingElementsFromTree(removedNode, selector);
-          if (matchingElements.length < 1) return;
-          matchingElements.forEach(node => onUnmount(node));
-        });
-      }
     });
-  });
 
-  observer.observe(rootElement, observerConfig);
+    observer.observe(rootElement, observerConfig);
 
-  return observer;
+    return observer;
 };
 
 // Returns an iterator containing elements that were part of a DOM mutation & matches the selector
-const getMatchingElementsFromTree = (rootElement, selector) => {
-  return rootElement.querySelectorAll && rootElement.matches
-    ? rootElement.matches(selector) ? [rootElement] : rootElement.querySelectorAll(selector)
-    : [];
+const doOnMount = (isMount, rootElement, reactors) => {
+    if (!(rootElement.querySelectorAll && rootElement.matches)) {
+        return [];
+    }
+    reactors.forEach(reactor => {
+        let matchingElements = [];
+        const event = isMount ? reactor.onMount : reactor.onUnmount;
+        if (event) {
+            if (rootElement.matches(reactor.selector)) {
+                matchingElements = [rootElement];
+            } else {
+                matchingElements = rootElement.querySelectorAll(reactor.selector);
+            }
+            if (matchingElements.length >= 1) {
+                matchingElements.forEach(event);
+            }
+        }
+    });
 };
 
 module.exports = createObserver;

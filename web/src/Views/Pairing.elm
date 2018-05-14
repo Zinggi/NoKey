@@ -103,7 +103,7 @@ view config isAndroid diag =
                            else
                             []
                     )
-                    [ Elements.inputText
+                    [ Elements.keyedInputText "pairing"
                         [ htmlAttribute (Attr.autocomplete False)
                         , htmlAttribute (Attr.attribute "autocorrect" "off")
                         , htmlAttribute (Attr.attribute "autocapitalize" "off")

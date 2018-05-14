@@ -1,4 +1,4 @@
-module Views.Settings exposing (view, State, Config, init)
+module Views.Settings exposing (view, State, Config, init, parseFileError, clear)
 
 import Element exposing (..)
 import Elements
@@ -9,12 +9,22 @@ import Styles
 
 
 type alias State =
-    { showConfirmReset : Bool }
+    { showConfirmReset : Bool, parseFileError : Maybe String }
 
 
 init : State
 init =
-    { showConfirmReset = False }
+    { showConfirmReset = False, parseFileError = Nothing }
+
+
+clear : State -> State
+clear state =
+    init
+
+
+parseFileError : String -> State -> State
+parseFileError txt state =
+    { state | parseFileError = Just txt }
 
 
 type alias Config msg =
@@ -23,6 +33,7 @@ type alias Config msg =
     , onShowTutorial : msg
     , onReset : msg
     , onExportPasswords : msg
+    , onOpenExtensionInTab : msg
     }
 
 
@@ -32,13 +43,40 @@ view config { syncData } state =
         options =
             Data.Sync.getSettings syncData
     in
-        column [ spacing (Styles.paddingScale 2) ]
+        column [ spacing (Styles.paddingScale 3) ]
             [ Elements.button (Just config.onShowTutorial) "Show Tutorial"
-            , Elements.line
-            , Elements.text ("Version: " ++ Data.Sync.appVersion)
             , Elements.line
             , Elements.button (Just config.onExportPasswords) "Export Passwords"
             , Elements.line
+            , if Data.Sync.numberOfKnownDevices syncData >= 2 then
+                column [ spacing (Styles.paddingScale 3), height shrink ]
+                    [ Elements.b "Import Passwords"
+                    , column [ spacing (Styles.paddingScale 3) ] <|
+                        (if Data.Sync.isExtension syncData then
+                            [ Elements.p "File upload only works if the extension is shown in it's own tab."
+                            , Elements.button (Just config.onOpenExtensionInTab) "Open in seperate tab"
+                            ]
+                         else
+                            []
+                        )
+                            ++ [ Elements.fileUpload
+                               , case state.parseFileError of
+                                    Just e ->
+                                        Elements.p ("Error:\n" ++ e)
+
+                                    Nothing ->
+                                        none
+                               ]
+                    , Elements.line
+                    ]
+              else
+                none
+
+            -- Version
+            , Elements.text ("Version: " ++ Data.Sync.appVersion)
+            , Elements.line
+
+            -- Dangerous settings
             , el [ paddingXY 0 (Styles.paddingScale 3) ] (Elements.h3 "Dangerous")
             , Elements.checkBox (\b -> setAllowLevel1 b options |> config.onSetSettings) False "Allow security level 1" options.allowLevel1
             , Elements.p allowLevel1Txt
@@ -52,13 +90,13 @@ view config { syncData } state =
                         [ Elements.b "Are you sure?"
                         , Elements.p "This will delete all saved passwords and group keys on this device."
                         , if numDevAfter < Data.Sync.maxUsedSecurityLevel syncData then
-                            paragraph []
+                            Elements.paragraph []
                                 [ Elements.b "WARNING"
-                                , Elements.p "If you reset this device, the passwords saved in "
+                                , Elements.text "If you reset this device, the passwords saved in "
                                 , Data.Sync.namedGroupsWithLevel (\l -> l > numDevAfter) syncData
                                     |> Elements.enumeration (Elements.groupIcon True)
                                     |> row []
-                                , Elements.p "will no longer be accessible. Better pair one more device and then reset!"
+                                , Elements.text "will no longer be accessible. Better pair one more device and then reset!"
                                 ]
                           else
                             none

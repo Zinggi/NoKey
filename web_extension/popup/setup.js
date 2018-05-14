@@ -3,7 +3,7 @@ import Elm from '../elm/elm.js';
 const app = Elm.Popup.fullscreen();
 const {setupDom} = require('../../web/js/setup.js');
 
-setupDom();
+setupDom(app);
 
 const getParams = () => {
     const query = window.location.search;
@@ -34,7 +34,7 @@ port.onMessage.addListener((msg) => {
     }
 });
 
-if (isPopup) {
+if (isPopup || getParams().tab === 'true') {
     window.document.documentElement.setAttribute("style", "");
     window.document.body.setAttribute("style", "");
 }

@@ -119,6 +119,17 @@ setup(Elm.MainBackground.fullscreen, (app) => {
         sendMsgToAll({ type: "onNewState", data: state }, ports);
         // console.log("(background) want to sendOutNewState", state);
     });
+
+    app.ports.openExtensionInTab.subscribe((state) => {
+        const popupUrl = browser.extension.getURL("popup/main.html");
+        browser.tabs.create({
+            url: popupUrl+"?tab=true"
+        }).then((win) => {
+            console.log("did it work?");
+        }, (err) => {
+            console.error("creating window failed!", err);
+        });
+    })
 });
 
 

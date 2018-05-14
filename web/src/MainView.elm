@@ -293,6 +293,7 @@ settingsConfig =
     , onSetSettings = SetSettings
     , onReset = ResetDevice
     , onExportPasswords = ExportPasswords
+    , onOpenExtensionInTab = OpenExtensionInTab
     }
 
 
@@ -313,6 +314,7 @@ passwordsConfig =
     , onNewPasswordRequirements = NewPasswordRequirements
     , movePw = MovePassword
     , onCopyToClipboard = ShowToast "Copied to clipboard"
+    , onCancelExportPassword = CancelExportPassword
     }
 
 
