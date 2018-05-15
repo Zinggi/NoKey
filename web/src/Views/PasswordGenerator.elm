@@ -19,6 +19,8 @@ type alias State =
     , requirements : PwReq.State
     , seed : Seed
     , pw : Maybe String
+    , pwAgain : String
+    , hasCleared : Bool
     , counter : Int
     }
 
@@ -28,6 +30,7 @@ type Msg
     | SetIsOpen Bool
     | UpdateLength Int
     | SetPw String
+    | SetPwAgain String
     | NextPw
     | Reset
 
@@ -46,7 +49,10 @@ update msg state =
             { state | showMore = b }
 
         SetPw pw ->
-            { state | pw = Just pw }
+            { state | pw = Just pw, hasCleared = state.hasCleared || String.length pw <= 1 }
+
+        SetPwAgain pw ->
+            { state | pwAgain = pw }
 
         NextPw ->
             nextPassword state
@@ -57,7 +63,15 @@ update msg state =
 
 init : Seed -> State
 init seed =
-    { showMore = False, requirements = PwReq.init, length = 16, seed = Random.step Random.independentSeed seed |> Tuple.first, pw = Nothing, counter = 0 }
+    { showMore = False
+    , requirements = PwReq.init
+    , length = 16
+    , seed = Random.step Random.independentSeed seed |> Tuple.first
+    , pw = Nothing
+    , pwAgain = ""
+    , counter = 0
+    , hasCleared = False
+    }
 
 
 nextPassword : State -> State
@@ -65,7 +79,9 @@ nextPassword state =
     { state
         | seed = PwReq.getNextPassword state.length state.requirements state.seed |> Tuple.second
         , pw = Nothing
+        , pwAgain = ""
         , counter = state.counter + 1
+        , hasCleared = False
     }
 
 
@@ -91,40 +107,52 @@ view onAcceptPw canAdd toMsg state =
 
                 Nothing ->
                     pass
+
+        isManuallyEntering =
+            state.pw /= Nothing && state.hasCleared
+
+        inp onIn type_ label =
+            Elements.inputTextHackHelper (toString state.counter ++ label) type_ [] [] (Just onIn) { label = label, placeholder = "" }
+
+        entryValid =
+            not isManuallyEntering || pw == state.pwAgain
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ if isOk then
-                Elements.inputTextHackHelper (toString state.counter)
-                    (if state.pw == Nothing then
-                        "text"
-                     else
-                        "password"
-                    )
-                    []
-                    []
-                    (Just SetPw)
-                    { label = "Password", placeholder = "" }
-                    pw
+                (if not isManuallyEntering then
+                    column [] [ inp SetPw "text" "Password" pw ]
+                 else
+                    column [ spacing (Styles.paddingScale 3) ]
+                        [ inp SetPw "password" "Password" pw
+                        , inp SetPwAgain "password" "Password again" state.pwAgain
+                        ]
+                )
                     |> Element.map (\msg -> update msg state |> toMsg)
               else
                 Elements.p error
             , column []
-                [ Elements.clampedNumberInput UpdateLength "Length" ( 6, 16, 32 ) state.length
-                    |> Element.map (\msg -> update msg state |> toMsg)
+                [ if isManuallyEntering then
+                    none
+                  else
+                    Elements.clampedNumberInput UpdateLength "Length" ( 6, 16, 32 ) state.length
+                        |> Element.map (\msg -> update msg state |> toMsg)
                 , row [ spacing (Styles.scaled 1) ] <|
                     if isOk then
                         [ Elements.button (Just NextPw) "Next"
                             |> Element.map (\msg -> update msg state |> toMsg)
-                        , Elements.primaryButton (Helper.boolToMaybe canAdd (onAcceptPw pw)) "Ok"
+                        , Elements.primaryButton (Helper.boolToMaybe (canAdd && entryValid) (onAcceptPw pw)) "Ok"
                         ]
                     else
                         [ Elements.primaryButton (Just Reset) "Reset"
                             |> Element.map (\msg -> update msg state |> toMsg)
                         ]
                 ]
-            , Elements.toggleMoreButton SetIsOpen "show more" "show less" state.showMore
-                |> Element.map (\msg -> update msg state |> toMsg)
-            , if state.showMore then
+            , if isManuallyEntering then
+                none
+              else
+                Elements.toggleMoreButton SetIsOpen "show more" "show less" state.showMore
+                    |> Element.map (\msg -> update msg state |> toMsg)
+            , if state.showMore && not isManuallyEntering then
                 PwReq.view PwReq state.requirements
                     |> Element.map (\msg -> update msg state |> toMsg)
               else
