@@ -12,6 +12,7 @@ import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Time exposing (Time)
 import Murmur3
+import Semver
 
 
 --
@@ -1357,10 +1358,11 @@ encodeComplete s =
         ]
 
 
-appVersion : String
+appVersion : Semver.Version
 appVersion =
     -- TODO!: change if a new version is released
-    "0.2.1"
+    -- "0.2.1"
+    Semver.version 0 2 1 [] []
 
 
 completeDecoder : Seed -> Decoder SyncData

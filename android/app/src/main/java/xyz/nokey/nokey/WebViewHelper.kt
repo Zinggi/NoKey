@@ -20,6 +20,17 @@ import android.os.Handler
 import android.content.pm.ApplicationInfo
 import android.net.http.SslError
 import android.util.Log
+import android.widget.Toast
+import android.content.ActivityNotFoundException
+import android.support.v4.app.ActivityCompat.startActivityForResult
+import android.webkit.WebChromeClient.FileChooserParams
+import android.webkit.ValueCallback
+import android.support.v4.content.ContextCompat.startActivity
+import android.webkit.DownloadListener
+
+
+
+
 
 
 class WebViewHelper(private val activity: MainActivity, private val uiManager: UIManager) {
@@ -85,6 +96,27 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
                 super.onProgressChanged(view, newProgress)
             }
 
+            override fun onShowFileChooser(webView: WebView, filePathCallback: ValueCallback<Array<Uri>>, fileChooserParams: FileChooserParams): Boolean {
+                // make sure there is no existing message
+                if (activity.uploadMessage != null) {
+                    activity.uploadMessage?.onReceiveValue(null)
+                    activity.uploadMessage = null
+                }
+
+                activity.uploadMessage = filePathCallback
+
+                val intent = fileChooserParams.createIntent()
+                try {
+                    activity.startActivityForResult(intent, activity.requestSelectFile)
+                } catch (e: ActivityNotFoundException) {
+                    activity.uploadMessage = null
+                    Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show()
+                    return false
+                }
+
+                return true
+            }
+
         }
 
         // Set up Webview client
@@ -115,9 +147,9 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
             }
 
             // TODO! comment out from release
-            /*override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
                 handler.proceed()
-            }*/
+            }
         }
 
         // Now we can call these functions from javascript
@@ -137,6 +169,23 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
                 })
             }*/
         }, "Android")
+
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
+            val i = Intent(Intent.ACTION_VIEW)
+            if (url.startsWith("data:")) {
+                val dataStartIndex = url.indexOf(",") + 1
+                val data = url.substring(dataStartIndex)
+                val result = java.net.URLDecoder.decode(data, "UTF-8")
+                activity.downloadTextFile("passwords.json", result)
+            } else {
+                i.data = Uri.parse(url)
+                try {
+                    activity.startActivity(i)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(activity, "No activity found to download this link", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     fun onScanQrResult(contents: String) {
@@ -171,7 +220,6 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
         if (!url.startsWith(activity.appBaseUrl)) {
             // stop loading
             view.stopLoading()
-
             // open external URL in Browser/3rd party apps instead
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))

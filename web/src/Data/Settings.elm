@@ -7,6 +7,24 @@ import Time exposing (Time)
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 
 
+{- TODO: update news + sync if read tutorial
+
+   save last seen update news for version number:
+       start at v 0.0.0.
+       If the current version number is bigger than our last seen,
+       show all news with v >= currentV
+
+       save news in a Dict Version Content
+
+       type alias UpdateNews msg = Dict Version (Content msg)
+
+       type alias Content msg = { title : String , shortSummery : Element msg, details : Element msg }
+
+       save read news and sync, so we only have to read once
+
+-}
+
+
 type alias SharedSettings =
     { allowLevel1 : Maybe (TimestampedVersionRegister Bool)
     , timeUntilAutoLock : Maybe (TimestampedVersionRegister Time)

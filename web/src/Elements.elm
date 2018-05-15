@@ -203,7 +203,7 @@ siteLogo siteName =
             , Font.size 24
             , Font.center
             ]
-            (el [ centerY ] (Element.text letter))
+            (el [ centerY, centerX ] (Element.text letter))
 
 
 hashIcon : String -> Element msg
