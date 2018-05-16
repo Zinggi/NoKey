@@ -2,16 +2,50 @@ module Views.Tutorial exposing (view)
 
 import Element exposing (..)
 import Elements
+import Styles
 import Model exposing (Msg(..))
+
+
+myP =
+    Elements.paragraph [ spacing (Styles.paddingScale 1) ]
 
 
 view : Element Msg
 view =
-    paragraph []
-        [ Elements.p """
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas eget mauris diam. Ut vel dolor eu ipsum tempor cursus eget sed turpis. Vivamus vitae dui sit amet nulla auctor commodo at ornare diam. Curabitur tempor quis felis placerat auctor. Phasellus aliquet efficitur arcu ac condimentum. Phasellus finibus justo vestibulum quam venenatis, vitae vestibulum lorem consequat. Sed mi tortor, interdum sit amet auctor vel, suscipit a leo. Maecenas congue condimentum luctus. Nam elementum tortor vitae elementum placerat. Suspendisse eu accumsan neque. Vestibulum rutrum tristique ultricies. Nulla auctor accumsan consequat. Maecenas venenatis ligula id bibendum sollicitudin. Praesent vitae arcu lobortis, venenatis augue posuere, posuere purus. Mauris aliquam interdum egestas.
-
-Sed a venenatis libero. Morbi pellentesque at mauris et vehicula. Nullam vitae finibus velit. Duis ac facilisis magna, nec interdum urna. Etiam congue, nulla eu consectetur rutrum, purus massa malesuada lorem, eu laoreet velit augue eu ligula. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Phasellus tristique vitae velit id sollicitudin. Donec rutrum magna eu mi aliquam tempor. Nunc quis arcu dignissim, dignissim sapien ut, pharetra turpis. Vestibulum porta diam in cursus ultrices. Fusce a commodo purus. Mauris vitae sapien lorem. Mauris porttitor metus vel massa porttitor tristique.
-"""
+    column [ spacing (Styles.paddingScale 3) ]
+        [ Elements.h2 "Welcome"
+        , Elements.p """
+            NoKey is a distributed password manager. In contrast to other password managers, it doesn't use
+            a master password to secure your passwords.
+            """
+        , Elements.p """
+        Instead, your passwords are stored on multiple devices
+            you own, such that you only get access to your passwords if enough devices are present.
+        """
+        , Elements.h3 "Concepts"
+        , Elements.h4 "Pairing"
+        , Elements.p """
+            To get started, you will have to pair your devices together. After pairing a device, the devices will
+            be able to communicate with each other and can share all your saved passwords.
+            """
+        , Elements.h4 "Password Group"
+        , myP
+            [ Elements.text """
+            You can think of a password group as a vault that contains your passwords.
+            A group has a
+            """
+            , Elements.b "security level"
+            , Elements.text """
+            associalted with it.
+            The security level indicates how many keys you need to unlock a vault.
+            Usually, every device holds one key.
+            """
+            , Elements.text "Password groups are refered to with the following icon:"
+            , Elements.groupIcon True ( ( 2, "" ), "" )
+            , Elements.text ". The icon stands for a password group with security level 2 that is currently locked."
+            ]
+        , Elements.text ""
+        , Elements.italicText "More to come.."
+        , Elements.text ""
         , Elements.primaryButton (Just DoneWithTutorial) "Ok, let's get started!"
         ]

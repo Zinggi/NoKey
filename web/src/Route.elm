@@ -15,6 +15,7 @@ type Page
     | NewPassword
     | Tutorial
     | CreateKeyBox
+    | ReleaseLog String
 
 
 route : Parser (Page -> a) a
@@ -28,6 +29,8 @@ route =
         , Url.map Tutorial (s "tutorial")
         , Url.map CreateKeyBox (s "createkeybox")
         , Url.map NewPassword (s "newpassword")
+        , Url.map ReleaseLog (s "releaselog" </> string)
+        , Url.map (ReleaseLog "") (s "releaselog")
         ]
 
 
@@ -38,6 +41,12 @@ pageToString page =
             case page of
                 Home ->
                     ""
+
+                ReleaseLog s ->
+                    if s == "" then
+                        "releaselog"
+                    else
+                        "releaselog/" ++ s
 
                 other ->
                     String.toLower (toString other)
@@ -64,6 +73,9 @@ hasBackButton page =
         CreateKeyBox ->
             True
 
+        ReleaseLog _ ->
+            True
+
         _ ->
             False
 
@@ -85,6 +97,12 @@ pageToTitle page =
 
         CreateKeyBox ->
             "Create Key Box"
+
+        ReleaseLog s ->
+            if s == "" then
+                "Release Log"
+            else
+                s
 
         other ->
             toString other

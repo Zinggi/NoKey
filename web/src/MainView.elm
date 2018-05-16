@@ -25,6 +25,7 @@ import Views.Devices
 import Views.Tutorial
 import Views.Passwords
 import Views.NewPassword
+import Views.ReleaseLog
 import Views.CreateKeyBox
 import Model exposing (Msg(..), ModelState(..), Model)
 import Route exposing (Page(..))
@@ -273,6 +274,9 @@ viewPage page model =
         CreateKeyBox ->
             Views.CreateKeyBox.view keyBoxConfig model model.createKeyBoxView
 
+        ReleaseLog s ->
+            Views.ReleaseLog.view s
+
 
 keyBoxConfig : Views.CreateKeyBox.Config Msg
 keyBoxConfig =
@@ -297,6 +301,7 @@ settingsConfig =
     , onReset = ResetDevice
     , onExportPasswords = ExportPasswords
     , onOpenExtensionInTab = OpenExtensionInTab
+    , onShowReleaseLog = NavigateTo (ReleaseLog "")
     }
 
 

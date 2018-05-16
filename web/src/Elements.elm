@@ -13,6 +13,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Keyed as Keyed
 import Element.Events
+import Element.Region as Region
 import Styles
 import HashIcon
 import Icons exposing (Icon)
@@ -64,7 +65,7 @@ inputGroup heading contents =
     if List.isEmpty contents then
         none
     else
-        column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 2), alignLeft ]
+        column [ paddingXY 0 (Styles.paddingScale 1), spacing (Styles.paddingScale 2) ]
             (el Styles.groupHeading (h4 heading) :: contents)
 
 
@@ -290,14 +291,9 @@ box =
     [ width (px (Styles.scaled 1)), height (px (Styles.scaled 1)) ]
 
 
-text : String -> Element msg
-text txt =
-    el [ Font.size (Styles.scaled 1), alignLeft ] (Element.text txt)
-
-
 textWithCustomOverflow : String -> String -> Element msg
 textWithCustomOverflow overflow txt =
-    el [ Font.size (Styles.scaled 1), alignLeft, clipX, width fill ]
+    el [ Font.size (Styles.scaled 1), clipX, width fill ]
         (Element.html <|
             Html.div
                 [ Attr.class "se text width-fill height-fill"
@@ -321,6 +317,7 @@ paragraph attrs children =
 
 downloadJsonButton : msg -> Value -> String -> Element msg
 downloadJsonButton onClick val txt =
+    -- TODO: use downloadAs
     newTabLink
         [ htmlAttribute (Attr.attribute "download" "passwords.json")
         , Element.Events.onClick onClick
@@ -357,34 +354,39 @@ fileUpload =
         |> el []
 
 
+text : String -> Element msg
+text txt =
+    el [ Font.size (Styles.scaled 1) ] (Element.text txt)
+
+
 italicText : String -> Element msg
 italicText txt =
-    el [ Font.size (Styles.scaled 1), alignLeft, Font.italic ] (Element.text txt)
+    el [ Font.size (Styles.scaled 1), Font.italic ] (Element.text txt)
 
 
 h1 : String -> Element msg
 h1 txt =
-    el [ Font.size (Styles.scaled 4), Font.bold, alignLeft ] (Element.text txt)
+    el [ Font.size (Styles.scaled 4), Font.bold, Region.heading 1 ] (Element.text txt)
 
 
 h2 : String -> Element msg
 h2 txt =
-    el [ Font.size (Styles.scaled 3), Font.bold, alignLeft ] (Element.text txt)
+    el [ Font.size (Styles.scaled 3), Font.bold, Region.heading 2 ] (Element.text txt)
 
 
 h3 : String -> Element msg
 h3 txt =
-    el [ Font.size (Styles.scaled 2), Font.bold, alignLeft ] (Element.text txt)
+    el [ Font.size (Styles.scaled 2), Font.bold, Region.heading 3 ] (Element.text txt)
 
 
 h4 : String -> Element msg
 h4 txt =
-    el [ Font.size (Styles.scaled 1), Font.bold, alignLeft ] (Element.text txt)
+    el [ Font.size (Styles.scaled 1), Font.bold, Region.heading 4 ] (Element.text txt)
 
 
 b : String -> Element msg
 b txt =
-    el [ Font.bold ] (text txt)
+    el [ Font.bold, Font.size (Styles.scaled 1) ] (Element.text txt)
 
 
 pageButton : msg -> Bool -> Page -> Element msg
@@ -497,6 +499,14 @@ button onPress txt =
         }
 
 
+linkButton : List (Attribute msg) -> msg -> String -> Element msg
+linkButton attrs onClick txt =
+    Input.button (Font.color Styles.linkColor :: attrs)
+        { label = text txt
+        , onPress = Just onClick
+        }
+
+
 delete onPress =
     Input.button []
         { label =
@@ -572,7 +582,7 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
 
 groupIcon : Bool -> Group -> Element msg
 groupIcon isLocked ( ( level, _ ), post ) =
-    row [ width shrink ]
+    row [ width shrink, padding (Styles.paddingScale 0) ]
         [ h3 (toString level)
         , if post == "" then
             none
@@ -589,7 +599,7 @@ avatar : List (Attribute msg) -> Data.Device -> Element msg
 avatar attrs { id, name, postFix } =
     row (spacing (Styles.scaled 1) :: attrs)
         [ hashIcon id
-        , paragraph [ Styles.selectable, alignLeft, width fill, spacing (Styles.scaled -2) ]
+        , paragraph [ Styles.selectable, width fill, spacing (Styles.scaled -2) ]
             [ helperMayName name, helperMayIdPart postFix ]
         ]
 

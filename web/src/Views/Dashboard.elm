@@ -49,12 +49,12 @@ type alias Hints =
 
 
 hints : Model -> Hints
-hints model =
+hints ({ syncData } as model) =
     { tutorial =
-        if model.isFirstTimeUser then
-            Just viewTutorial
-        else
+        if (Data.Sync.getSettings syncData).hasSeenTutorial then
             Nothing
+        else
+            Just viewTutorial
     , needsPairing = needsPairingHint model
     }
 

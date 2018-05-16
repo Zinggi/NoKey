@@ -30,7 +30,7 @@ encode { syncData, uniqueIdentifyier, isFirstTimeUser } =
     JE.object
         [ ( "syncData", Sync.encodeComplete syncData )
         , ( "uuid", JE.string uniqueIdentifyier )
-        , ( "isFirstTimeUser", JE.bool isFirstTimeUser )
+        , ( "isFirstTimeUser", JE.bool False )
         ]
 
 

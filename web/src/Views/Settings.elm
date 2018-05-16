@@ -32,6 +32,7 @@ type alias Config msg =
     { toMsg : State -> msg
     , onSetSettings : Settings -> msg
     , onShowTutorial : msg
+    , onShowReleaseLog : msg
     , onReset : msg
     , onExportPasswords : msg
     , onOpenExtensionInTab : msg
@@ -46,6 +47,8 @@ view config { syncData } state =
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ Elements.button (Just config.onShowTutorial) "Show Tutorial"
+            , Elements.line
+            , Elements.button (Just config.onShowReleaseLog) "Show release log"
             , Elements.line
             , Elements.button (Just config.onExportPasswords) "Export Passwords"
             , Elements.line

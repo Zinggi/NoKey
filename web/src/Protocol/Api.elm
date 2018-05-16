@@ -111,7 +111,7 @@ connectPrivateSocket uuid =
             Channel.init ("private:" ++ uuid)
                 -- register a handler for messages with a "new_msg" event
                 |> Channel.on "new_msg" (NewMsg >> Self >> protocolMsg)
-                |> Channel.withDebug
+                -- |> Channel.withDebug
                 |> Channel.withPayload (JE.object [ ( "uuid", JE.string uuid ) ])
                 |> Channel.onJoin (JoinedChannel >> Self >> protocolMsg)
                 |> Channel.onRejoin (JoinedChannel >> Self >> protocolMsg)
@@ -735,8 +735,11 @@ syncToOthers model =
     let
         ( debounce, cmd ) =
             Debounce.push syncToOthersDebouncer () model.protocolState.debounce
+
+        newModel =
+            updateProtocol (\s -> { s | debounce = debounce }) model
     in
-        ( updateProtocol (\s -> { s | debounce = debounce }) model, cmd )
+        ( newModel, Cmd.batch [ cmd, Ports.storeState (Data.Storage.encode newModel) ] )
 
 
 

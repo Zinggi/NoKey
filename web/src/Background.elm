@@ -98,16 +98,12 @@ update msg model =
 
         DoneWithTutorial ->
             let
-                newModel =
-                    { model | isFirstTimeUser = False }
-
                 ret =
-                    newModel |> withCmds [ storeState newModel ]
+                    setSettings (Data.Settings.setDoneWithTutorial (Data.Sync.getSettings model.syncData)) model
             in
                 case model.currentPage of
                     Tutorial ->
-                        ret
-                            |> addCmds [ Navigation.back 1 ]
+                        ret |> addCmds [ Navigation.back 1 ]
 
                     _ ->
                         ret
@@ -336,9 +332,8 @@ update msg model =
                 -- add new password entry
                 model |> updateNotifications (Notifications.newSiteEntry entry True)
 
-        SetSettings options ->
-            model
-                |> withCmds [ Helper.withTimestamp (DoSetSettings options) ]
+        SetSettings settings ->
+            setSettings settings model
 
         DoSetSettings options time ->
             { model | syncData = Data.Sync.setSettings time options model.syncData }
@@ -429,6 +424,12 @@ update msg model =
 
         OpenExtensionInTab ->
             model |> withCmds [ Ports.openExtensionInTab () ]
+
+
+setSettings : Data.Settings.Settings -> Model -> ( Model, Cmd Msg )
+setSettings settings model =
+    model
+        |> withCmds [ Helper.withTimestamp (DoSetSettings settings) ]
 
 
 navigateTo : Page -> Model -> ( Model, Cmd Msg )

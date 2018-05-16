@@ -77,6 +77,10 @@ textColor =
     Color.rgb 1 58 76
 
 
+linkColor =
+    Color.rgb 8 73 153
+
+
 borderStyle =
     [ Border.width 1
     , Border.color thinLineColor

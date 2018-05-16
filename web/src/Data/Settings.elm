@@ -1,4 +1,17 @@
-module Data.Settings exposing (Settings, SharedSettings, encode, decoder, init, setAllowLevel1, minSecurityLevel, merge, get, set)
+module Data.Settings
+    exposing
+        ( Settings
+        , SharedSettings
+        , encode
+        , decoder
+        , init
+        , setAllowLevel1
+        , minSecurityLevel
+        , merge
+        , get
+        , set
+        , setDoneWithTutorial
+        )
 
 import Json.Encode as JE exposing (Value)
 import Json.Decode as JD exposing (Decoder)
@@ -28,12 +41,14 @@ import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (T
 type alias SharedSettings =
     { allowLevel1 : Maybe (TimestampedVersionRegister Bool)
     , timeUntilAutoLock : Maybe (TimestampedVersionRegister Time)
+    , hasSeenTutorial : Bool
     }
 
 
 type alias Settings =
     { allowLevel1 : Bool
     , timeUntilAutoLock : Time
+    , hasSeenTutorial : Bool
     }
 
 
@@ -41,6 +56,7 @@ get : SharedSettings -> Settings
 get shared =
     { allowLevel1 = getMaybe .allowLevel1 .allowLevel1 shared
     , timeUntilAutoLock = getMaybe .timeUntilAutoLock .timeUntilAutoLock shared
+    , hasSeenTutorial = shared.hasSeenTutorial
     }
 
 
@@ -48,6 +64,7 @@ set : String -> Time -> Settings -> SharedSettings -> SharedSettings
 set id time settings shared =
     { allowLevel1 = setMaybe id time .allowLevel1 .allowLevel1 settings shared
     , timeUntilAutoLock = setMaybe id time .timeUntilAutoLock .timeUntilAutoLock settings shared
+    , hasSeenTutorial = settings.hasSeenTutorial
     }
 
 
@@ -71,6 +88,11 @@ getMaybe f1 f2 options =
     Maybe.map TimestampedVersionRegister.get (f1 options) |> Maybe.withDefault (f2 defaults)
 
 
+setDoneWithTutorial : Settings -> Settings
+setDoneWithTutorial settings =
+    { settings | hasSeenTutorial = True }
+
+
 setAllowLevel1 : Bool -> Settings -> Settings
 setAllowLevel1 b o =
     { o | allowLevel1 = b }
@@ -88,6 +110,7 @@ init : SharedSettings
 init =
     { allowLevel1 = Nothing
     , timeUntilAutoLock = Nothing
+    , hasSeenTutorial = False
     }
 
 
@@ -110,12 +133,13 @@ merge : SharedSettings -> SharedSettings -> SharedSettings
 merge s1 s2 =
     { allowLevel1 = mergeMaybe s1.allowLevel1 s2.allowLevel1
     , timeUntilAutoLock = mergeMaybe s1.timeUntilAutoLock s2.timeUntilAutoLock
+    , hasSeenTutorial = s1.hasSeenTutorial || s2.hasSeenTutorial
     }
 
 
 defaults : Settings
 defaults =
-    { allowLevel1 = False, timeUntilAutoLock = 10 * Time.minute }
+    { allowLevel1 = False, timeUntilAutoLock = 10 * Time.minute, hasSeenTutorial = False }
 
 
 maybeEncode : String -> (a -> Value) -> Maybe a -> List ( String, Value )
@@ -134,11 +158,13 @@ encode opt =
         List.concat
             [ maybeEncode "allowLevel1" (TimestampedVersionRegister.encode JE.bool) opt.allowLevel1
             , maybeEncode "timeUntilAutoLock" (TimestampedVersionRegister.encode JE.float) opt.timeUntilAutoLock
+            , [ ( "hasSeenTutorial", JE.bool opt.hasSeenTutorial ) ]
             ]
 
 
 decoder : Decoder SharedSettings
 decoder =
-    JD.decode (\al1 t -> { allowLevel1 = al1, timeUntilAutoLock = t })
+    JD.decode (\al1 t ht -> { allowLevel1 = al1, timeUntilAutoLock = t, hasSeenTutorial = ht })
         |> optional "allowLevel1" (TimestampedVersionRegister.decoder JD.bool |> JD.map Just) Nothing
         |> optional "timeUntilAutoLock" (TimestampedVersionRegister.decoder JD.float |> JD.map Just) Nothing
+        |> optional "hasSeenTutorial" JD.bool False
