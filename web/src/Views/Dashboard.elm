@@ -10,6 +10,7 @@ import Data.Settings exposing (Settings)
 import Route exposing (Page(..))
 import Styles
 import Views.Passwords
+import Views.ReleaseLog
 
 
 view : Views.Passwords.Config Msg -> Model -> Element Msg
@@ -29,6 +30,7 @@ view passwordsConfig model =
         column [ spacing (Styles.scaled 1), height shrink ]
             [ Elements.myAvatar SetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
             , viewSummery model
+            , Maybe.withDefault none h.updateNews
             , Maybe.withDefault none h.tutorial
             , Tuple.second h.needsPairing
             , Views.Passwords.tasks passwordsConfig model.syncData model.passwordsView (Data.Sync.getTasks model.syncData)
@@ -45,18 +47,38 @@ view passwordsConfig model =
 type alias Hints =
     { tutorial : Maybe (Element Msg)
     , needsPairing : ( Bool, Element Msg )
+    , updateNews : Maybe (Element Msg)
     }
 
 
 hints : Model -> Hints
 hints ({ syncData } as model) =
-    { tutorial =
-        if (Data.Sync.getSettings syncData).hasSeenTutorial then
-            Nothing
-        else
-            Just viewTutorial
-    , needsPairing = needsPairingHint model
-    }
+    let
+        seenTut =
+            (Data.Sync.getSettings syncData).hasSeenTutorial
+    in
+        { tutorial =
+            if seenTut then
+                Nothing
+            else
+                Just viewTutorial
+        , updateNews =
+            let
+                news =
+                    Data.Settings.notSeenNews (Data.Sync.getSettings syncData)
+            in
+                if List.isEmpty news || not seenTut then
+                    Nothing
+                else
+                    Just
+                        (Elements.card 1
+                            [ spacing (Styles.paddingScale 3) ]
+                            [ Elements.h3 "Updates"
+                            , Views.ReleaseLog.summery news
+                            ]
+                        )
+        , needsPairing = needsPairingHint model
+        }
 
 
 {-| The bool indicates if it should be rendered inside the passwords view

@@ -99,7 +99,7 @@ update msg model =
         DoneWithTutorial ->
             let
                 ret =
-                    setSettings (Data.Settings.setDoneWithTutorial (Data.Sync.getSettings model.syncData)) model
+                    updateSettings Data.Settings.setDoneWithTutorial model
             in
                 case model.currentPage of
                     Tutorial ->
@@ -383,13 +383,11 @@ update msg model =
         -- AddDrivePressed ->
         --     -- TODO:
         --     model |> withCmds [ Navigation.load "https://www.googleapis.com/auth/drive.appfolder" ]
-        UpdateCreateKeyBox state ->
-            { model | createKeyBoxView = state } |> noCmd
-
-        DoCreateKeyBox { password, name } ->
-            -- TODO!
-            model |> noCmd
-
+        -- UpdateCreateKeyBox state ->
+        --     { model | createKeyBoxView = state } |> noCmd
+        -- DoCreateKeyBox { password, name } ->
+        --     -- TODO:
+        --     model |> noCmd
         ExportPasswords ->
             let
                 sync =
@@ -432,6 +430,11 @@ setSettings settings model =
         |> withCmds [ Helper.withTimestamp (DoSetSettings settings) ]
 
 
+updateSettings : (Data.Settings.Settings -> Data.Settings.Settings) -> Model -> ( Model, Cmd Msg )
+updateSettings f model =
+    setSettings (f (Data.Sync.getSettings model.syncData)) model
+
+
 navigateTo : Page -> Model -> ( Model, Cmd Msg )
 navigateTo page model =
     let
@@ -442,6 +445,9 @@ navigateTo page model =
             case ( model.currentPage, page ) of
                 ( _, Pairing ) ->
                     ( Route.newUrl, getToken )
+
+                ( _, ReleaseLog s ) ->
+                    ( Route.newUrl, updateSettings (Data.Settings.markSeen s) )
 
                 ( Home, _ ) ->
                     ( Route.newUrl, doNothing )

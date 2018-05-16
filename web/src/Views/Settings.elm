@@ -1,6 +1,5 @@
 module Views.Settings exposing (view, State, Config, init, parseFileError, clear)
 
-import Semver
 import Element exposing (..)
 import Elements
 import Route exposing (Page(..))
@@ -77,7 +76,7 @@ view config { syncData } state =
                 none
 
             -- Version
-            , Elements.text ("Version: " ++ Semver.print Data.Sync.appVersion)
+            , Elements.text ("Version: " ++ Data.Sync.appVersion)
             , Elements.line
 
             -- Dangerous settings

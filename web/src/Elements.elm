@@ -310,9 +310,25 @@ p txt =
     paragraph [] [ text txt ]
 
 
+br : Element msg
+br =
+    html (Html.br [] [])
+
+
 paragraph : List (Attribute msg) -> List (Element msg) -> Element msg
 paragraph attrs children =
     Element.paragraph (width (fill |> minimum 0) :: attrs) children
+
+
+list : List (Element msg) -> Element msg
+list children =
+    List.map
+        (\c ->
+            row [ spacing (Styles.paddingScale 2) ]
+                [ dot, c ]
+        )
+        children
+        |> column [ paddingXY (Styles.paddingScale 4) 0, spacing (Styles.paddingScale 3) ]
 
 
 downloadJsonButton : msg -> Value -> String -> Element msg
@@ -689,6 +705,11 @@ clampedNumberInput onChange label ( min, default, max ) n =
 line : Element msg
 line =
     el [ height (px 1), Background.color Styles.black, width fill ] none
+
+
+dot : Element msg
+dot =
+    el [ height (px 8), width (px 8), Border.rounded 10, Background.color Styles.black ] none
 
 
 spacer : Element msg

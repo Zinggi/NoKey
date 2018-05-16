@@ -12,7 +12,6 @@ import Random.Pcg as Random exposing (Seed)
 import Random.Pcg.Extended as RandomE
 import Time exposing (Time)
 import Murmur3
-import Semver
 
 
 --
@@ -296,7 +295,7 @@ initShared seed encryptionKey signingKey devType uuid =
 
     -- , keyBoxes = KeyBox.init seed
     , passwords = ORDict.init seed
-    , settings = Data.Settings.init
+    , settings = Data.Settings.init seed
     , version = VClock.init
     }
 
@@ -1318,7 +1317,7 @@ sharedDecoderV1 seed =
             )
         |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder seed)
         -- |> optional "keyBoxes" (KeyBox.decoder seed) (KeyBox.init seed)
-        |> optional "settings" Data.Settings.decoder Data.Settings.init
+        |> optional "settings" (Data.Settings.decoder seed) (Data.Settings.init seed)
         |> required "version" VClock.decoder
 
 
@@ -1358,11 +1357,9 @@ encodeComplete s =
         ]
 
 
-appVersion : Semver.Version
+appVersion : String
 appVersion =
-    -- TODO!: change if a new version is released
-    -- "0.2.1"
-    Semver.version 0 2 1 [] []
+    Data.Settings.currentVersion
 
 
 completeDecoder : Seed -> Decoder SyncData

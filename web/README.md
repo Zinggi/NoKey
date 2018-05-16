@@ -21,3 +21,9 @@ For live reload + debugger, run `elm live src/Main.elm --output=build/main.js --
 
 To run tests, run `elm-verify-examples && elm-test`
 
+
+## Release
+
+ * Bump version in Data/Settings
+ * Write release log in Views/ReleaseLog
+

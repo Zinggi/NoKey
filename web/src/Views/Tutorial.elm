@@ -36,11 +36,11 @@ view =
             """
             , Elements.b "security level"
             , Elements.text """
-            associalted with it.
+            associated with it.
             The security level indicates how many keys you need to unlock a vault.
             Usually, every device holds one key.
             """
-            , Elements.text "Password groups are refered to with the following icon:"
+            , Elements.text "Password groups are referred to with the following icon:"
             , Elements.groupIcon True ( ( 2, "" ), "" )
             , Elements.text ". The icon stands for a password group with security level 2 that is currently locked."
             ]

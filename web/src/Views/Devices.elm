@@ -23,7 +23,8 @@ type alias Config msg =
     , onSetDeviceName : String -> msg
     , onGoToPairing : msg
     , onRemoveDevice : String -> msg
-    , onCreateKeyBox : msg
+
+    -- , onCreateKeyBox : msg
     }
 
 

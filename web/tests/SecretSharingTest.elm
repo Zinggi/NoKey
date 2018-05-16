@@ -3,6 +3,7 @@ module SecretSharingTest exposing (..)
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, list, int, string, tuple, intRange, string, tuple3)
 import Test exposing (..)
+import Dict
 
 
 --
@@ -47,11 +48,16 @@ suite =
             "secret should be recoverable from minimum number of shares"
           <|
             \( ( m, n ), s, seed_ ) ->
-                SecretSharing.splitSecret ( m, n ) s seed_
-                    |> Tuple.first
-                    |> List.take m
-                    |> SecretSharing.joinSecret
-                    |> Expect.equal (Ok s)
+                let
+                    xVal =
+                        Dict.fromList (List.range 1 n |> List.map (\x -> ( x, x )))
+                in
+                    SecretSharing.splitSecret ( m, xVal ) s seed_
+                        |> Tuple.first
+                        |> Dict.values
+                        |> List.take m
+                        |> SecretSharing.joinSecret
+                        |> Expect.equal (Ok s)
         , fuzz share "share decoder should be the reverse of encode" <|
             \share ->
                 SecretSharing.shareToJson share

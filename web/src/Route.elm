@@ -14,7 +14,7 @@ type Page
     | Pairing
     | NewPassword
     | Tutorial
-    | CreateKeyBox
+      -- | CreateKeyBox
     | ReleaseLog String
 
 
@@ -27,7 +27,8 @@ route =
         , Url.map Options (s "options")
         , Url.map Pairing (s "pairing")
         , Url.map Tutorial (s "tutorial")
-        , Url.map CreateKeyBox (s "createkeybox")
+
+        -- , Url.map CreateKeyBox (s "createkeybox")
         , Url.map NewPassword (s "newpassword")
         , Url.map ReleaseLog (s "releaselog" </> string)
         , Url.map (ReleaseLog "") (s "releaselog")
@@ -70,9 +71,8 @@ hasBackButton page =
         NewPassword ->
             True
 
-        CreateKeyBox ->
-            True
-
+        -- CreateKeyBox ->
+        --     True
         ReleaseLog _ ->
             True
 
@@ -95,9 +95,8 @@ pageToTitle page =
         Passwords ->
             "Vault"
 
-        CreateKeyBox ->
-            "Create Key Box"
-
+        -- CreateKeyBox ->
+        --     "Create Key Box"
         ReleaseLog s ->
             if s == "" then
                 "Release Log"

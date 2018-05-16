@@ -89,8 +89,8 @@ type Msg
     | UpdateDevicesView Views.Devices.State
     | DoSetSettings Settings Time
       -- | AddDrivePressed
-    | UpdateCreateKeyBox Views.CreateKeyBox.State
-    | DoCreateKeyBox { password : String, name : String }
+      -- | UpdateCreateKeyBox Views.CreateKeyBox.State
+      -- | DoCreateKeyBox { password : String, name : String }
     | ExportPasswords
     | CancelExportPassword
     | OnImportPasswords Ports.FileData

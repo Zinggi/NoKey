@@ -2,6 +2,7 @@ module Crdt.ORSet
     exposing
         ( ORSet
         , init
+        , set
         , add
         , remove
         , get
@@ -132,6 +133,31 @@ init seed =
     { seed = seed, data = Dict.empty }
 
 
+{-|
+
+    import Set
+    import Random.Pcg as Random
+
+    let
+        a = init (Random.initialSeed 0) |> add 1 |> add 42
+    in
+        get <| set (Set.fromList [42, 35]) a
+    --> Set.fromList [35, 42]
+-}
+set : Set comparable -> ORSet comparable -> ORSet comparable
+set set orSet =
+    let
+        toAdd =
+            Set.diff set (get orSet)
+
+        toRemove =
+            Set.diff (get orSet) set
+    in
+        Set.foldl add
+            (Set.foldl remove orSet toRemove)
+            toAdd
+
+
 add : comparable -> ORSet comparable -> ORSet comparable
 add e set =
     let
@@ -183,7 +209,7 @@ The order of arguments matter, e.g.
         b = init (Random.initialSeed 1) |> add 42 |> remove 42 |> add 2
     in
         merge b a |> get
-        --> Set.fromList [1, 2, 42]
+    --> Set.fromList [1, 2, 42]
 
 -}
 merge : ORSet comparable -> ORSet comparable -> ORSet comparable
