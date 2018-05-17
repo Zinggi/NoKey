@@ -23,7 +23,7 @@ More specific instructions can be found in the corresponding folders.
 
   * Grep for `TODO!`s: `rg TODO!` and resolve them
   * Find stray log statements: `rg "^([^/\n]*(console.log|Log\.[de])|[^-]*Debug.log)"` and possibly remove them
-  * Increment versions in `build.gradle`, `web/src/Data/Sync.elm` and `web_extension/manifest.json`
+  * Increment versions in `build.gradle`, `web/src/Data/Settings.elm` and `web_extension/manifest.json`
   * Go through the readmes of `web, android, web_extension`
   * Push changes to github
   * Upload the generated builds on github releases

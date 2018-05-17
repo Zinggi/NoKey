@@ -147,9 +147,9 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
             }
 
             // TODO! comment out from release
-            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+            /*override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
                 handler.proceed()
-            }
+            }*/
         }
 
         // Now we can call these functions from javascript
@@ -159,13 +159,17 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
                 activity.scanQR()
             }
 
+            @JavascriptInterface
+            fun getAndroidShellVersion() : String {
+                return activity.androidShellVersion
+            }
+
             /*@JavascriptInterface
             fun test() {
                 // communicate back to JS
                 webView.loadUrl("javascript:fromAndroid(\"lloldsds\"");
                 // new and better way:
                 webView.evaluateJavascript("(function() { return 'this'; })();", { s ->
-                    Log.d("sdsd", s) // Prints: "this"
                 })
             }*/
         }, "Android")
@@ -205,7 +209,7 @@ class WebViewHelper(private val activity: MainActivity, private val uiManager: U
     // handle load errors
     private fun handleLoadError(errorCode: Int) {
         if (errorCode != WebViewClient.ERROR_UNSUPPORTED_SCHEME) {
-            Log.e("sasas", "offline: $errorCode")
+            Log.e(this.javaClass.name, "offline: $errorCode")
             uiManager.setOffline(true)
             // TODO?
         } else {

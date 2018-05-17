@@ -125,7 +125,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
         browser.tabs.create({
             url: popupUrl+"?tab=true"
         }).then((win) => {
-            console.log("did it work?");
+            // console.log("did it work?");
         }, (err) => {
             console.error("creating window failed!", err);
         });

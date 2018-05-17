@@ -314,14 +314,9 @@ const onWindowLoad = () => {
 };
 
 
-// TODO: isolate styles:
-//  iframes:
-//      https://github.com/anderspitman/octopress-blog/blob/dbd21b2a76ea57cf4e967fd44a204c610b35325f/source/_posts/2014-08-04-chrome-extension-content-script-stylesheet-isolation.markdown
-
-
 if (document.readyState === 'complete') {
     onWindowLoad();
 } else {
-    window.onload = onWindowLoad;
+    window.addEventListener('load', onWindowLoad, false);
 }
 

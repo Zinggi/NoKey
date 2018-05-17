@@ -194,7 +194,9 @@ initModel mayState location initialSeed encryptionKey signingKey devType =
         , requirementsState = PW.init (RandomE.initialSeed base ext)
         , seed = newSeed
         , uniqueIdentifyier = uniqueIdentifyier
-        , syncData = syncData
+        , syncData =
+            syncData
+                |> Data.Sync.setDeviceType devType
         , pairingDialogue = Views.Pairing.init
         , notifications = Notifications.init
         , notificationsView = Views.Notifications.init

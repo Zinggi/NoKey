@@ -31,16 +31,19 @@ class MainActivity : Activity() {
     // TODO: Is it possible to change to "file:///android_asset/..."
     // and later, once online use that?
     // TODO! change before release
-    // val appUrl = "https://nokey.xyz/webApp"
-    // val appBaseUrl =  "https://nokey.xyz"
+    val appUrl = "https://nokey.xyz/webApp"
+    val appBaseUrl =  "https://nokey.xyz"
 
     // for this to work run the dev server with yarn dev_ssl.
     // 10.0.3.2 is from genymotion and forwards to localhost
     // val appUrl = "https://10.0.3.2:3001/main.html"
     // val appBaseUrl = "https://10.0.3.2:3001"
     // local ip, to test on device
-    val appUrl = "https://10.2.121.215:3001/main.html"
-    val appBaseUrl = "https://10.2.121.215:3001"
+    // val appUrl = "https://10.2.121.215:3001/main.html"
+    // val appBaseUrl = "https://10.2.121.215:3001"
+
+    // TODO! change shell version if android apk changes
+    val androidShellVersion: String = "0.3"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

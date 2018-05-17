@@ -135,13 +135,37 @@ type alias DeviceInfo =
 
 type DeviceType
     = Browser
-    | Android
+    | Android (Maybe String)
     | WebExtension
 
 
 isAndroid : SyncData -> Bool
 isAndroid sync =
-    sync.deviceType == Android
+    case sync.deviceType of
+        Android _ ->
+            True
+
+        _ ->
+            False
+
+
+getDeviceType : SyncData -> DeviceType
+getDeviceType sync =
+    sync.deviceType
+
+
+setDeviceType : DeviceType -> SyncData -> SyncData
+setDeviceType devT sync =
+    { sync | deviceType = devT }
+        |> updateShared
+            (\s ->
+                { s
+                    | knownIds =
+                        ORDict.update sync.id
+                            (SingleVersionRegister.update (\v -> { v | deviceType = devT }))
+                            s.knownIds
+                }
+            )
 
 
 isExtension : SyncData -> Bool
@@ -1427,15 +1451,23 @@ decodeDeviceInfo =
 
 encodeDeviceType : DeviceType -> Value
 encodeDeviceType t =
-    JE.string (toString t)
+    case t of
+        Android (Just v) ->
+            JE.object [ ( "type", JE.string "Android" ), ( "version", JE.string v ) ]
+
+        Android Nothing ->
+            JE.object [ ( "type", JE.string "Android" ) ]
+
+        other ->
+            JE.object [ ( "type", JE.string (toString t) ) ]
 
 
-deviceTypeDecoder : Decoder DeviceType
-deviceTypeDecoder =
+oldDeviceTypeDecoder : Decoder DeviceType
+oldDeviceTypeDecoder =
     JD.string
         |> JD.andThen
-            (\s ->
-                case s of
+            (\t ->
+                case t of
                     "WebExtension" ->
                         JD.succeed WebExtension
 
@@ -1443,11 +1475,35 @@ deviceTypeDecoder =
                         JD.succeed Browser
 
                     "Android" ->
-                        JD.succeed Android
+                        JD.succeed (Android Nothing)
 
                     e ->
                         JD.fail (e ++ " isn't a valid instance of DeviceType")
             )
+
+
+deviceTypeDecoder : Decoder DeviceType
+deviceTypeDecoder =
+    JD.oneOf
+        [ JD.field "type" JD.string
+            |> JD.andThen
+                (\t ->
+                    case t of
+                        "WebExtension" ->
+                            JD.succeed WebExtension
+
+                        "Browser" ->
+                            JD.succeed Browser
+
+                        "Android" ->
+                            decode Android
+                                |> optional "version" (JD.string |> JD.map Just) Nothing
+
+                        e ->
+                            JD.fail (e ++ " isn't a valid instance of DeviceType")
+                )
+        , oldDeviceTypeDecoder
+        ]
 
 
 encodeVersion : SyncData -> Value

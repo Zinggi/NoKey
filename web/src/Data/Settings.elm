@@ -62,7 +62,6 @@ type alias Settings =
 
 currentVersion =
     -- TODO!: change if a new version is released
-    -- "0.2.1"
     "0.3.0"
 
 
@@ -98,8 +97,7 @@ notSeenNews settings =
 markSeen : String -> Settings -> Settings
 markSeen s opt =
     if Set.member s allVersions then
-        Debug.log "settings"
-            { opt | seenNews = Set.insert s opt.seenNews }
+        { opt | seenNews = Set.insert s opt.seenNews }
     else
         opt
 

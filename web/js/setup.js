@@ -323,11 +323,16 @@ const setup = (startFn, onStart, onError) => {
         // e.g. more than enough for 32 character passwords.
         const rands = getRandomInts(9);
 
-        let deviceType = "Browser";
+        let deviceTypeString = "Browser";
+        let androidShellVersion = null;
         if (typeof window.Android !== 'undefined') {
-            deviceType = "Android";
+            deviceTypeString = "Android";
         } else if (runsInsideExtension()) {
-            deviceType = "WebExtension";
+            deviceTypeString = "WebExtension";
+        }
+        let deviceType = { type: deviceTypeString };
+        if (deviceTypeString === "Android" && window.Android.getAndroidShellVersion) {
+            deviceType.version = window.Android.getAndroidShellVersion();
         }
         // console.log("device type:", deviceType);
 
@@ -473,7 +478,7 @@ const setup = (startFn, onStart, onError) => {
         // make copyToClipboard work.
         setupDom(app);
 
-        if (deviceType === "Android") {
+        if (deviceTypeString === "Android") {
             setupAndroid(app);
         }
 

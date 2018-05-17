@@ -3,7 +3,7 @@ module Views.Settings exposing (view, State, Config, init, parseFileError, clear
 import Element exposing (..)
 import Elements
 import Route exposing (Page(..))
-import Data.Sync exposing (SyncData)
+import Data.Sync exposing (SyncData, DeviceType(..))
 import Data.Settings exposing (Settings, setAllowLevel1)
 import Styles
 
@@ -43,33 +43,43 @@ view config { syncData } state =
     let
         options =
             Data.Sync.getSettings syncData
+
+        deviceType =
+            Data.Sync.getDeviceType syncData
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ Elements.button (Just config.onShowTutorial) "Show Tutorial"
             , Elements.line
             , Elements.button (Just config.onShowReleaseLog) "Show release log"
             , Elements.line
-            , Elements.button (Just config.onExportPasswords) "Export Passwords"
+
+            -- Export
+            , importExportAndroidMsg deviceType
+                (Elements.button (Just config.onExportPasswords) "Export Passwords")
             , Elements.line
+
+            -- Import
             , if Data.Sync.numberOfKnownDevices syncData >= 2 then
                 column [ spacing (Styles.paddingScale 3), height shrink ]
                     [ Elements.b "Import Passwords"
-                    , column [ spacing (Styles.paddingScale 3) ] <|
-                        (if Data.Sync.isExtension syncData then
-                            [ Elements.p "File upload only works if the extension is shown in it's own tab."
-                            , Elements.button (Just config.onOpenExtensionInTab) "Open in seperate tab"
-                            ]
-                         else
-                            []
-                        )
-                            ++ [ Elements.fileUpload
-                               , case state.parseFileError of
-                                    Just e ->
-                                        Elements.p ("Error:\n" ++ e)
+                    , importExportAndroidMsg deviceType
+                        (column [ spacing (Styles.paddingScale 3) ] <|
+                            (if Data.Sync.isExtension syncData then
+                                [ Elements.p "File upload only works if the extension is shown in it's own tab."
+                                , Elements.button (Just config.onOpenExtensionInTab) "Open in seperate tab"
+                                ]
+                             else
+                                []
+                            )
+                                ++ [ Elements.fileUpload
+                                   , case state.parseFileError of
+                                        Just e ->
+                                            Elements.p ("Error:\n" ++ e)
 
-                                    Nothing ->
-                                        none
-                               ]
+                                        Nothing ->
+                                            none
+                                   ]
+                        )
                     , Elements.line
                     ]
               else
@@ -77,6 +87,15 @@ view config { syncData } state =
 
             -- Version
             , Elements.text ("Version: " ++ Data.Sync.appVersion)
+            , case deviceType of
+                Android (Just v) ->
+                    Elements.p ("Android shell version: " ++ v)
+
+                Android Nothing ->
+                    Elements.p ("Android shell version: unknown")
+
+                _ ->
+                    none
             , Elements.line
 
             -- Dangerous settings
@@ -112,6 +131,26 @@ view config { syncData } state =
                 Elements.button (Just (config.toMsg { state | showConfirmReset = True })) "Reset Device"
             , el [ height (px 30) ] none
             ]
+
+
+importExportAndroidMsg : DeviceType -> Element msg -> Element msg
+importExportAndroidMsg type_ it =
+    let
+        warn =
+            Elements.p "You need at least version 0.3 of android shell to use the import/export password feature"
+    in
+        case type_ of
+            Android (Just v) ->
+                if v >= "0.3" then
+                    it
+                else
+                    warn
+
+            Android Nothing ->
+                warn
+
+            _ ->
+                it
 
 
 allowLevel1Txt : String
