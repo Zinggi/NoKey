@@ -111,6 +111,9 @@ setup(Elm.MainBackground.fullscreen, (app) => {
         } else {
             browser.browserAction.setBadgeText({text: ""});
             browser.browserAction.setTitle({title: "NoKey"});
+            if (hasPopupOpen) {
+
+            }
         }
         previousNotificationsCount = count;
     });
@@ -129,7 +132,7 @@ setup(Elm.MainBackground.fullscreen, (app) => {
         }, (err) => {
             console.error("creating window failed!", err);
         });
-    })
+    });
 });
 
 

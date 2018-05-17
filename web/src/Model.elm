@@ -16,7 +16,7 @@ import PortUtils
 
 --
 
-import Helper exposing (withCmds)
+import Helper exposing (withCmds, andThenCmd)
 import Data exposing (GroupId, AccountId, Password, DeviceId)
 import Data.Settings exposing (Settings)
 import Data.PasswordMeta exposing (PasswordMetaData)
@@ -242,6 +242,15 @@ updateNotifications f model =
     in
         { model | notifications = newNot }
             |> withCmds [ Ports.notificationCount (Notifications.count newNot) ]
+            |> andThenCmd closePopup
+
+
+closePopup : Model -> Cmd Msg
+closePopup model =
+    if Notifications.count model.notifications <= 0 then
+        Ports.closePopup ()
+    else
+        Cmd.none
 
 
 updateProtocol : (Protocol.State -> Protocol.State) -> Model -> Model

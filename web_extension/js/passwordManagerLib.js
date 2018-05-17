@@ -12,9 +12,11 @@
 
 const loginInputTypes = ['text', 'email', 'tel'];
 const config_passwordInputNames = ['passwd','password','pass'];
-const config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name'];
+const config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name', 'benutzer'];
 const config_buttonSignUpNames = ['signup', 'sign up', 'register', 'create', 'join'];
 const config_buttonLogInNames = ['login', 'log in'];
+
+
 
 //--------------------------------------------------------------------------------
 
@@ -148,16 +150,28 @@ const isSignUpGroup = (group) => {
 
 
 const classifyGroups = (groups) => {
+    let newGroups = [];
     for (let i = 0; i < groups.forms.length; i++) {
-        groups[i].mainLogin = groups[i].logins[0];
-        groups[i].mainPw = groups[i].pws[0];
+        let g = {
+            login: groups[i].logins[0],
+            password: groups[i].pws[0],
+            form: groups.forms[i]
+        };
+        if (!(g.login && g.password)) {
+            continue;
+        }
 
         const [isSignUp, submitButtons] = isSignUpGroup(groups[i]);
-        groups[i].isSignUp = isSignUp;
-        groups[i].submitButtons = submitButtons;
+        g.isSignUp = isSignUp;
+        g.submitButtons = submitButtons;
+        // groups[i].isSignUp = isSignUp;
+        // groups[i].submitButtons = submitButtons;
+        newGroups.push(g);
     }
-    delete groups.forms;
-    return groups;
+    // delete groups.forms;
+
+    console.log("newGroups", newGroups);
+    return newGroups;
 };
 
 
@@ -177,6 +191,8 @@ const getPasswordInputs = () => {
  * Given a form element, returns all buttons inside the form that appear to act as a submit button.
  * Returns [Bool isSignUp, Array buttons] | null
  *
+ * TODO: If we aren't sure what it is yet, try to find the closeset title to
+ *          check if it says something with sign up or login.
  * TODO: I probably should rename this, e.g. classify form
  */
 const getSubmitButtons = (form) => {
@@ -236,20 +252,19 @@ const getSubmitButtons = (form) => {
 /*
  * finds all login and sign in forms of the page and classifies them
  *
- * returns {
+ * returns [{
  *  isSignUp: Bool,
  *  submitButtons: Array DomElement,
- *  mainLogin: DomElement,
- *  mainPw: DomElement,
+ *  login: DomElement,
+ *  password: DomElement,
  *  form: DomElement,
- *  logins: Array DomElement,
- *  pws: Array DomElement
- * }
+ * }]
  */
 const classifyForms = () => {
     const logins = getLoginInputs();
     const pws = getPasswordInputs();
     const forms = findForms(logins, pws);
+    // console.log("logins, pws, forms", logins, pws, forms);
     return classifyGroups(forms);
 };
 

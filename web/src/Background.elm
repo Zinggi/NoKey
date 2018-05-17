@@ -475,14 +475,6 @@ getToken model =
         |> Api.initPairing model.uniqueIdentifyier
 
 
-closePopup : Model -> Cmd Msg
-closePopup model =
-    if Notifications.count model.notifications <= 0 then
-        Ports.closePopup ()
-    else
-        Cmd.none
-
-
 saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )
 saveEntry groupId entry model =
     let

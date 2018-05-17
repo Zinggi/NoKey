@@ -11,6 +11,37 @@ const sendSize = (id) => () => {
     window.parent.postMessage({ type: "onSizeChanged", data: { height: height, width: width, id: id } }, "*");
 };
 
+const createCloseButton = (div) => {
+    const c = document.createElement("div");
+    c.style.position = "absolute";
+    c.style.top = "0px";
+    c.style.right = "0px";
+    c.style.background = "#ff00001a none repeat scroll 0% 0%;";
+    c.style.zIndex = "99";
+    c.style.width = "32px";
+    c.style.height = "24px";
+    c.style.fontSize = "20px";
+    c.style.textAlign = "center";
+    c.style.borderRadius = "3px";
+    c.style.border = "#2400004d";
+    c.style.borderWidth = "1px";
+    c.style.borderStyle = "solid";
+    c.style.padding = "1px";
+    c.style.margin = "4px";
+    c.style.cursor = "pointer";
+
+
+    c.setAttribute("role", "button");
+    c.setAttribute("title", "Close popup and keep it closed for 20 seconds.")
+    c.addEventListener("click", () => {
+        window.parent.postMessage({ type: "onCloseClicked" }, "*");
+    });
+
+    const x = document.createTextNode("X");
+    c.appendChild(x);
+    div.parentElement.appendChild(c);
+};
+
 const setupElm = (id) => {
     const port = browser.runtime.connect({name: window.location.href + Math.random() });
 
@@ -31,6 +62,8 @@ const setupElm = (id) => {
     div.style.position = "absolute";
     div.style.minWidth = "300px";
     document.body.appendChild(div);
+
+    createCloseButton(div);
 
     return [port, div];
 };

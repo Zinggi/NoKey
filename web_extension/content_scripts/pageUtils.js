@@ -80,8 +80,8 @@ const injectIcon = (isPw, isSignUp, accounts, groupKey) => {
 
 const getFormData = (group) => {
     // TODO: extract all login values, not just one
-    const login = group.mainLogin.value;
-    const pw = group.mainPw.value;
+    const login = group.login.value;
+    const pw = group.password.value;
     return { password: pw, login: login, site: getCurrentSite(), securityLevel: 2 };
 };
 
@@ -89,7 +89,7 @@ const onNodeAdded = (accounts) => () => {
     // console.log("onNodeAdded");
 
     groups = pwLib.classifyForms();
-    // console.log("groups:", groups); // TODO: comment out
+    // console.log("groups:", groups);
 
     const hijackedOnSubmit = (group) => (event) => {
         const entry = getFormData(group);
@@ -107,8 +107,8 @@ const onNodeAdded = (accounts) => () => {
 
         // console.log("group", group);
 
-        group.logins.forEach(injectIcon(false, group.isSignUp, accounts, key));
-        group.pws.forEach(injectIcon(true, group.isSignUp, accounts, key));
+        injectIcon(false, group.isSignUp, accounts, key)(group.login);
+        injectIcon(true, group.isSignUp, accounts, key)(group.password);
 
         group.form.addEventListener('submit', hijackedOnSubmit(group), false);
         for (const b of group.submitButtons) {
@@ -119,6 +119,7 @@ const onNodeAdded = (accounts) => () => {
 };
 
 let popupLoaded = false;
+let popupDisabled = false;
 let popupContainer = null;
 let actionOutsidePopup = null;
 let currentInput = null;
@@ -158,8 +159,23 @@ const closePopup = () => {
     actionOutsidePopup.listen(false);
 };
 
+const closePopupFor = (time) => {
+    // TODO!
+    closePopup();
+    disablePopup();
+    setTimeout(() => { enablePopup(); }, time);
+};
+
+const disablePopup = () => {
+    popupDisabled = true;
+};
+const enablePopup = () => {
+    popupDisabled = false;
+};
+
+
 const openPopup = (elem, isPw, isSignUp, accounts) => {
-    if (!popupLoaded) return;
+    if (!popupLoaded || popupDisabled) return;
 
     // Don't allow to immediately close again:
     setTimeout(() => { actionOutsidePopup.listen(true); }, 1000);
@@ -295,6 +311,8 @@ const onWindowLoad = () => {
                 } else if (msg.type === "onSizeChanged") {
                     // console.log("on size change", msg);
                     adjustPopupSize(msg.data);
+                } else if (msg.type === "onCloseClicked") {
+                    closePopupFor(1000*20);
                 } else {
                     console.error("msg type not recognised", msg);
                 }
