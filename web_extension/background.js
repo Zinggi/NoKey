@@ -82,7 +82,8 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             // this is the tooltip
             browser.browserAction.setTitle({title: "NoKey: User interaction required"});
 
-            if (hasPopupOpen || count == previousNotificationsCount ) {
+            if (hasPopupOpen || count <= previousNotificationsCount ) {
+                previousNotificationsCount = count;
                 return;
             }
             hasPopupOpen = true;
