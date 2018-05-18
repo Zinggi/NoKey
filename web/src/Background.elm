@@ -5,6 +5,7 @@ import Navigation exposing (Location)
 import Toasty
 import Time
 import Timer
+import Set
 
 
 --
@@ -198,6 +199,15 @@ update msg model =
                 |> updateNotifications (Notifications.remove id)
                 |> andThenCmd closePopup
 
+        DeactivateForSite id site ->
+            { model | syncData = Data.Sync.deactivateForSite site model.syncData }
+                |> updateNotifications (Notifications.remove id)
+                |> andThenUpdate Api.syncToOthers
+
+        RemoveFromIgnored site ->
+            { model | syncData = Data.Sync.removeFromIgnored site model.syncData }
+                |> Api.syncToOthers
+
         SiteNameChanged s ->
             { model
                 | newSiteEntry = (\e -> { e | siteName = s }) model.newSiteEntry
@@ -329,8 +339,12 @@ update msg model =
             else if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
             else
-                -- add new password entry
-                model |> updateNotifications (Notifications.newSiteEntry entry True)
+                (-- add new password entry, but only if we don't ignore the current site
+                 if Set.member entry.site (Data.Sync.getSettings model.syncData).deactivateForSite then
+                    model |> noCmd
+                 else
+                    model |> updateNotifications (Notifications.newSiteEntry entry True)
+                )
 
         SetSettings settings ->
             setSettings settings model

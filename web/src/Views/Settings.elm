@@ -1,7 +1,8 @@
-module Views.Settings exposing (view, State, Config, init, parseFileError, clear)
+module Views.Settings exposing (view, State, Config, init, parseFileError, clear, viewIgnoredSites)
 
 import Element exposing (..)
 import Elements
+import Set
 import Route exposing (Page(..))
 import Data.Sync exposing (SyncData, DeviceType(..))
 import Data.Settings exposing (Settings, setAllowLevel1)
@@ -35,6 +36,8 @@ type alias Config msg =
     , onReset : msg
     , onExportPasswords : msg
     , onOpenExtensionInTab : msg
+    , onShowDeactivatedSites : msg
+    , onRemoveFromIgnored : String -> msg
     }
 
 
@@ -46,6 +49,9 @@ view config { syncData } state =
 
         deviceType =
             Data.Sync.getDeviceType syncData
+
+        col =
+            column [ spacing (Styles.paddingScale 3), height shrink ]
     in
         column [ spacing (Styles.paddingScale 3) ]
             [ Elements.button (Just config.onShowTutorial) "Show Tutorial"
@@ -60,10 +66,10 @@ view config { syncData } state =
 
             -- Import
             , if Data.Sync.numberOfKnownDevices syncData >= 2 then
-                column [ spacing (Styles.paddingScale 3), height shrink ]
+                col
                     [ Elements.b "Import Passwords"
                     , importExportAndroidMsg deviceType
-                        (column [ spacing (Styles.paddingScale 3) ] <|
+                        (col <|
                             (if Data.Sync.isExtension syncData then
                                 [ Elements.p "File upload only works if the extension is shown in it's own tab."
                                 , Elements.button (Just config.onOpenExtensionInTab) "Open in seperate tab"
@@ -84,6 +90,16 @@ view config { syncData } state =
                     ]
               else
                 none
+
+            -- DeactivateForSite
+            , if Set.isEmpty options.deactivateForSite then
+                none
+              else
+                col
+                    [ Elements.b "Deactivate NoKey for"
+                    , Elements.button (Just (config.onShowDeactivatedSites)) "Edit sites"
+                    , Elements.line
+                    ]
 
             -- Version
             , Elements.text ("Version: " ++ Data.Sync.appVersion)
@@ -130,6 +146,29 @@ view config { syncData } state =
               else
                 Elements.button (Just (config.toMsg { state | showConfirmReset = True })) "Reset Device"
             , el [ height (px 30) ] none
+            ]
+
+
+viewIgnoredSites : Config msg -> { m | syncData : SyncData } -> Element msg
+viewIgnoredSites config { syncData } =
+    let
+        ignoredSites =
+            Data.Sync.getSettings syncData
+                |> .deactivateForSite
+                |> Set.toList
+    in
+        column [ spacing (Styles.paddingScale 3) ]
+            [ Elements.b "NoKey is deactivated for these sites:"
+            , column [ spacing (Styles.paddingScale 3) ]
+                (List.map
+                    (\site ->
+                        Elements.paragraph [ spacing (Styles.paddingScale 1) ]
+                            [ Elements.text site
+                            , el [ width shrink, alignLeft ] <| Elements.button (Just (config.onRemoveFromIgnored site)) "Reactivate"
+                            ]
+                    )
+                    ignoredSites
+                )
             ]
 
 

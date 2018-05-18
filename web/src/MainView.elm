@@ -276,6 +276,9 @@ viewPage page model =
         ReleaseLog s ->
             Views.ReleaseLog.view s
 
+        DeactivatedForSites ->
+            Views.Settings.viewIgnoredSites settingsConfig model
+
 
 
 -- keyBoxConfig : Views.CreateKeyBox.Config Msg
@@ -303,6 +306,8 @@ settingsConfig =
     , onExportPasswords = ExportPasswords
     , onOpenExtensionInTab = OpenExtensionInTab
     , onShowReleaseLog = NavigateTo (ReleaseLog "")
+    , onShowDeactivatedSites = NavigateTo DeactivatedForSites
+    , onRemoveFromIgnored = RemoveFromIgnored
     }
 
 
@@ -333,5 +338,6 @@ notificationsConfig =
     , onGrantRequest = GrantShareRequest
     , onDismiss = DismissNotification
     , onSaveEntry = SaveEntry
+    , onDeactivateForSite = DeactivateForSite
     , toMsg = UpdateNotifications
     }

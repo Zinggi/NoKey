@@ -183,6 +183,16 @@ setSettings time settings sync =
     updateShared (\s -> { s | settings = Data.Settings.set sync.id time settings s.settings }) sync
 
 
+deactivateForSite : String -> SyncData -> SyncData
+deactivateForSite site sync =
+    updateShared (\s -> { s | settings = Data.Settings.deactivateForSite site s.settings }) sync
+
+
+removeFromIgnored : String -> SyncData -> SyncData
+removeFromIgnored site sync =
+    updateShared (\s -> { s | settings = Data.Settings.removeFromIgnored site s.settings }) sync
+
+
 sharesToDistribute : SyncData -> Dict GroupId (Dict DeviceId Value)
 sharesToDistribute sync =
     ORDict.getWith TimestampedVersionRegister.get sync.shared.sharesToDistribute

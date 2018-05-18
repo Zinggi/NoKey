@@ -4,6 +4,7 @@ module Data.Settings
         , SharedSettings
         , encode
         , decoder
+        , removeFromIgnored
         , init
         , currentVersion
         , allVersions
@@ -14,6 +15,7 @@ module Data.Settings
         , merge
         , get
         , set
+        , deactivateForSite
         , setDoneWithTutorial
         )
 
@@ -49,6 +51,7 @@ type alias SharedSettings =
     , timeUntilAutoLock : Maybe (TimestampedVersionRegister Time)
     , hasSeenTutorial : Bool
     , seenNews : ORSet String
+    , deactivateForSite : ORSet String
     }
 
 
@@ -57,6 +60,7 @@ type alias Settings =
     , timeUntilAutoLock : Time
     , hasSeenTutorial : Bool
     , seenNews : Set String
+    , deactivateForSite : Set String
     }
 
 
@@ -76,6 +80,7 @@ get shared =
     , timeUntilAutoLock = getMaybe .timeUntilAutoLock .timeUntilAutoLock shared
     , hasSeenTutorial = shared.hasSeenTutorial
     , seenNews = ORSet.get shared.seenNews
+    , deactivateForSite = ORSet.get shared.deactivateForSite
     }
 
 
@@ -85,7 +90,18 @@ set id time settings shared =
     , timeUntilAutoLock = setMaybe id time .timeUntilAutoLock .timeUntilAutoLock settings shared
     , hasSeenTutorial = settings.hasSeenTutorial
     , seenNews = ORSet.set settings.seenNews shared.seenNews
+    , deactivateForSite = ORSet.set settings.deactivateForSite shared.deactivateForSite
     }
+
+
+deactivateForSite : String -> SharedSettings -> SharedSettings
+deactivateForSite site opt =
+    { opt | deactivateForSite = ORSet.add site opt.deactivateForSite }
+
+
+removeFromIgnored : String -> SharedSettings -> SharedSettings
+removeFromIgnored site opt =
+    { opt | deactivateForSite = ORSet.remove site opt.deactivateForSite }
 
 
 notSeenNews : Settings -> List String
@@ -156,6 +172,7 @@ init seed =
     , timeUntilAutoLock = Nothing
     , hasSeenTutorial = False
     , seenNews = ORSet.init seed
+    , deactivateForSite = ORSet.init seed
     }
 
 
@@ -180,12 +197,18 @@ merge other my =
     , timeUntilAutoLock = mergeMaybe other.timeUntilAutoLock my.timeUntilAutoLock
     , hasSeenTutorial = other.hasSeenTutorial || my.hasSeenTutorial
     , seenNews = ORSet.merge other.seenNews my.seenNews
+    , deactivateForSite = ORSet.merge other.deactivateForSite my.deactivateForSite
     }
 
 
 defaults : Settings
 defaults =
-    { allowLevel1 = False, timeUntilAutoLock = 10 * Time.minute, hasSeenTutorial = False, seenNews = Set.empty }
+    { allowLevel1 = False
+    , timeUntilAutoLock = 10 * Time.minute
+    , hasSeenTutorial = False
+    , seenNews = Set.empty
+    , deactivateForSite = Set.empty
+    }
 
 
 maybeEncode : String -> (a -> Value) -> Maybe a -> List ( String, Value )
@@ -206,14 +229,24 @@ encode opt =
             , maybeEncode "timeUntilAutoLock" (TimestampedVersionRegister.encode JE.float) opt.timeUntilAutoLock
             , [ ( "hasSeenTutorial", JE.bool opt.hasSeenTutorial )
               , ( "seenNews", ORSet.encode opt.seenNews )
+              , ( "deactivateForSite", ORSet.encode opt.deactivateForSite )
               ]
             ]
 
 
 decoder : Seed -> Decoder SharedSettings
 decoder seed =
-    JD.decode (\al1 t ht sn -> { allowLevel1 = al1, timeUntilAutoLock = t, hasSeenTutorial = ht, seenNews = sn })
+    JD.decode
+        (\al1 t ht sn dfs ->
+            { allowLevel1 = al1
+            , timeUntilAutoLock = t
+            , hasSeenTutorial = ht
+            , seenNews = sn
+            , deactivateForSite = dfs
+            }
+        )
         |> optional "allowLevel1" (TimestampedVersionRegister.decoder JD.bool |> JD.map Just) Nothing
         |> optional "timeUntilAutoLock" (TimestampedVersionRegister.decoder JD.float |> JD.map Just) Nothing
         |> optional "hasSeenTutorial" JD.bool False
         |> optional "seenNews" (ORSet.decoder seed) (ORSet.init seed)
+        |> optional "deactivateForSite" (ORSet.decoder seed) (ORSet.init seed)

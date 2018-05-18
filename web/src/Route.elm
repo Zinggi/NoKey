@@ -16,6 +16,7 @@ type Page
     | Tutorial
       -- | CreateKeyBox
     | ReleaseLog String
+    | DeactivatedForSites
 
 
 route : Parser (Page -> a) a
@@ -32,6 +33,7 @@ route =
         , Url.map NewPassword (s "newpassword")
         , Url.map ReleaseLog (s "releaselog" </> string)
         , Url.map (ReleaseLog "") (s "releaselog")
+        , Url.map DeactivatedForSites (s "deactivatedforsites")
         ]
 
 
@@ -76,6 +78,9 @@ hasBackButton page =
         ReleaseLog _ ->
             True
 
+        DeactivatedForSites ->
+            True
+
         _ ->
             False
 
@@ -94,6 +99,9 @@ pageToTitle page =
 
         Passwords ->
             "Vault"
+
+        DeactivatedForSites ->
+            "Ignored Sites"
 
         -- CreateKeyBox ->
         --     "Create Key Box"

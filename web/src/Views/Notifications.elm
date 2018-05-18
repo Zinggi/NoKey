@@ -17,6 +17,7 @@ type alias Config msg =
     , onGrantRequest : Id -> ShareRequest -> msg
     , onDismiss : Id -> msg
     , onSaveEntry : Id -> String -> SiteEntry -> msg
+    , onDeactivateForSite : Id -> String -> msg
     , toMsg : State -> msg
     }
 
@@ -91,6 +92,7 @@ viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n ( secLevel, should
                         )
                         "Save"
                     , Elements.button (Just (config.onDismiss n.id)) "Forget"
+                    , Elements.button (Just (config.onDeactivateForSite n.id entry.site)) "Deactivate NoKey for this site"
                     ]
                 ]
         )

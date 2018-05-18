@@ -67,6 +67,8 @@ type Msg
     | SaveEntry Notifications.Id String SiteEntry
     | UpdatePassword GroupId AccountId String
     | DismissNotification Notifications.Id
+    | DeactivateForSite Notifications.Id String
+    | RemoveFromIgnored String
     | FillForm AccountId
     | ProtocolMsg Protocol.Msg
     | ReceiveMyShares (List ( GroupId, Value ))
