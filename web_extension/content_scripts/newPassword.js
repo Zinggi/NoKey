@@ -15,7 +15,7 @@ const main = () => {
     app.ports.onAcceptPw.subscribe((pw) => {
         // console.log("On accept: ", pw);
         window.parent.postMessage({ type: "closePopup" }, "*");
-        window.parent.postMessage({ type: "fillCurrentInput", data: pw }, "*");
+        window.parent.postMessage({ type: "fillPassword", data: pw }, "*");
     });
 };
 

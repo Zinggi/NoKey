@@ -49,6 +49,7 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": ["dist/webextensionPolyfill.js", "content/bundle.js"],
+      "run_at": "document_end",
       "all_frames": true
     }
   ],

@@ -91,13 +91,6 @@ const onNodeAdded = (accounts) => () => {
     groups = pwLib.classifyForms();
     // console.log("groups:", groups);
 
-    const hijackedOnSubmit = (group) => (event) => {
-        const entry = getFormData(group);
-        const data = { entry: entry, isSignUp: group.isSignUp };
-        postMsg({ type: "didSubmit", data: data });
-    };
-
-
     for (const key in groups) {
         const group = groups[key];
 
@@ -109,12 +102,6 @@ const onNodeAdded = (accounts) => () => {
 
         injectIcon(false, group.isSignUp, accounts, key)(group.login);
         injectIcon(true, group.isSignUp, accounts, key)(group.password);
-
-        group.form.addEventListener('submit', hijackedOnSubmit(group), false);
-        for (const b of group.submitButtons) {
-            b.addEventListener('click', hijackedOnSubmit(group), false);
-        }
-        // TODO: what if we press enter inside the form?
     }
 };
 
@@ -131,6 +118,15 @@ const fillCurrentInput = (content) => {
     if (!currentInput) return;
 
     fillInput(content, currentInput);
+};
+
+const fillPassword = (pw) => {
+    if (!groups || !currentGroup) {
+        fillCurrentInput(pw);
+    } else {
+        const group = groups[currentGroup];
+        group.pws.forEach((elem) => { fillInput(pw, elem); });
+    }
 };
 
 const fillInput = (txt, elem) => {
@@ -152,6 +148,15 @@ const fillCurrentForm = (msg) => {
     group.pws.forEach((elem) => { fillInput(msg.password, elem); });
     group.logins.forEach((elem) => { fillInput(msg.login, elem); });
 };
+
+const saveEnteredForm = () => {
+    if (!groups || !currentGroup) return;
+    const group = groups[currentGroup];
+    const entry = getFormData(group);
+    const data = { entry: entry, isSignUp: group.isSignUp };
+    postMsg({ type: "didSubmit", data: data });
+};
+
 
 const closePopup = () => {
     popupContainer.style.display = 'none';
@@ -306,8 +311,8 @@ const onWindowLoad = () => {
                 // console.log("msg from iframe:", msg);
                 if (msg.type === "closePopup") {
                     closePopup();
-                } else if (msg.type === "fillCurrentInput") {
-                    fillCurrentInput(msg.data);
+                } else if (msg.type === "fillPassword") {
+                    fillPassword(msg.data);
                 } else if (msg.type === "onSizeChanged") {
                     // console.log("on size change", msg);
                     adjustPopupSize(msg.data);
@@ -337,4 +342,8 @@ if (document.readyState === 'complete') {
 } else {
     window.addEventListener('load', onWindowLoad, false);
 }
+window.addEventListener('beforeunload', () => {
+    saveEnteredForm();
+}, false);
+
 

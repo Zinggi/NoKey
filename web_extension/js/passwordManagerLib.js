@@ -13,7 +13,7 @@
 const loginInputTypes = ['text', 'email', 'tel'];
 const config_passwordInputNames = ['passwd','password','pass'];
 const config_loginInputNames = ['login','user','mail','email','username','opt_login','log','usr_name', 'benutzer'];
-const config_buttonSignUpNames = ['signup', 'sign up', 'register', 'create', 'join'];
+const config_buttonSignUpNames = ['signup', 'sign up', 'register', 'create', 'join', 'get started'];
 const config_buttonLogInNames = ['login', 'log in'];
 
 
@@ -44,6 +44,16 @@ const boolWithConfidence = (bool, confidence) => {
 const getBool = (bWithConfidence) => {
     return bWithConfidence[0];
 };
+const moreLikelyBool = (b1, b2) => {
+    if (b1[1] > b2[1]) {
+        return b1;
+    } else if (b1[1] < b2[1]) {
+        return b2;
+    } else {
+        // same, so lets bias towards the first argument
+        return b1;
+    }
+};
 
 
 //--------------------------------------------------------------------------------
@@ -60,7 +70,7 @@ const hasGoodName = (fieldNames, goodFieldNames) => {
             return boolWithConfidence(true, i);
         }
     }
-    return boolWithConfidence(false, -1);
+    return boolWithConfidence(false, 10);
 };
 
 const isPasswordInput = (input) => {
@@ -89,7 +99,23 @@ const isLogInButton = (button) => {
 };
 
 const isSignUpForm = (form) => {
-    return hasGoodName(readFormNames(form), config_buttonSignUpNames);
+    // if it has two password fields, it's a sign up.
+    const allPasswordInputs = form.querySelectorAll('input[type="password"]');
+    if (allPasswordInputs.length === 2) {
+        return boolWithConfidence(true, -1);
+    }
+
+    // Sign up forms usually contain more fields than sign in pages.
+    // if it has multiple fields, it might be a sign up field, but we aren't too certain
+    let isSign = boolWithConfidence(false, 100);
+    if (form.elements.length > 2) {
+        isSign = boolWithConfidence(true, 9);
+    } else if (form.elements.length > 3) {
+        isSign = boolWithConfidence(true, 2);
+    }
+    const otherGuess = hasGoodName(readFormNames(form), config_buttonSignUpNames);
+
+    return moreLikelyBool(otherGuess, isSign);
 };
 
 //--------------------------------------------------------------------------------
@@ -133,9 +159,9 @@ const isSignUpGroup = (group) => {
     if (group.mainPw) {
         const auto = group.mainPw.getAttribute("autocomplete");
         // console.log("auto", auto, "pw", group.mainPw);
-        if (auto === "new-password") {
+        if (auto.indexOf("new-password") !== -1) {
             return [true, submitButtons];
-        } else if (auto === "current-password") {
+        } else if (auto.indexOf("current-password") !== -1) {
             return [false, submitButtons];
         }
     }
@@ -155,7 +181,9 @@ const classifyGroups = (groups) => {
         let g = {
             login: groups[i].logins[0],
             password: groups[i].pws[0],
-            form: groups.forms[i]
+            form: groups.forms[i],
+            pws: groups[i].pws,
+            logins: groups[i].logins
         };
         if (!(g.login && g.password)) {
             continue;
