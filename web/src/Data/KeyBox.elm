@@ -1,4 +1,19 @@
-module Data.KeyBox exposing (KeyBoxId, KeyBox, KeyBoxes, init, merge, decoder, encode)
+module Data.KeyBox
+    exposing
+        ( KeyBoxId
+        , KeyBox
+        , Box
+        , KeyBoxes
+        , init
+        , merge
+        , decoder
+        , encode
+        , isNameTaken
+        , createBox
+        , mapBoxes
+        , openBox
+        , closeBox
+        )
 
 import Time exposing (Time)
 import Random.Pcg as Random exposing (Seed)
@@ -7,7 +22,7 @@ import Json.Decode.Extra as JD
 import Json.Decode.Pipeline exposing (decode, required, optional)
 import Json.Encode as JE exposing (Value)
 import Json.Encode.Extra as JE
-import Set
+import Set exposing (Set)
 import Dict exposing (Dict)
 import Crdt.ORDict as ORDict exposing (ORDict)
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
@@ -19,14 +34,10 @@ import AES
 
 -- TODO:
 --  Make use of those functions + ports for web crypto
--- Static:
---      Verify a password - ok
---
--- Stateful:
---      Create a new box (boxes are created in the 'open' state) - ok
+--      Create a new box (boxes are created in the 'open' state) - ok -> used
 --      Add a share (shares are only added if the box is open) - ok
---      Open a box - ok
---      Close a box - ok
+--      Open a box - ok -> used
+--      Close a box - ok -> used
 --      Close all boxes - ok
 --      Get a share (only works if the box is open) - ok
 --      Get shares - ok
@@ -79,9 +90,32 @@ type alias KeyBox =
     }
 
 
+type alias Box =
+    { name : String, salt : String, hashSalt : String, id : KeyBoxId, hasShares : List GroupId }
+
+
 init : Seed -> KeyBoxes
 init seed =
     { data = ORDict.init seed, seed = seed, openBoxes = Dict.empty }
+
+
+keyBoxToBox id { name, salt, hashSalt, encryptedShares } =
+    { id = id
+    , name = TimestampedVersionRegister.get name
+    , salt = salt
+    , hashSalt = hashSalt
+    , hasShares = ORDict.keys encryptedShares |> Set.toList
+    }
+
+
+mapBoxes : (Box -> Bool -> b) -> KeyBoxes -> List b
+mapBoxes fn boxes =
+    ORDict.get boxes.data
+        |> Dict.foldl
+            (\id box acc ->
+                fn (keyBoxToBox id box) (Dict.member id boxes.openBoxes) :: acc
+            )
+            []
 
 
 isKeyCorrect : KeyBoxId -> String -> KeyBoxes -> Bool
@@ -91,6 +125,16 @@ isKeyCorrect id passwordHash boxes =
             box.passwordHash == passwordHash
 
         Nothing ->
+            False
+
+
+isNameTaken : String -> KeyBoxes -> Bool
+isNameTaken name boxes =
+    ORDict.get boxes.data
+        |> Dict.foldl
+            (\id box isTaken ->
+                TimestampedVersionRegister.get box.name == name || isTaken
+            )
             False
 
 

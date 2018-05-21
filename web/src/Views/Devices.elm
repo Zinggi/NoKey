@@ -1,21 +1,50 @@
-module Views.Devices exposing (view, actionButton, Config, State, init)
+module Views.Devices exposing (view, actionButton, Config, State, init, clear, wrongPassword, closeBox)
 
 import Dict exposing (Dict)
 import Element exposing (..)
 import Elements
 import Styles
 import Data.Sync exposing (SyncData)
+import Data.KeyBox exposing (KeyBoxId, Box)
 import Route exposing (Page(..))
 import Icons
 
 
 type alias State =
-    { confirmDelete : Maybe String, isActionButtonOpen : Bool }
+    { confirmDelete : Maybe String, isActionButtonOpen : Bool, selectedBox : Maybe BoxState }
 
 
 init : State
 init =
-    { confirmDelete = Nothing, isActionButtonOpen = False }
+    { confirmDelete = Nothing, isActionButtonOpen = False, selectedBox = Nothing }
+
+
+clear : State -> State
+clear state =
+    init
+
+
+type alias BoxState =
+    { id : KeyBoxId, pw : String, error : Maybe String }
+
+
+initBox : KeyBoxId -> BoxState
+initBox id =
+    { id = id, pw = "", error = Nothing }
+
+
+setPw : String -> Maybe BoxState -> Maybe BoxState
+setPw pw =
+    Maybe.map (\b -> { b | pw = pw })
+
+
+closeBox state =
+    { state | selectedBox = Nothing }
+
+
+wrongPassword : String -> State -> State
+wrongPassword err state =
+    { state | selectedBox = Maybe.map (\b -> { b | error = Just err }) state.selectedBox }
 
 
 type alias Config msg =
@@ -23,8 +52,9 @@ type alias Config msg =
     , onSetDeviceName : String -> msg
     , onGoToPairing : msg
     , onRemoveDevice : String -> msg
-
-    -- , onCreateKeyBox : msg
+    , onCreateKeyBox : msg
+    , onOpenBox : Box -> String -> msg
+    , onCloseBox : KeyBoxId -> msg
     }
 
 
@@ -37,30 +67,91 @@ view config { syncData, uniqueIdentifyier } state =
         column [ spacing (Styles.paddingScale 1) ]
             (Elements.myAvatar config.onSetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
                 :: devicesMap (viewDeviceEntry config syncData state myId) knownIds
+                ++ viewKeyBoxes config syncData state
                 ++ [ el [ height (px 30) ] none ]
             )
 
 
 actionButton : Config msg -> State -> Element msg
 actionButton config state =
-    -- TODO:
-    -- if state.isActionButtonOpen then
-    --     column [ spacing (Styles.paddingScale 3) ]
-    --         [ Elements.floatingButton [ alignRight ] config.onCreateKeyBox "Create key box"
-    --         , Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
-    --         , Elements.floatingIconButton [ alignRight ] (config.toMsg { state | isActionButtonOpen = False }) Icons.close
-    --         ]
-    -- else
-    --     Elements.floatingIconButton [] (config.toMsg { state | isActionButtonOpen = True }) Icons.more
-    Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
+    -- Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
+    if state.isActionButtonOpen then
+        column [ spacing (Styles.paddingScale 3) ]
+            [ Elements.floatingButton [ alignRight ] config.onCreateKeyBox "Create key box"
+            , Elements.floatingButton [ alignRight ] config.onGoToPairing "Pair new device"
+            , Elements.floatingIconButton [ alignRight ] (config.toMsg { state | isActionButtonOpen = False }) Icons.close
+            ]
+    else
+        Elements.floatingIconButton [] (config.toMsg { state | isActionButtonOpen = True }) Icons.more
 
 
-{-| TODO: fix input lag on input fields. Workaround:
+viewKeyBoxes : Config msg -> SyncData -> State -> List (Element msg)
+viewKeyBoxes config syncData state =
+    let
+        boxes =
+            Data.Sync.getKeyBoxes syncData
 
-    https://github.com/elm-lang/html/issues/105#issuecomment-309524197
-    https://ellie-app.com/3fPSxX6VHK7a1/0
+        bs =
+            Data.KeyBox.mapBoxes
+                (\box isOpen ->
+                    column [ height shrink ]
+                        [ Elements.keyBox
+                            (config.toMsg { state | selectedBox = Just (initBox box.id) })
+                            (config.onCloseBox box.id)
+                            box.id
+                            box.name
+                            isOpen
+                        , if not isOpen then
+                            case state.selectedBox of
+                                Just b ->
+                                    if b.id == box.id then
+                                        column []
+                                            [ Elements.newPasswordInput []
+                                                (Just (\p -> config.toMsg { state | selectedBox = setPw p state.selectedBox }))
+                                                { label = "Password", placeholder = "" }
+                                                b.pw
+                                            , case b.error of
+                                                Just err ->
+                                                    Elements.text "Wrong password"
 
--}
+                                                Nothing ->
+                                                    none
+                                            , Elements.buttonRow []
+                                                [ Elements.button (Just (config.toMsg { state | selectedBox = Nothing })) "Cancel"
+                                                , if String.length b.pw >= 8 then
+                                                    Elements.primaryButton (Just (config.onOpenBox box b.pw)) "Open"
+                                                  else
+                                                    none
+                                                ]
+                                            ]
+                                    else
+                                        none
+
+                                Nothing ->
+                                    none
+                          else
+                            let
+                                gs =
+                                    Elements.groupIcons syncData box.hasShares
+                            in
+                                Elements.paragraph []
+                                    (if List.isEmpty gs then
+                                        [ Elements.text "No Keys in here yet." ]
+                                     else
+                                        [ Elements.text "Has keys for "
+                                        , row [] gs
+                                        ]
+                                    )
+                        ]
+                )
+                boxes
+    in
+        if List.isEmpty bs then
+            []
+        else
+            el [ paddingXY 0 (Styles.paddingScale 4) ] (Elements.h3 "Key Boxes") :: bs
+
+
 viewDeviceEntry : Config msg -> SyncData -> State -> String -> String -> ( String, String ) -> Element msg
 viewDeviceEntry config sync state myId uuid ( name, idPart ) =
     if myId == uuid then
@@ -82,10 +173,6 @@ viewDeviceEntry config sync state myId uuid ( name, idPart ) =
                     column [ spacing (Styles.paddingScale 1) ]
                         [ Elements.b "Are you sure?"
                         , Elements.p "Do you really want to remove this device?"
-
-                        -- TODO: this is not true, as when a device gets removed, we delete all its shares.
-                        -- Should we keep them?
-                        -- , Elements.p "You can reverse this later by just pairing again."
                         , if numDevAfter < Data.Sync.maxUsedSecurityLevel sync then
                             Elements.paragraph []
                                 [ Elements.b "WARNING"

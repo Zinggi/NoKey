@@ -18,6 +18,7 @@ import Styles
 import HashIcon
 import Icons exposing (Icon)
 import Data exposing (..)
+import Data.Sync exposing (SyncData)
 import Route exposing (Page(..))
 import Helper
 
@@ -596,9 +597,49 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
         }
 
 
+keyBox : msg -> msg -> ( String, Int ) -> String -> Bool -> Element msg
+keyBox onOpen onClose ( ids, idi ) name isOpen =
+    row [ spacing (Styles.scaled 1) ]
+        [ hashIcon (ids ++ toString idi)
+        , text name
+        , el [ alignRight ] (keyBoxButton onOpen onClose isOpen)
+        ]
+
+
+keyBoxButton : msg -> msg -> Bool -> Element msg
+keyBoxButton onOpen onClose isOpen =
+    customButton []
+        (Just
+            (if isOpen then
+                onClose
+             else
+                onOpen
+            )
+        )
+        (row []
+            [ text
+                (if isOpen then
+                    "Close"
+                 else
+                    "Open"
+                )
+            , keyBoxIcon isOpen
+            ]
+        )
+
+
+keyBoxIcon : Bool -> Element msg
+keyBoxIcon isOpen =
+    el [ width shrink, paddingXY (Styles.paddingScale -1) 0 ] <|
+        if isOpen then
+            Icons.small Icons.chestOpen
+        else
+            Icons.small Icons.chestClose
+
+
 groupIcon : Bool -> Group -> Element msg
 groupIcon isLocked ( ( level, _ ), post ) =
-    row [ width shrink, padding (Styles.paddingScale 0) ]
+    row [ width shrink, paddingXY (Styles.paddingScale -1) 0 ]
         [ h3 (toString level)
         , if post == "" then
             none
@@ -609,6 +650,15 @@ groupIcon isLocked ( ( level, _ ), post ) =
           else
             Icons.small Icons.unlocked
         ]
+
+
+groupIcons : SyncData -> List GroupId -> List (Element msg)
+groupIcons sync groups =
+    let
+        gs =
+            Data.Sync.getNamedGroupsFor groups sync
+    in
+        enumeration (groupIcon False) gs
 
 
 avatar : List (Attribute msg) -> Data.Device -> Element msg

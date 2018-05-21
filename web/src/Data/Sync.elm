@@ -28,10 +28,7 @@ import Data.Settings exposing (Settings)
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
-
-
--- TODO
--- import Data.KeyBox as KeyBox exposing (KeyBoxes)
+import Data.KeyBox as KeyBox exposing (KeyBoxes)
 
 
 {-| This represents the data that is shared + all the metadata we need to sync this to others + our own private shares
@@ -121,8 +118,9 @@ type alias SharedData =
     -- here we store all passwords, encrypted with the group password
     , passwords : ORDict AccountId (TimestampedVersionRegister ( GroupId, EncryptedPassword ))
 
-    -- TODO: keyBoxes contain one share for each group. The shares are encrypted using a a user password.
-    -- , keyBoxes : KeyBoxes
+    -- keyBoxes contain one share for each group. The shares are encrypted using a a user password.
+    , keyBoxes : KeyBoxes
+
     -- We need to sync the settings
     , settings : Data.Settings.SharedSettings
     , version : VClock
@@ -171,6 +169,16 @@ setDeviceType devT sync =
 isExtension : SyncData -> Bool
 isExtension sync =
     sync.deviceType == WebExtension
+
+
+updateKeyBoxes : (KeyBoxes -> KeyBoxes) -> SyncData -> SyncData
+updateKeyBoxes fn sync =
+    updateShared (\s -> { s | keyBoxes = fn s.keyBoxes }) sync
+
+
+getKeyBoxes : SyncData -> KeyBoxes
+getKeyBoxes sync =
+    sync.shared.keyBoxes
 
 
 getSettings : SyncData -> Settings
@@ -240,6 +248,16 @@ namedGroups sync =
             )
         -- Now we have a Dict Level (List (GroupId, PostFix))
         |> Dict.foldl (\_ inner acc -> acc ++ inner) []
+
+
+getNamedGroupsFor : List GroupId -> SyncData -> List Group
+getNamedGroupsFor gIds sync =
+    let
+        ids =
+            Set.fromList gIds
+    in
+        namedGroups sync
+            |> List.filter (\( id, _ ) -> Set.member id ids)
 
 
 namedGroupsWithLevel : (Int -> Bool) -> SyncData -> List Group
@@ -326,8 +344,7 @@ initShared seed encryptionKey signingKey devType uuid =
                 )
     , sharesToDistribute = ORDict.init seed
     , distributedShares = ORDict.init seed
-
-    -- , keyBoxes = KeyBox.init seed
+    , keyBoxes = KeyBox.init seed
     , passwords = ORDict.init seed
     , settings = Data.Settings.init seed
     , version = VClock.init
@@ -1186,8 +1203,7 @@ merge onShouldDecryptMyShares timestamp other my =
                         sharesForOthers
                         newSharesToDistribute
                 , settings = Data.Settings.merge other.shared.settings my.shared.settings
-
-                -- , keyBoxes = KeyBox.merge other.shared.keyBoxes my.shared.keyBoxes
+                , keyBoxes = KeyBox.merge other.shared.keyBoxes my.shared.keyBoxes
                 , version = VClock.merge other.shared.version my.shared.version
                 }
           }
@@ -1312,8 +1328,7 @@ encodeShared shared =
                         shared.sharesToDistribute
                   )
                 , ( "distributedShares", ORDict.encode2 encodeGroupId GSet.encode shared.distributedShares )
-
-                -- , ( "keyBoxes", KeyBox.encode shared.keyBoxes )
+                , ( "keyBoxes", KeyBox.encode shared.keyBoxes )
                 , ( "settings", Data.Settings.encode shared.settings )
                 , ( "version", VClock.encode shared.version )
                 ]
@@ -1327,13 +1342,12 @@ encodeShared shared =
 sharedDecoderV1 : Seed -> Decoder SharedData
 sharedDecoderV1 seed =
     decode
-        (\knownIds passwords sharesToDistribute distributedShares {- keyBoxes -} settings version ->
+        (\knownIds passwords sharesToDistribute distributedShares keyBoxes settings version ->
             { knownIds = knownIds
             , passwords = passwords
             , sharesToDistribute = sharesToDistribute
             , distributedShares = distributedShares
-
-            -- , keyBoxes = keyBoxes
+            , keyBoxes = keyBoxes
             , settings = settings
             , version = version
             }
@@ -1350,7 +1364,7 @@ sharedDecoderV1 seed =
                 seed
             )
         |> required "distributedShares" (ORDict.decoder2 groupIdDecoder GSet.decoder seed)
-        -- |> optional "keyBoxes" (KeyBox.decoder seed) (KeyBox.init seed)
+        |> optional "keyBoxes" (KeyBox.decoder seed) (KeyBox.init seed)
         |> optional "settings" (Data.Settings.decoder seed) (Data.Settings.init seed)
         |> required "version" VClock.decoder
 

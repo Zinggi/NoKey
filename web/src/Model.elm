@@ -23,6 +23,7 @@ import Data.PasswordMeta exposing (PasswordMetaData)
 import Data.Notifications as Notifications exposing (Notifications, ShareRequest, SiteEntry)
 import Data.Sync exposing (SyncData)
 import Data.Storage
+import Data.KeyBox exposing (KeyBoxId, Box)
 import Protocol.Data as Protocol
 import Views.PasswordGenerator as PW
 import Views.Pairing
@@ -91,8 +92,12 @@ type Msg
     | UpdateDevicesView Views.Devices.State
     | DoSetSettings Settings Time
       -- | AddDrivePressed
-      -- | UpdateCreateKeyBox Views.CreateKeyBox.State
-      -- | DoCreateKeyBox { password : String, name : String }
+    | UpdateCreateKeyBox Views.CreateKeyBox.State
+    | StartCreatingKeyBox { password : String, name : String }
+    | DoCreateKeyBox { name : String, key : String, salt : String, passwordHash : String, hashSalt : String, time : Time }
+    | OpenBox Box String
+    | DoOpenBox { boxId : KeyBoxId, key : String, passwordHash : String }
+    | CloseBox KeyBoxId
     | ExportPasswords
     | CancelExportPassword
     | OnImportPasswords Ports.FileData

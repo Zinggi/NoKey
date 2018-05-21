@@ -211,6 +211,35 @@ const importKeys = (keys) => {
     });
 };
 
+
+const hashPassword = (pw, salt) => {
+    const encodedPw = stringToUint(pw);
+    const saltBuffer = stringToUint(salt);
+    return window.crypto.subtle.importKey(
+        'raw', encodedPw, {name: 'PBKDF2'}, false, ['deriveBits', 'deriveKey']
+    ).then((key) => {
+        return window.crypto.subtle.deriveKey({
+                "name": 'PBKDF2', "salt": saltBuffer,
+                // TODO: how high do we go? Think about mobile...
+                "iterations": 100,
+                "hash": 'SHA-256'
+            }, key,
+            // For this we don't actually need a cipher suite,
+            // but the api requires that it must be specified..
+            { "name": 'AES-CBC', "length": 256 }, true,
+            [ "encrypt", "decrypt" ]
+        );
+    }).then((webKey) => {
+        return crypto.subtle.exportKey("raw", webKey);
+    }).then((buffer) => {
+        return uintToString(buffer);
+    });
+};
+
+
+
+
+
 // retrive state and keys or if no keys are stored yet, generate new ones
 const getState = (onGot, onError) => {
     if (runsInsideExtension()) {
@@ -256,11 +285,20 @@ const resetStorage = (state, keys) => {
 // Random lib
 //--------------------------------------------------------------------------------
 
+const getRandomUints = (n) => {
+    const randInts = new Uint32Array(n);
+    crypto.getRandomValues(randInts);
+    return randInts;
+};
+
 const getRandomInts = (n) => {
     const randInts = new Uint32Array(n);
     crypto.getRandomValues(randInts);
     return Array.from(randInts);
 };
+
+
+// Setup
 
 
 const setupAndroid = (app) => {
@@ -463,6 +501,31 @@ const setup = (startFn, onStart, onError) => {
                 // console.log("requested shares decrypted", decShares);
                 app.ports.onDidDecryptRequestedShares.send({ shares: decShares, time: msg.time, otherId: msg.otherId, ids: msg.ids });
             });
+        });
+
+
+        // port hashPwFirst : { password : String, name : String } -> Cmd msg
+        // port didHashPwFirst : ({ name : String, key : String, salt : String, passwordHash : String, hashSalt : String } -> msg) -> Sub msg
+        app.ports.hashPwFirst.subscribe((msg) => {
+            const salt = uintToString(getRandomUints(8));
+            const hashSalt = uintToString(getRandomUints(8));
+            Promise.all([hashPassword(msg.password, salt), hashPassword(msg.password, hashSalt)]).then(([key, passwordHash]) => {
+                app.ports.didHashPwFirst.send({
+                    name: msg.name, key: key, salt: salt, passwordHash: passwordHash, hashSalt: hashSalt, time: Date.now()
+                });
+            });
+        });
+
+        // port openBox : { boxId : KeyBoxId, salt: String, hashSalt: String, password : String } -> Cmd msg
+        // port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String } -> msg) -> Sub msg
+        app.ports.openBox.subscribe((msg) => {
+            Promise.all([hashPassword(msg.password, msg.salt), hashPassword(msg.password, msg.hashSalt)])
+                .then(([key, passwordHash]) => {
+                    app.ports.onDidOpenBox.send({
+                        boxId: msg.boxId, key: key, passwordHash: passwordHash
+                    });
+                }
+            );
         });
 
         // when we reconnect, ask others if there is a new version

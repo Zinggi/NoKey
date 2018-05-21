@@ -18,10 +18,13 @@ import Data.Notifications as Notifications exposing (SiteEntry)
 import Data.Sync
 import Data.Storage
 import Data.Settings
+import Data.KeyBox
 import Protocol.Api as Api
 import Views.PasswordGenerator as PW
 import Views.Pairing
 import Views.Passwords
+import Views.CreateKeyBox
+import Views.Devices
 import Views.Settings
 import MainView
 import Model exposing (..)
@@ -397,11 +400,55 @@ update msg model =
         -- AddDrivePressed ->
         --     -- TODO:
         --     model |> withCmds [ Navigation.load "https://www.googleapis.com/auth/drive.appfolder" ]
-        -- UpdateCreateKeyBox state ->
-        --     { model | createKeyBoxView = state } |> noCmd
-        -- DoCreateKeyBox { password, name } ->
-        --     -- TODO:
-        --     model |> noCmd
+        UpdateCreateKeyBox state ->
+            { model | createKeyBoxView = state } |> noCmd
+
+        StartCreatingKeyBox params ->
+            model |> withCmds [ Ports.hashPwFirst params ]
+
+        DoCreateKeyBox { name, key, salt, passwordHash, hashSalt, time } ->
+            { model
+                | syncData =
+                    Data.Sync.updateKeyBoxes
+                        (Data.KeyBox.createBox
+                            { creatorId = model.syncData.id
+                            , name = name
+                            , key = key
+                            , salt = salt
+                            , passwordHash = passwordHash
+                            , hashSalt = hashSalt
+                            }
+                            time
+                        )
+                        model.syncData
+            }
+                |> withCmds [ Navigation.back 1 ]
+                |> andThenUpdate Api.syncToOthers
+
+        OpenBox box pw ->
+            model |> withCmds [ Ports.openBox { boxId = box.id, password = pw, salt = box.salt, hashSalt = box.hashSalt } ]
+
+        DoOpenBox { boxId, key, passwordHash } ->
+            let
+                mayBox =
+                    Data.KeyBox.openBox boxId { key = key, passwordHash = passwordHash } (Data.Sync.getKeyBoxes model.syncData)
+            in
+                (case mayBox of
+                    Ok b ->
+                        { model | syncData = Data.Sync.updateKeyBoxes (always b) model.syncData }
+
+                    Err e ->
+                        { model | devicesView = Views.Devices.wrongPassword e model.devicesView }
+                )
+                    |> noCmd
+
+        CloseBox id ->
+            { model
+                | syncData = Data.Sync.updateKeyBoxes (Data.KeyBox.closeBox id) model.syncData
+                , devicesView = Views.Devices.closeBox model.devicesView
+            }
+                |> noCmd
+
         ExportPasswords ->
             let
                 sync =
@@ -477,6 +524,8 @@ navigateTo page model =
         { model
             | settingsView = Views.Settings.clear model.settingsView
             , passwordsView = Views.Passwords.clear model.passwordsView
+            , devicesView = Views.Devices.clear model.devicesView
+            , createKeyBoxView = Views.CreateKeyBox.clear model.createKeyBoxView
         }
             |> withCmds [ navFn page ]
             |> andThenUpdate updateFn
@@ -558,6 +607,8 @@ subs state =
             , Ports.onGotQR OnGotQR
             , Ports.onGotOnlineStatus OnGotOnlineStatus
             , Ports.onFileContentRead OnImportPasswords
+            , Ports.didHashPwFirst DoCreateKeyBox
+            , Ports.onDidOpenBox DoOpenBox
             ]
 
         _ ->

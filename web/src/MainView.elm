@@ -271,8 +271,9 @@ viewPage page model =
         NewPassword ->
             Views.NewPassword.view model
 
-        -- CreateKeyBox ->
-        --     Views.CreateKeyBox.view keyBoxConfig model model.createKeyBoxView
+        CreateKeyBox ->
+            Views.CreateKeyBox.view keyBoxConfig model model.createKeyBoxView
+
         ReleaseLog s ->
             Views.ReleaseLog.view s
 
@@ -280,10 +281,9 @@ viewPage page model =
             Views.Settings.viewIgnoredSites settingsConfig model
 
 
-
--- keyBoxConfig : Views.CreateKeyBox.Config Msg
--- keyBoxConfig =
---     { toMsg = UpdateCreateKeyBox, onCreateKeyBox = DoCreateKeyBox, onCancel = NavigateBack }
+keyBoxConfig : Views.CreateKeyBox.Config Msg
+keyBoxConfig =
+    { toMsg = UpdateCreateKeyBox, onCreateKeyBox = StartCreatingKeyBox, onCancel = NavigateBack }
 
 
 devicesConfig : Views.Devices.Config Msg
@@ -292,8 +292,9 @@ devicesConfig =
     , onSetDeviceName = SetDeviceName
     , onGoToPairing = NavigateTo Pairing
     , onRemoveDevice = RemoveDevice
-
-    -- , onCreateKeyBox = NavigateTo CreateKeyBox
+    , onCreateKeyBox = NavigateTo CreateKeyBox
+    , onOpenBox = OpenBox
+    , onCloseBox = CloseBox
     }
 
 

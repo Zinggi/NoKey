@@ -212,7 +212,7 @@ viewTask config sync state task =
                         column []
                             [ Elements.paragraph []
                                 [ Elements.text "Passwords in"
-                                , el [ alignLeft ] (viewGroups done)
+                                , viewGroups done
                                 , Elements.text " are ready to export."
                                 ]
                             , niceRow
@@ -405,7 +405,7 @@ groupsButtonHelper txt onPress groups =
         else
             Elements.customButton []
                 (Just (onPress groupIds))
-                (row [ spacing (Styles.paddingScale 0) ] [ Elements.text txt, viewGroups groups ])
+                (row [] [ Elements.text txt, viewGroups groups ])
 
 
 viewGroups : List ( Group, Status ) -> Element msg

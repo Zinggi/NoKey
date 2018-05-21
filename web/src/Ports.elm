@@ -4,6 +4,7 @@ import Time exposing (Time)
 import Json.Encode exposing (Value)
 import Data.Notifications exposing (SiteEntry)
 import Data exposing (GroupId, DeviceId)
+import Data.KeyBox exposing (KeyBoxId)
 
 
 port setTitle : String -> Cmd msg
@@ -137,3 +138,19 @@ port decryptRequestedShares : { ids : List String, shares : Value, time : Time, 
 
 
 port onDidDecryptRequestedShares : (DidDecryptRequestedSharesT -> msg) -> Sub msg
+
+
+
+-- KeyBoxes
+
+
+port hashPwFirst : { password : String, name : String } -> Cmd msg
+
+
+port didHashPwFirst : ({ name : String, key : String, salt : String, passwordHash : String, hashSalt : String, time : Time } -> msg) -> Sub msg
+
+
+port openBox : { boxId : KeyBoxId, salt : String, hashSalt : String, password : String } -> Cmd msg
+
+
+port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String } -> msg) -> Sub msg

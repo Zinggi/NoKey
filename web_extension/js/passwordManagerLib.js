@@ -198,7 +198,7 @@ const classifyGroups = (groups) => {
     }
     // delete groups.forms;
 
-    console.log("newGroups", newGroups);
+    // console.log("newGroups", newGroups);
     return newGroups;
 };
 

@@ -25,6 +25,14 @@ devices =
     Icons.Svg.devices
 
 
+chestClose =
+    Icons.Svg.chestClose
+
+
+chestOpen =
+    Icons.Svg.chestOpen
+
+
 options =
     -- ,.sliders , .menu, .list, .alignJustify
     FeatherIcons.settings
