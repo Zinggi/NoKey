@@ -652,7 +652,7 @@ backToInit model =
 We start the process with initPairing. This sends our Id to the server, which replies with a random token.
 We enter the token on another client and send it to the server. (pairWith)
 The server sends both devices the id of the other device back. (PairedWith)
-On receiving PairedWith, they send (TODO) (StartFinishPairing) to each other.
+On receiving PairedWith, they send (StartFinishPairing) to each other.
 when receiving this, they send
 (FinishPairing token sync) to each other.
 On receiving (FinishPairing token sync), check if the token matches, if yes pair.

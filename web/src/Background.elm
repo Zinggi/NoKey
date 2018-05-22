@@ -164,11 +164,7 @@ update msg model =
         InsertSite accountId groupId password timestamp ->
             let
                 ( newSync, newSeed, shouldRequestShare, cmd ) =
-                    Data.Sync.insertSite encryptShares timestamp model.seed accountId groupId password model.syncData
-
-                -- Here we should encrypt the shares for the others
-                encryptShares time groupId_ shares =
-                    Ports.encryptNewShares { time = time, groupId = groupId_, shares = shares }
+                    Data.Sync.insertSite encryptNewShares timestamp model.seed accountId groupId password model.syncData
             in
                 { model | syncData = newSync, seed = newSeed }
                     |> Api.syncToOthers
@@ -177,15 +173,12 @@ update msg model =
 
         ImportPasswords pws groupId timestamp ->
             let
-                encryptShares time groupId_ shares =
-                    Ports.encryptNewShares { time = time, groupId = groupId_, shares = shares }
-
                 ( nSync, nSeed, nShouldRequestShare, nCmds ) =
                     List.foldl
                         (\{ site, login, password } ( sync, seed, shouldRequestShare, cmds ) ->
                             let
                                 ( newSync, newSeed, newShouldRequestShare, cmd ) =
-                                    Data.Sync.insertSite encryptShares timestamp seed ( site, login ) groupId password sync
+                                    Data.Sync.insertSite encryptNewShares timestamp seed ( site, login ) groupId password sync
                             in
                                 ( newSync, newSeed, newShouldRequestShare || shouldRequestShare, cmd :: cmds )
                         )
@@ -407,8 +400,8 @@ update msg model =
             model |> withCmds [ Ports.hashPwFirst params ]
 
         DoCreateKeyBox { name, key, salt, passwordHash, hashSalt, time } ->
-            { model
-                | syncData =
+            let
+                newSync =
                     Data.Sync.updateKeyBoxes
                         (Data.KeyBox.createBox
                             { creatorId = model.syncData.id
@@ -421,9 +414,14 @@ update msg model =
                             time
                         )
                         model.syncData
-            }
-                |> withCmds [ Navigation.back 1 ]
-                |> andThenUpdate Api.syncToOthers
+
+                -- Create shares for the new device for all currently unlocked groups
+                ( newSync2, encryptCmd ) =
+                    Data.Sync.createNewSharesIfPossible encryptNewShares time newSync
+            in
+                { model | syncData = newSync2 }
+                    |> withCmds [ Navigation.back 1, encryptCmd ]
+                    |> andThenUpdate Api.syncToOthers
 
         OpenBox box pw ->
             model |> withCmds [ Ports.openBox { boxId = box.id, password = pw, salt = box.salt, hashSalt = box.hashSalt } ]
@@ -483,6 +481,13 @@ update msg model =
 
         OpenExtensionInTab ->
             model |> withCmds [ Ports.openExtensionInTab () ]
+
+
+encryptNewShares time group shares =
+    if List.isEmpty shares then
+        Cmd.none
+    else
+        Ports.encryptNewShares { time = time, groupId = group, shares = shares }
 
 
 setSettings : Data.Settings.Settings -> Model -> ( Model, Cmd Msg )

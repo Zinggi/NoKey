@@ -13,6 +13,8 @@ module Data.KeyBox
         , mapBoxes
         , openBox
         , closeBox
+        , getOpenAndInNeedOfShare
+        , storeShares
         )
 
 import Time exposing (Time)
@@ -108,6 +110,25 @@ keyBoxToBox id { name, salt, hashSalt, encryptedShares } =
     }
 
 
+getOpenAndInNeedOfShare : GroupId -> KeyBoxes -> List KeyBoxId
+getOpenAndInNeedOfShare groupId boxes =
+    let
+        hasShare bId =
+            Dict.get bId (ORDict.get boxes.data)
+                |> Maybe.map (\b -> Set.member groupId (ORDict.keys b.encryptedShares))
+                |> Maybe.withDefault False
+    in
+        boxes.openBoxes
+            |> Dict.foldl
+                (\id _ acc ->
+                    if hasShare id then
+                        acc
+                    else
+                        id :: acc
+                )
+                []
+
+
 mapBoxes : (Box -> Bool -> b) -> KeyBoxes -> List b
 mapBoxes fn boxes =
     ORDict.get boxes.data
@@ -136,6 +157,21 @@ isNameTaken name boxes =
                 TimestampedVersionRegister.get box.name == name || isTaken
             )
             False
+
+
+storeShares : DeviceId -> Time -> GroupId -> Result e (Dict KeyBoxId SecretSharing.Share) -> KeyBoxes -> KeyBoxes
+storeShares deviceId time groupId rShares boxes =
+    case rShares of
+        Ok shares ->
+            Dict.foldl
+                (\id share newBoxes ->
+                    storeShare deviceId time id groupId share newBoxes
+                )
+                boxes
+                shares
+
+        Err e ->
+            boxes
 
 
 {-| store a share. also rememeber the stored share as long as the box stays open.

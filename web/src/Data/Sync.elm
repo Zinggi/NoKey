@@ -28,7 +28,7 @@ import Data.Settings exposing (Settings)
 import Data.RequestGroupPassword as Request exposing (Status, PasswordStatus)
 import Data.TaskList as Tasks exposing (TaskList, Task)
 import Data exposing (..)
-import Data.KeyBox as KeyBox exposing (KeyBoxes)
+import Data.KeyBox as KeyBox exposing (KeyBoxes, KeyBoxId)
 
 
 {-| This represents the data that is shared + all the metadata we need to sync this to others + our own private shares
@@ -507,8 +507,8 @@ groupsNotFullyDistributed sync =
             groupsWithShares
 
 
-devicesNeedingSharesFor : GroupId -> SyncData -> List DeviceId
-devicesNeedingSharesFor groupId sync =
+devicesNeedingShareFor : GroupId -> SyncData -> List DeviceId
+devicesNeedingShareFor groupId sync =
     case Dict.get groupId (groupsNotFullyDistributed sync) of
         Just devs ->
             List.map .id devs
@@ -590,7 +590,7 @@ getXValues sync =
            This way, a collision here will also show in the icon (the reverse is not true):
            If there is a collision here, you will also have two icons that are the same.
            My theory is that users don't want to have the same icons, so they reset one device to get a new icon
-           which in turn also resolves the collision here!
+           which in turn also resolves the possible collision here!
         -}
         |> Dict.map (\id _ -> Murmur3.hashString 42 id)
 
@@ -605,6 +605,16 @@ getXValuesFor devs _ =
                 Dict.insert id (Murmur3.hashString 42 id) acc
             )
             Dict.empty
+
+
+{-| gets the x values for the boxes that are open and need a share
+-}
+getXValuesForBoxes : GroupId -> SyncData -> Dict KeyBoxId Int
+getXValuesForBoxes groupId sync =
+    getKeyBoxes sync
+        |> KeyBox.getOpenAndInNeedOfShare groupId
+        |> List.map (\( ids, idi ) -> ( ( ids, idi ), Murmur3.hashString 42 (ids ++ toString idi) ))
+        |> Dict.fromList
 
 
 exportPasswords : SyncData -> SyncData
@@ -1029,6 +1039,7 @@ createNewSharesIfPossible onShouldAddNewShares time sync =
 
 createNewSharesForGroupIfPossible : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SyncData -> ( SyncData, Cmd msg )
 createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
+    -- TODO: also create shares for key boxes
     case Request.getGroupPassword groupId sync.groupPasswordRequestsState of
         Just groupPw ->
             let
@@ -1043,11 +1054,20 @@ createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
                         -- remove pw from stash(es)
                         |> clearStashes groupId
 
+                allShares =
+                    -- TODO: change Request.getAllShares to include shares from boxes
+                    Request.getAllShares groupId sync2.myShares sync2.groupPasswordRequestsState
+
+                sharesForBoxes =
+                    -- Generate new shares for open boxes in need of shares
+                    SecretSharing.createMoreShares (getXValuesForBoxes groupId sync2) allShares
+
+                newBoxes =
+                    KeyBox.storeShares sync2.id time groupId sharesForBoxes (getKeyBoxes sync2)
+
                 newShares =
                     -- Generate new shares for those that need them
-                    SecretSharing.createMoreShares
-                        (getXValuesFor (devicesNeedingSharesFor groupId sync2) sync2)
-                        (Request.getAllShares groupId sync2.myShares sync2.groupPasswordRequestsState)
+                    SecretSharing.createMoreShares (getXValuesFor (devicesNeedingShareFor groupId sync2) sync2) allShares
 
                 -- take out our share
                 ( myShares, sharesForOthers, newDistributedShares ) =
@@ -1072,7 +1092,7 @@ createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
                     onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers sync2)
             in
                 ( { sync2 | myShares = myShares }
-                    |> updateShared (\s -> { s | distributedShares = newDistributedShares })
+                    |> updateShared (\s -> { s | distributedShares = newDistributedShares, keyBoxes = newBoxes })
                 , cmd
                 )
 
