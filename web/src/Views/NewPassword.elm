@@ -13,7 +13,7 @@ import Model exposing (Msg(..))
 view model =
     newSiteForm model.requirementsState
         model.newSiteEntry
-        ( Data.Sync.minSecurityLevel model.syncData, Data.Sync.numberOfKnownDevices model.syncData )
+        ( Data.Sync.minSecurityLevel model.syncData, Data.Sync.numberOfAvailableDevices model.syncData )
 
 
 newSiteForm : Views.PasswordGenerator.State -> PasswordMetaData -> ( Int, Int ) -> Element Msg

@@ -73,8 +73,8 @@ hackMinMaxWidthCentred min max =
 viewModel : Model -> Element Msg
 viewModel model =
     let
-        numberOfKnownDevices =
-            Data.Sync.numberOfKnownDevices model.syncData
+        numberOfAvailableDevices =
+            Data.Sync.numberOfAvailableDevices model.syncData
 
         minSecLevel =
             Data.Sync.minSecurityLevel model.syncData
@@ -102,7 +102,7 @@ viewModel model =
                             [ Views.Notifications.view notificationsConfig
                                 model.syncData
                                 model.notifications
-                                ( minSecLevel, numberOfKnownDevices )
+                                ( minSecLevel, numberOfAvailableDevices )
                                 model.notificationsView
                             ]
                         ]
@@ -212,7 +212,10 @@ bottomNavigation page model =
         |> row
             ([ padding (Styles.paddingScale 1)
              , alignBottom
-             , above (el [ alignRight, paddingXY (Styles.paddingScale 4) (Styles.paddingScale 5) ] (viewActionButton page model))
+             , above
+                (el [ alignRight, paddingXY (Styles.paddingScale 4) (Styles.paddingScale 5), Styles.noPointerEvents ]
+                    (el [ Styles.withPointerEvents, width shrink ] (viewActionButton page model))
+                )
              ]
             )
         |> (\c ->

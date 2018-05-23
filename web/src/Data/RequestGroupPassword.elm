@@ -34,6 +34,7 @@ import Set as SetStd
 import AES
 import SecretSharing exposing (Share)
 import Data exposing (GroupId, AccountId, GroupPassword, Password, EncryptedPassword)
+import Data.KeyBox as KeyBox exposing (KeyBoxes)
 import Helper exposing (maybeToEverySet)
 
 
@@ -67,26 +68,18 @@ init =
     State { groupPws = Dict.empty, pws = Dict.empty }
 
 
-getAllShares : GroupId -> Dict GroupId SecretSharing.Share -> State -> List Share
+getAllShares : GroupId -> List Share -> State -> List Share
 getAllShares groupId myShares (State state) =
     Dict.get groupId state.groupPws
         |> Maybe.map .shares
-        |> Maybe.map
-            (\shares ->
-                case Dict.get groupId myShares of
-                    Just share ->
-                        Set.insert share shares
-
-                    Nothing ->
-                        shares
-            )
+        |> Maybe.map (\s -> List.foldl (\share acc -> Set.insert share acc) s myShares)
         |> Maybe.map Set.toList
         |> Maybe.withDefault []
 
 
-getGroupPassword : GroupId -> State -> Maybe GroupPassword
-getGroupPassword groupId state =
-    case getStatus groupId state of
+getGroupPassword : GroupId -> List Share -> State -> Maybe GroupPassword
+getGroupPassword groupId shares state =
+    case getStatus groupId shares state of
         Done _ pw ->
             Just pw
 
@@ -94,9 +87,9 @@ getGroupPassword groupId state =
             Nothing
 
 
-isGroupUnlocked : GroupId -> State -> Bool
-isGroupUnlocked groupId state =
-    case getStatus groupId state of
+isGroupUnlocked : GroupId -> List Share -> State -> Bool
+isGroupUnlocked groupId shares state =
+    case getStatus groupId shares state of
         Done _ _ ->
             True
 
@@ -115,13 +108,13 @@ lockGroups groupIds (State state) =
         }
 
 
-getStatus : GroupId -> State -> Status
-getStatus key (State state) =
-    mayInfoToStatus key (Dict.get key state.groupPws)
+getStatus : GroupId -> List Share -> State -> Status
+getStatus key shares (State state) =
+    mayInfoToStatus key shares (Dict.get key state.groupPws)
 
 
-canFill : Maybe AccountId -> State -> Maybe ( AccountId, GroupPassword )
-canFill mayId (State state) =
+canFill : (GroupId -> List Share) -> Maybe AccountId -> State -> Maybe ( AccountId, GroupPassword )
+canFill getShares mayId (State state) =
     Maybe.andThen
         (\id ->
             Dict.filter (\key info -> info.fillForm == Just id) state.groupPws
@@ -129,7 +122,7 @@ canFill mayId (State state) =
                 |> List.head
                 |> Maybe.andThen
                     (\( groupId, info ) ->
-                        case mayInfoToStatus groupId (Just info) of
+                        case mayInfoToStatus groupId (getShares groupId) (Just info) of
                             Done (Just accountId) pw ->
                                 Just ( accountId, pw )
 
@@ -140,8 +133,8 @@ canFill mayId (State state) =
         mayId
 
 
-mayInfoToStatus : GroupId -> Maybe Info -> Status
-mayInfoToStatus ( level, _ ) mayInfo =
+mayInfoToStatus : GroupId -> List Share -> Maybe Info -> Status
+mayInfoToStatus ( level, _ ) shares mayInfo =
     case mayInfo of
         Nothing ->
             NotRequested
@@ -155,16 +148,17 @@ mayInfoToStatus ( level, _ ) mayInfo =
                     Error r
 
                 Nothing ->
-                    Waiting (Set.size info.shares) level
+                    Waiting (Set.size info.shares + List.length shares) level
 
 
-waitFor : GroupId -> Maybe AccountId -> Maybe Share -> State -> State
-waitFor key fillForm maybeMyShare =
+waitFor : GroupId -> Maybe AccountId -> List Share -> State -> State
+waitFor key fillForm shares =
     updateGroupPws
         (Dict.insert key
             (tryGetPassword key
+                shares
                 { fillForm = fillForm
-                , shares = maybeToEverySet maybeMyShare
+                , shares = Set.empty
                 , password = Nothing
                 }
             )
@@ -204,17 +198,17 @@ updatePws fn (State ({ pws } as state)) =
     State { state | pws = fn pws }
 
 
-addShare : GroupId -> Share -> State -> ( State, Maybe AccountId )
-addShare key share state =
+addShare : GroupId -> List Share -> Share -> State -> ( State, Maybe AccountId )
+addShare key shares share state =
     let
         newState =
             updateGroupPws
                 (Dict.update key
-                    (Maybe.map (\info -> tryGetPassword key { info | shares = Set.insert share info.shares }))
+                    (Maybe.map (\info -> tryGetPassword key shares { info | shares = Set.insert share info.shares }))
                 )
                 state
     in
-        case getStatus key newState of
+        case getStatus key shares newState of
             Done (Just accountId) groupPw ->
                 ( newState, Just accountId )
 
@@ -242,15 +236,15 @@ isUnlocked status =
             False
 
 
-getPassword : AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> State -> Maybe Password
-getPassword accountId mayEncPw mayPw state =
-    tryGetAccountPassword accountId mayEncPw mayPw False state
+getPassword : (GroupId -> List Share) -> AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> State -> Maybe Password
+getPassword getShares accountId mayEncPw mayPw state =
+    tryGetAccountPassword getShares accountId mayEncPw mayPw False state
         |> (\(State s) -> Dict.get accountId s.pws)
         |> Maybe.map Tuple.first
 
 
-getPwStatus : AccountId -> GroupId -> State -> PasswordStatus
-getPwStatus accountId groupId (State state) =
+getPwStatus : AccountId -> GroupId -> List Share -> State -> PasswordStatus
+getPwStatus accountId groupId shares (State state) =
     case Dict.get accountId state.pws of
         Just ( pw, doShow ) ->
             if doShow then
@@ -259,7 +253,7 @@ getPwStatus accountId groupId (State state) =
                 UnlockedButHidden
 
         Nothing ->
-            case mayInfoToStatus groupId (Dict.get groupId state.groupPws) of
+            case mayInfoToStatus groupId shares (Dict.get groupId state.groupPws) of
                 Done _ _ ->
                     UnlockedButHidden
 
@@ -270,9 +264,9 @@ getPwStatus accountId groupId (State state) =
                     Locked
 
 
-togglePassword : AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> State -> State
-togglePassword accountId mayEncPw mayPw state =
-    tryGetAccountPassword accountId mayEncPw mayPw False state
+togglePassword : (GroupId -> List Share) -> AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> State -> State
+togglePassword getShares accountId mayEncPw mayPw state =
+    tryGetAccountPassword getShares accountId mayEncPw mayPw False state
         |> updatePws (Dict.update accountId (Maybe.map (\( pw, shouldShow ) -> ( pw, not shouldShow ))))
 
 
@@ -281,8 +275,8 @@ hasPwInCache accountId (State state) =
     Dict.member accountId state.pws
 
 
-tryGetAccountPassword : AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> Bool -> State -> State
-tryGetAccountPassword accountId mayEncPw mayPw shouldShow state =
+tryGetAccountPassword : (GroupId -> List Share) -> AccountId -> Maybe ( GroupId, EncryptedPassword ) -> Maybe Password -> Bool -> State -> State
+tryGetAccountPassword getShares accountId mayEncPw mayPw shouldShow state =
     if hasPwInCache accountId state then
         state
     else
@@ -293,7 +287,7 @@ tryGetAccountPassword accountId mayEncPw mayPw shouldShow state =
             Nothing ->
                 case mayEncPw of
                     Just ( groupId, encPw ) ->
-                        case getStatus groupId state of
+                        case getStatus groupId (getShares groupId) state of
                             Done _ groupPw ->
                                 case AES.decryptPassword groupPw encPw of
                                     Ok pw ->
@@ -351,15 +345,15 @@ cacheGroupPw groupId groupPw (State state) =
         }
 
 
-tryGetPassword : GroupId -> Info -> Info
-tryGetPassword ( level, _ ) info =
+tryGetPassword : GroupId -> List Share -> Info -> Info
+tryGetPassword ( level, _ ) shares info =
     case info.password of
         Just pw ->
             info
 
         Nothing ->
-            if Set.size info.shares >= level then
+            if Set.size info.shares + List.length shares >= level then
                 -- expensive operation
-                { info | password = Just <| SecretSharing.joinToBytes (Set.toList info.shares) }
+                { info | password = Just <| SecretSharing.joinToBytes (Set.toList info.shares ++ shares) }
             else
                 info

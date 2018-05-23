@@ -82,7 +82,7 @@ unlockedGroups sync =
     groups sync
         |> List.filter
             (\g ->
-                Request.isGroupUnlocked g sync.groupPasswordRequestsState
+                Request.isGroupUnlocked g (mySharesFor g sync) sync.groupPasswordRequestsState
             )
 
 
@@ -355,7 +355,8 @@ togglePassword : AccountId -> SyncData -> SyncData
 togglePassword accountId sync =
     { sync
         | groupPasswordRequestsState =
-            Request.togglePassword accountId
+            Request.togglePassword (\g -> mySharesFor g sync)
+                accountId
                 (Dict.get accountId (encryptedPasswords sync))
                 (Tasks.getStashPw accountId sync.tasks)
                 sync.groupPasswordRequestsState
@@ -407,7 +408,16 @@ knownIds sync =
 
 numberOfKnownDevices : SyncData -> Int
 numberOfKnownDevices sync =
-    knownIds sync |> Dict.size
+    Dict.size (knownIds sync) + KeyBox.numberOfBoxes sync.shared.keyBoxes
+
+
+{-| This counts the number of devices + currently open boxes.
+This is what should be used for the maximum security level, as we can only save a group if enough shares can be stored,
+which requires that we either have enough devices or enough open boxes
+-}
+numberOfAvailableDevices : SyncData -> Int
+numberOfAvailableDevices sync =
+    Dict.size (knownIds sync) + KeyBox.numberOfOpenBoxes sync.shared.keyBoxes
 
 
 getSigningKeyOf : DeviceId -> SyncData -> Maybe Value
@@ -575,7 +585,8 @@ renameDevice newName sync =
 
 getPassword : AccountId -> SyncData -> Maybe Password
 getPassword accountId sync =
-    Request.getPassword accountId
+    Request.getPassword (\g -> mySharesFor g sync)
+        accountId
         (Dict.get accountId (encryptedPasswords sync))
         (Tasks.getStashPw accountId sync.tasks)
         sync.groupPasswordRequestsState
@@ -703,7 +714,7 @@ insertSite :
     -> SyncData
     -> ( SyncData, RandomE.Seed, Bool, Cmd msg )
 insertSite onShouldAddNewShares time seed accountId groupId pw sync =
-    case Request.getGroupPassword groupId sync.groupPasswordRequestsState of
+    case Request.getGroupPassword groupId (mySharesFor groupId sync) sync.groupPasswordRequestsState of
         -- if have group password then
         Just groupPw ->
             -- insert into passwords
@@ -723,7 +734,7 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                 -- if groupId already exists then
                 if List.member groupId (allGroups sync) then
                     -- ask others for their shares/keys
-                    ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId sync))
+                    ( updateGroupPasswordRequest (Request.waitFor groupId Nothing (mySharesFor groupId sync))
                         -- add password to stash (since the group is locked)
                         (addToStash Tasks.GroupLocked)
                     , seed
@@ -737,8 +748,11 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                             RandomE.step Helper.groupPwGenerator seed
 
                         -- generate shares/keys
-                        ( shares, seed3 ) =
-                            SecretSharing.splitBytes ( level, getXValues sync ) groupPw seed2
+                        ( shares, sharesForBoxes, seed3 ) =
+                            SecretSharing.splitBytes2 ( level, getXValues sync, getXValuesForBoxes groupId sync ) groupPw seed2
+
+                        newBoxes =
+                            KeyBox.storeShares sync.id time groupId (Ok sharesForBoxes) (getKeyBoxes sync)
 
                         -- take out our share
                         ( myShares, sharesForOthers, newDistributedShares ) =
@@ -757,7 +771,7 @@ insertSite onShouldAddNewShares time seed accountId groupId pw sync =
                             -- add password to stash (since keys aren't distributed yet)
                             addToStash Tasks.KeysNotYetDistributed
                                 |> (\s -> { s | myShares = myShares })
-                                |> updateShared (\s -> { s | distributedShares = newDistributedShares })
+                                |> updateShared (\s -> { s | distributedShares = newDistributedShares, keyBoxes = newBoxes })
                                 -- insert groupPw to stash (since the keys are not yet distributed)
                                 |> (\s -> { s | tasks = Tasks.insertGroupPw groupId groupPw s.tasks })
                                 -- store pw in passwords
@@ -777,7 +791,7 @@ doMovePassword time accountId toPw to sync =
             -- as there can only be one accountId
             sync
                 |> insertToStorage time toPw accountId to pw
-                |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) Dict.empty s.tasks })
+                |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (\g -> KeyBox.numberOfsharesFor g s.shared.keyBoxes) (accounts s) Dict.empty s.tasks })
 
         Nothing ->
             Debug.log "This should never happen: We have the group password, but we can't read the password??" ()
@@ -788,7 +802,7 @@ movePassword : Time -> AccountId -> GroupId -> GroupId -> SyncData -> ( SyncData
 movePassword time accountId from to sync =
     let
         getGroupPw g =
-            Request.getGroupPassword g sync.groupPasswordRequestsState
+            Request.getGroupPassword g (mySharesFor g sync) sync.groupPasswordRequestsState
 
         addToTasks s groups =
             { s | tasks = Tasks.moveAccountFromTo accountId from to s.tasks }
@@ -796,7 +810,7 @@ movePassword time accountId from to sync =
                         -- indicate we are waiting for group to unlock
                         List.foldl
                             (\groupId acc ->
-                                updateGroupPasswordRequest (Request.waitFor groupId Nothing (getShare groupId acc)) acc
+                                updateGroupPasswordRequest (Request.waitFor groupId Nothing (mySharesFor groupId acc)) acc
                             )
                             s
                             groups
@@ -917,7 +931,7 @@ mapAccountsForSite : String -> (GroupId -> AccountId -> Status -> a) -> SyncData
 mapAccountsForSite site f sync =
     List.map
         (\( loginName, groupId ) ->
-            f groupId ( site, loginName ) (Request.getStatus groupId sync.groupPasswordRequestsState)
+            f groupId ( site, loginName ) (Request.getStatus groupId (mySharesFor groupId sync) sync.groupPasswordRequestsState)
         )
         (getAccountsForSite site sync)
 
@@ -940,7 +954,7 @@ mapGroups f sync =
                 (\(( siteName, userName ) as accountId) ( groupId, encPw ) acc ->
                     let
                         status =
-                            Request.getPwStatus accountId groupId sync.groupPasswordRequestsState
+                            Request.getPwStatus accountId groupId (mySharesFor groupId sync) sync.groupPasswordRequestsState
 
                         inner =
                             Dict.singleton userName status
@@ -954,8 +968,8 @@ mapGroups f sync =
             |> Dict.foldl
                 (\groupId dict acc ->
                     f ( groupId, getPostFixFromDict groupId postFixDict )
-                        (Tasks.getProgress groupId (distributedShares sync))
-                        (Request.getStatus groupId sync.groupPasswordRequestsState)
+                        (Tasks.getProgress groupId (KeyBox.numberOfsharesFor groupId sync.shared.keyBoxes) (distributedShares sync))
+                        (Request.getStatus groupId (mySharesFor groupId sync) sync.groupPasswordRequestsState)
                         dict
                         :: acc
                 )
@@ -978,7 +992,7 @@ addShares onShouldAddNewShares time shares sync =
                 -- Move passwords that can be moved
                 let
                     getGroupPw g =
-                        Request.getGroupPassword g s.groupPasswordRequestsState
+                        Request.getGroupPassword g (mySharesFor g s) s.groupPasswordRequestsState
 
                     newSync =
                         Tasks.processMoveFromTo
@@ -1003,13 +1017,13 @@ addShare onShouldAddNewShares time groupId share sync =
     -- moving passwords from stash to storage and generating more shares for those that need them.
     let
         ( newReqState, mayForm ) =
-            Request.addShare groupId share sync.groupPasswordRequestsState
+            Request.addShare groupId (mySharesFor groupId sync) share sync.groupPasswordRequestsState
 
         newSync =
             { sync | groupPasswordRequestsState = newReqState }
 
         sync2 =
-            case Request.getGroupPassword groupId newReqState of
+            case Request.getGroupPassword groupId (mySharesFor groupId newSync) newReqState of
                 Just _ ->
                     addPasswordsToExport [ groupId ] newSync
 
@@ -1037,10 +1051,15 @@ createNewSharesIfPossible onShouldAddNewShares time sync =
         |> (\( s, cs ) -> ( s, Cmd.batch cs ))
 
 
+mySharesFor : GroupId -> SyncData -> List SecretSharing.Share
+mySharesFor groupId sync =
+    Helper.maybeToList (Dict.get groupId sync.myShares)
+        |> List.append (KeyBox.getShares groupId sync.shared.keyBoxes)
+
+
 createNewSharesForGroupIfPossible : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SyncData -> ( SyncData, Cmd msg )
 createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
-    -- TODO: also create shares for key boxes
-    case Request.getGroupPassword groupId sync.groupPasswordRequestsState of
+    case Request.getGroupPassword groupId (mySharesFor groupId sync) sync.groupPasswordRequestsState of
         Just groupPw ->
             let
                 sync2 =
@@ -1055,8 +1074,7 @@ createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
                         |> clearStashes groupId
 
                 allShares =
-                    -- TODO: change Request.getAllShares to include shares from boxes
-                    Request.getAllShares groupId sync2.myShares sync2.groupPasswordRequestsState
+                    Request.getAllShares groupId (mySharesFor groupId sync2) sync2.groupPasswordRequestsState
 
                 sharesForBoxes =
                     -- Generate new shares for open boxes in need of shares
@@ -1106,13 +1124,13 @@ requestPasswordPressed : List GroupId -> Maybe AccountId -> SyncData -> ( SyncDa
 requestPasswordPressed groupIds mayAccount sync =
     let
         newReqState =
-            List.foldl (\groupId -> Request.waitFor groupId mayAccount (getShare groupId sync)) sync.groupPasswordRequestsState groupIds
+            List.foldl (\groupId -> Request.waitFor groupId mayAccount (mySharesFor groupId sync)) sync.groupPasswordRequestsState groupIds
 
         newSync =
             { sync | groupPasswordRequestsState = newReqState }
 
         mayFill =
-            Request.canFill mayAccount newReqState
+            Request.canFill (\g -> mySharesFor g newSync) mayAccount newReqState
                 |> Maybe.andThen
                     (\( ( site, login ) as accountId, _ ) ->
                         getPassword accountId newSync
@@ -1138,7 +1156,7 @@ unlockGroup1IfExists sync =
 
 getTasks : SyncData -> List Task
 getTasks sync =
-    Tasks.getTasks sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) (namedGroupsDict sync) sync.tasks
+    Tasks.getTasks (\g -> mySharesFor g sync) (\g -> KeyBox.numberOfsharesFor g sync.shared.keyBoxes) sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) (namedGroupsDict sync) sync.tasks
 
 
 distributedShares : SyncData -> Dict GroupId (Set DeviceId)
@@ -1229,7 +1247,15 @@ merge onShouldDecryptMyShares timestamp other my =
           }
             |> receiveVersion other.id other.shared.version
             -- if enough shares/keys are distributed, resolve tasks (remove groupPw + pws from stash).
-            |> (\s -> { s | tasks = Tasks.resolveWaitingTasks (accounts s) (ORDict.getWith GSet.get newDistributedShares) s.tasks })
+            |> (\s ->
+                    { s
+                        | tasks =
+                            Tasks.resolveWaitingTasks (\g -> KeyBox.numberOfsharesFor g s.shared.keyBoxes)
+                                (accounts s)
+                                (ORDict.getWith GSet.get newDistributedShares)
+                                s.tasks
+                    }
+               )
             |> updateGroupPasswordRequest Request.invalidatePwCaches
             |> incrementIf shouldIncrement
         , cmd

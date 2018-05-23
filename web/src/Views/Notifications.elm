@@ -28,17 +28,17 @@ init =
 
 
 view : Config msg -> SyncData -> Notifications -> ( Int, Int ) -> State -> Element msg
-view config sync ns ( minSecLevel, numberOfKnownDevices ) state =
+view config sync ns ( minSecLevel, numberOfAvailableDevices ) state =
     case Notifications.first ns of
         Just n ->
-            viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n state
+            viewEntry config sync ( minSecLevel, numberOfAvailableDevices ) n state
 
         Nothing ->
             none
 
 
 viewEntry : Config msg -> SyncData -> ( Int, Int ) -> Notification -> State -> Element msg
-viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n ( secLevel, shouldShow ) =
+viewEntry config sync ( minSecLevel, numberOfAvailableDevices ) n ( secLevel, shouldShow ) =
     let
         groups gs =
             let
@@ -77,11 +77,11 @@ viewEntry config sync ( minSecLevel, numberOfKnownDevices ) n ( secLevel, should
                     (Just entry.password)
                 , Elements.clampedNumberInput (\l -> config.toMsg ( l, shouldShow ))
                     "Security Level"
-                    ( minSecLevel, 2, min 5 numberOfKnownDevices )
+                    ( minSecLevel, 2, min 5 numberOfAvailableDevices )
                     secLevel
                 , Elements.buttonRow []
                     [ Elements.primaryButton
-                        (if numberOfKnownDevices < minSecLevel then
+                        (if numberOfAvailableDevices < minSecLevel then
                             Nothing
                          else
                             Just

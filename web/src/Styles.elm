@@ -95,6 +95,14 @@ dangerStyle =
     ]
 
 
+noPointerEvents =
+    htmlAttribute (Attr.style [ ( "pointerEvents", "none" ) ])
+
+
+withPointerEvents =
+    htmlAttribute (Attr.style [ ( "pointerEvents", "auto" ) ])
+
+
 titleHighlight =
     [ Background.color accentColor, Font.color white ]
 

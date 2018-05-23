@@ -15,6 +15,10 @@ module Data.KeyBox
         , closeBox
         , getOpenAndInNeedOfShare
         , storeShares
+        , getShares
+        , numberOfBoxes
+        , numberOfOpenBoxes
+        , numberOfsharesFor
         )
 
 import Time exposing (Time)
@@ -37,12 +41,11 @@ import AES
 -- TODO:
 --  Make use of those functions + ports for web crypto
 --      Create a new box (boxes are created in the 'open' state) - ok -> used
---      Add a share (shares are only added if the box is open) - ok
+--      Add a share (shares are only added if the box is open) - ok -> used
 --      Open a box - ok -> used
 --      Close a box - ok -> used
 --      Close all boxes - ok
---      Get a share (only works if the box is open) - ok
---      Get shares - ok
+--      Get shares - ok -> used
 --
 --  For the password hash:
 --  - https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey
@@ -108,6 +111,29 @@ keyBoxToBox id { name, salt, hashSalt, encryptedShares } =
     , hashSalt = hashSalt
     , hasShares = ORDict.keys encryptedShares |> Set.toList
     }
+
+
+numberOfBoxes : KeyBoxes -> Int
+numberOfBoxes boxes =
+    ORDict.keys boxes.data |> Set.size
+
+
+numberOfOpenBoxes : KeyBoxes -> Int
+numberOfOpenBoxes boxes =
+    Dict.size boxes.openBoxes
+
+
+numberOfsharesFor : GroupId -> KeyBoxes -> Int
+numberOfsharesFor groupId boxes =
+    ORDict.get boxes.data
+        |> Dict.foldl
+            (\boxId b acc ->
+                if Set.member groupId (ORDict.keys b.encryptedShares) then
+                    1 + acc
+                else
+                    acc
+            )
+            0
 
 
 getOpenAndInNeedOfShare : GroupId -> KeyBoxes -> List KeyBoxId
@@ -261,6 +287,25 @@ getShares groupId boxes =
         )
         []
         boxes.openBoxes
+
+
+
+-- Not needed
+-- getAllShares : KeyBoxes -> List ( GroupId, SecretSharing.Share )
+-- getAllShares boxes =
+--     Set.foldl (\groupId acc -> ( groupId, getShares groupId boxes ) :: acc) [] (groupsInBoxes boxes)
+--         -- List (GroupId, List Share)
+--         |> List.foldl (\( g, shares ) acc -> List.map (\s -> ( g, s )) shares ++ acc) []
+
+
+groupsInBoxes : KeyBoxes -> Set GroupId
+groupsInBoxes boxes =
+    Dict.foldl
+        (\boxId box acc ->
+            Set.union (ORDict.keys box.encryptedShares) acc
+        )
+        Set.empty
+        (ORDict.get boxes.data)
 
 
 getUniqueIdForCreatorId : DeviceId -> KeyBoxes -> ( Int, Seed )

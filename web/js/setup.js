@@ -517,12 +517,13 @@ const setup = (startFn, onStart, onError) => {
         });
 
         // port openBox : { boxId : KeyBoxId, salt: String, hashSalt: String, password : String } -> Cmd msg
-        // port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String } -> msg) -> Sub msg
+        // port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String, time : Time } -> msg) -> Sub msg
         app.ports.openBox.subscribe((msg) => {
+            // console.log("open box", msg);
             Promise.all([hashPassword(msg.password, msg.salt), hashPassword(msg.password, msg.hashSalt)])
                 .then(([key, passwordHash]) => {
                     app.ports.onDidOpenBox.send({
-                        boxId: msg.boxId, key: key, passwordHash: passwordHash
+                        boxId: msg.boxId, key: key, passwordHash: passwordHash, time: Date.now()
                     });
                 }
             );

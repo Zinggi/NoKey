@@ -33,6 +33,7 @@ import Json.Decode.Extra as JD
 import Json.Decode.Pipeline as JD exposing (required, optional)
 import Data.RequestGroupPassword as Request exposing (PasswordStatus(..), Status)
 import Data exposing (..)
+import SecretSharing exposing (Share)
 import Helper exposing (encodeTuple3, decodeTuple3, encodeTuple, decodeTuple, encodeSet, decodeSet)
 
 
@@ -131,11 +132,11 @@ type Task
     | ExportPws { done : List ( Group, Status ), toDo : List ( Group, Status ) }
 
 
-resolveWaitingTasks : Dict AccountId GroupId -> Dict GroupId (Set String) -> TaskList -> TaskList
-resolveWaitingTasks accounts newDistributedShares tasks =
+resolveWaitingTasks : (GroupId -> Int) -> Dict AccountId GroupId -> Dict GroupId (Set String) -> TaskList -> TaskList
+resolveWaitingTasks getSharesInBoxes accounts newDistributedShares tasks =
     Dict.foldl
         (\(( level, _ ) as groupId) set acc ->
-            if Set.size set >= level then
+            if Set.size set + getSharesInBoxes groupId >= level then
                 { acc
                     | groupPws = Dict.remove groupId acc.groupPws
                     , stash =
@@ -209,19 +210,20 @@ haveMovedToDestination accounts accountIds destination =
         |> List.all (\accountId -> Dict.get accountId accounts == Just destination)
 
 
-getProgress : GroupId -> Dict GroupId (Set String) -> Int
-getProgress groupId dict =
-    Dict.get groupId dict |> Maybe.map Set.size |> Maybe.withDefault 0
+getProgress : GroupId -> Int -> Dict GroupId (Set String) -> Int
+getProgress groupId sharesInBoxes dict =
+    (Dict.get groupId dict |> Maybe.map Set.size |> Maybe.withDefault 0) + sharesInBoxes
 
 
-getTasks : Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> Dict GroupId String -> TaskList -> List Task
-getTasks request groupsNotFullyDistributed progress postFixDict tasks =
+getTasks : (GroupId -> List Share) -> (GroupId -> Int) -> Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> Dict GroupId String -> TaskList -> List Task
+getTasks getShares getSharesInBoxes request groupsNotFullyDistributed progress postFixDict tasks =
+    -- TODO!: Create new task for "create new keys for box -> open box + unlock group"
     let
         getGroup groupId =
             ( groupId, Helper.dictGetWithDefault "" groupId postFixDict )
 
         getStatus groupId =
-            Request.getStatus groupId request
+            Request.getStatus groupId (getShares groupId) request
     in
         -- Collect all same groups into a single task
         Dict.foldl
@@ -260,7 +262,7 @@ getTasks request groupsNotFullyDistributed progress postFixDict tasks =
                                 [ WaitForKeysDistributed
                                     { accounts = waitForKeysDistributed
                                     , group = getGroup groupId
-                                    , progress = getProgress groupId progress
+                                    , progress = getProgress groupId (getSharesInBoxes groupId) progress
                                     , status = getStatus groupId
                                     }
                                 ]

@@ -30,7 +30,6 @@ type alias Config msg =
 
 entryError : KeyBoxes -> State -> Maybe String
 entryError boxes { password, passwordAgain, boxName } =
-    -- TODO!: has to be unique!
     if boxName == "" then
         Just "Give a name to your box"
     else if password == "" then

@@ -153,4 +153,4 @@ port didHashPwFirst : ({ name : String, key : String, salt : String, passwordHas
 port openBox : { boxId : KeyBoxId, salt : String, hashSalt : String, password : String } -> Cmd msg
 
 
-port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String } -> msg) -> Sub msg
+port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String, time : Time } -> msg) -> Sub msg

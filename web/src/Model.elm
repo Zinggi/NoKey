@@ -96,7 +96,7 @@ type Msg
     | StartCreatingKeyBox { password : String, name : String }
     | DoCreateKeyBox { name : String, key : String, salt : String, passwordHash : String, hashSalt : String, time : Time }
     | OpenBox Box String
-    | DoOpenBox { boxId : KeyBoxId, key : String, passwordHash : String }
+    | DoOpenBox { boxId : KeyBoxId, key : String, passwordHash : String, time : Time }
     | CloseBox KeyBoxId
     | ExportPasswords
     | CancelExportPassword

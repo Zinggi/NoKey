@@ -187,6 +187,11 @@ splitBytes config secret =
     splitSecret config (bytesToBigInt secret)
 
 
+splitBytes2 : ( Int, Dict comparable1 Int, Dict comparable2 Int ) -> List Int -> Seed -> ( Dict comparable1 Share, Dict comparable2 Share, Seed )
+splitBytes2 config2 secret =
+    splitSecret2 config2 (bytesToBigInt secret)
+
+
 joinToString : List Share -> Result String String
 joinToString shares =
     joinSecret shares
@@ -212,6 +217,26 @@ splitSecret ( level, xValues ) secret seed =
             makeField prime
     in
         ( getPolynomialPointsFor field coefficients xValues
+            |> Dict.map (\_ ( x, y ) -> { requiredParts = level, x = x, y = y, prime = prime })
+        , newSeed
+        )
+
+
+splitSecret2 : ( Int, Dict comparable1 Int, Dict comparable2 Int ) -> Secret -> Seed -> ( Dict comparable1 Share, Dict comparable2 Share, Seed )
+splitSecret2 ( level, xValues1, xValues2 ) secret seed =
+    let
+        prime =
+            primeBiggerThan secret
+
+        ( coefficients, newSeed ) =
+            Random.step (secretPolynom prime secret (level - 1)) seed
+
+        field =
+            makeField prime
+    in
+        ( getPolynomialPointsFor field coefficients xValues1
+            |> Dict.map (\_ ( x, y ) -> { requiredParts = level, x = x, y = y, prime = prime })
+        , getPolynomialPointsFor field coefficients xValues2
             |> Dict.map (\_ ( x, y ) -> { requiredParts = level, x = x, y = y, prime = prime })
         , newSeed
         )

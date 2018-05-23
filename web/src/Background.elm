@@ -330,7 +330,7 @@ update msg model =
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials
             -- LogIn can be ignored if we already have an entry for it,
             -- TODO: unless the group is unlocked and the entered password differs from the one we saved.
-            if Data.Sync.numberOfKnownDevices model.syncData < Data.Sync.minSecurityLevel model.syncData then
+            if Data.Sync.numberOfAvailableDevices model.syncData < Data.Sync.minSecurityLevel model.syncData then
                 model |> noCmd
             else if not isSignUp && Data.Sync.hasPasswordFor ( entry.site, entry.login ) model.syncData then
                 model |> noCmd
@@ -415,7 +415,7 @@ update msg model =
                         )
                         model.syncData
 
-                -- Create shares for the new device for all currently unlocked groups
+                -- Create shares for the new box for all currently unlocked groups
                 ( newSync2, encryptCmd ) =
                     Data.Sync.createNewSharesIfPossible encryptNewShares time newSync
             in
@@ -426,19 +426,26 @@ update msg model =
         OpenBox box pw ->
             model |> withCmds [ Ports.openBox { boxId = box.id, password = pw, salt = box.salt, hashSalt = box.hashSalt } ]
 
-        DoOpenBox { boxId, key, passwordHash } ->
+        DoOpenBox { boxId, key, passwordHash, time } ->
             let
                 mayBox =
                     Data.KeyBox.openBox boxId { key = key, passwordHash = passwordHash } (Data.Sync.getKeyBoxes model.syncData)
             in
-                (case mayBox of
+                case mayBox of
                     Ok b ->
-                        { model | syncData = Data.Sync.updateKeyBoxes (always b) model.syncData }
+                        let
+                            newSync =
+                                Data.Sync.updateKeyBoxes (always b) model.syncData
+
+                            ( newSync2, encryptCmd ) =
+                                Data.Sync.createNewSharesIfPossible encryptNewShares time newSync
+                        in
+                            { model | syncData = newSync2 }
+                                |> withCmds [ encryptCmd ]
 
                     Err e ->
                         { model | devicesView = Views.Devices.wrongPassword e model.devicesView }
-                )
-                    |> noCmd
+                            |> noCmd
 
         CloseBox id ->
             { model
@@ -547,7 +554,7 @@ saveEntry : String -> SiteEntry -> Model -> ( Model, Cmd Msg )
 saveEntry groupId entry model =
     let
         n =
-            Data.Sync.numberOfKnownDevices model.syncData
+            Data.Sync.numberOfAvailableDevices model.syncData
 
         minSecLevel =
             Data.Sync.minSecurityLevel model.syncData

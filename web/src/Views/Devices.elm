@@ -68,7 +68,7 @@ view config { syncData, uniqueIdentifyier } state =
             (Elements.myAvatar config.onSetDeviceName myId (Dict.get myId knownIds |> Maybe.withDefault ( "", "" )) []
                 :: devicesMap (viewDeviceEntry config syncData state myId) knownIds
                 ++ viewKeyBoxes config syncData state
-                ++ [ el [ height (px 30) ] none ]
+                ++ [ el [ height (px 45) ] none ]
             )
 
 
