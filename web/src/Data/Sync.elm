@@ -229,9 +229,14 @@ allGroups sync =
 -}
 groups : SyncData -> List GroupId
 groups sync =
+    groupIds sync
+        |> Set.toList
+
+
+groupIds : SyncData -> Set GroupId
+groupIds sync =
     accounts sync
         |> Dict.foldl (\_ groupId acc -> Set.insert groupId acc) Set.empty
-        |> Set.toList
 
 
 {-| Gets all the groups, and a string containing a postfix to distinguish groups of the same level.
@@ -1059,63 +1064,70 @@ mySharesFor groupId sync =
 
 createNewSharesForGroupIfPossible : (Time -> GroupId -> List ( DeviceId, ( Value, Value ) ) -> Cmd msg) -> Time -> GroupId -> SyncData -> ( SyncData, Cmd msg )
 createNewSharesForGroupIfPossible onShouldAddNewShares time groupId sync =
-    case Request.getGroupPassword groupId (mySharesFor groupId sync) sync.groupPasswordRequestsState of
-        Just groupPw ->
-            let
-                sync2 =
-                    -- insert password from stash into storage
-                    Dict.foldl
-                        (\accountId pw accSync ->
-                            insertToStorage time groupPw accountId groupId pw accSync
-                        )
-                        sync
-                        (Tasks.getStashFor groupId sync.tasks)
-                        -- remove pw from stash(es)
-                        |> clearStashes groupId
+    let
+        myShares =
+            mySharesFor groupId sync
 
-                allShares =
-                    Request.getAllShares groupId (mySharesFor groupId sync2) sync2.groupPasswordRequestsState
+        newRequest =
+            Request.unlockIfPossible groupId myShares sync.groupPasswordRequestsState
+    in
+        case Request.getGroupPassword groupId myShares newRequest of
+            Just groupPw ->
+                let
+                    sync2 =
+                        -- insert password from stash into storage
+                        Dict.foldl
+                            (\accountId pw accSync ->
+                                insertToStorage time groupPw accountId groupId pw accSync
+                            )
+                            sync
+                            (Tasks.getStashFor groupId sync.tasks)
+                            -- remove pw from stash(es)
+                            |> clearStashes groupId
 
-                sharesForBoxes =
-                    -- Generate new shares for open boxes in need of shares
-                    SecretSharing.createMoreShares (getXValuesForBoxes groupId sync2) allShares
+                    allShares =
+                        Request.getAllShares groupId myShares newRequest
 
-                newBoxes =
-                    KeyBox.storeShares sync2.id time groupId sharesForBoxes (getKeyBoxes sync2)
+                    sharesForBoxes =
+                        -- Generate new shares for open boxes in need of shares
+                        SecretSharing.createMoreShares (getXValuesForBoxes groupId sync2) allShares
 
-                newShares =
-                    -- Generate new shares for those that need them
-                    SecretSharing.createMoreShares (getXValuesFor (devicesNeedingShareFor groupId sync2) sync2) allShares
+                    newBoxes =
+                        KeyBox.storeShares sync2.id time groupId sharesForBoxes (getKeyBoxes sync2)
 
-                -- take out our share
-                ( myShares, sharesForOthers, newDistributedShares ) =
-                    case newShares of
-                        Ok shares ->
-                            case Dict.get sync2.id shares of
-                                Just share ->
-                                    ( Dict.insert groupId share sync2.myShares
-                                    , Dict.remove sync2.id shares
-                                    , addIdToDistributedShares sync2.id groupId sync2.shared.distributedShares
-                                    )
+                    newShares =
+                        -- Generate new shares for those that need them
+                        SecretSharing.createMoreShares (getXValuesFor (devicesNeedingShareFor groupId sync2) sync2) allShares
 
-                                Nothing ->
-                                    ( sync2.myShares, shares, sync2.shared.distributedShares )
+                    -- take out our share
+                    ( myNewShares, sharesForOthers, newDistributedShares ) =
+                        case newShares of
+                            Ok shares ->
+                                case Dict.get sync2.id shares of
+                                    Just share ->
+                                        ( Dict.insert groupId share sync2.myShares
+                                        , Dict.remove sync2.id shares
+                                        , addIdToDistributedShares sync2.id groupId sync2.shared.distributedShares
+                                        )
 
-                        Err e ->
-                            Debug.log "Failed to create more shares" e
-                                |> always ( sync2.myShares, Dict.empty, sync2.shared.distributedShares )
+                                    Nothing ->
+                                        ( sync2.myShares, shares, sync2.shared.distributedShares )
 
-                -- Call encryptShares port here
-                cmd =
-                    onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers sync2)
-            in
-                ( { sync2 | myShares = myShares }
-                    |> updateShared (\s -> { s | distributedShares = newDistributedShares, keyBoxes = newBoxes })
-                , cmd
-                )
+                            Err e ->
+                                Debug.log "Failed to create more shares" e
+                                    |> always ( sync2.myShares, Dict.empty, sync2.shared.distributedShares )
 
-        Nothing ->
-            ( sync, Cmd.none )
+                    -- Call encryptShares port here
+                    cmd =
+                        onShouldAddNewShares time groupId (getAssociatedKeys sharesForOthers sync2)
+                in
+                    ( { sync2 | myShares = myNewShares, groupPasswordRequestsState = newRequest }
+                        |> updateShared (\s -> { s | distributedShares = newDistributedShares, keyBoxes = newBoxes })
+                    , cmd
+                    )
+
+            Nothing ->
+                ( { sync | groupPasswordRequestsState = newRequest }, Cmd.none )
 
 
 {-| Update the group status, and in case we want to fill the password once it's ready, keep track of that
@@ -1156,7 +1168,14 @@ unlockGroup1IfExists sync =
 
 getTasks : SyncData -> List Task
 getTasks sync =
-    Tasks.getTasks (\g -> mySharesFor g sync) (\g -> KeyBox.numberOfsharesFor g sync.shared.keyBoxes) sync.groupPasswordRequestsState (groupsNotFullyDistributed sync) (distributedShares sync) (namedGroupsDict sync) sync.tasks
+    Tasks.getTasks (\g -> mySharesFor g sync)
+        (\g -> KeyBox.numberOfsharesFor g sync.shared.keyBoxes)
+        (KeyBox.boxesNeedingShares (groupIds sync) sync.shared.keyBoxes)
+        sync.groupPasswordRequestsState
+        (groupsNotFullyDistributed sync)
+        (distributedShares sync)
+        (namedGroupsDict sync)
+        sync.tasks
 
 
 distributedShares : SyncData -> Dict GroupId (Set DeviceId)

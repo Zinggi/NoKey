@@ -33,6 +33,7 @@ import Json.Decode.Extra as JD
 import Json.Decode.Pipeline as JD exposing (required, optional)
 import Data.RequestGroupPassword as Request exposing (PasswordStatus(..), Status)
 import Data exposing (..)
+import Data.KeyBox exposing (Box)
 import SecretSharing exposing (Share)
 import Helper exposing (encodeTuple3, decodeTuple3, encodeTuple, decodeTuple, encodeSet, decodeSet)
 
@@ -130,6 +131,7 @@ type Task
     | WaitForKeysDistributed { accounts : Dict String (Dict String ()), group : Group, status : Status, progress : Int }
     | CreateMoreShares { for : List Device, group : Group, status : Status }
     | ExportPws { done : List ( Group, Status ), toDo : List ( Group, Status ) }
+    | CreateSharesForKeyBox { for : Box, groups : List ( Group, Status ) }
 
 
 resolveWaitingTasks : (GroupId -> Int) -> Dict AccountId GroupId -> Dict GroupId (Set String) -> TaskList -> TaskList
@@ -215,8 +217,8 @@ getProgress groupId sharesInBoxes dict =
     (Dict.get groupId dict |> Maybe.map Set.size |> Maybe.withDefault 0) + sharesInBoxes
 
 
-getTasks : (GroupId -> List Share) -> (GroupId -> Int) -> Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> Dict GroupId String -> TaskList -> List Task
-getTasks getShares getSharesInBoxes request groupsNotFullyDistributed progress postFixDict tasks =
+getTasks : (GroupId -> List Share) -> (GroupId -> Int) -> List ( Box, Set GroupId ) -> Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> Dict GroupId String -> TaskList -> List Task
+getTasks getShares getSharesInBoxes boxesNeedingShares request groupsNotFullyDistributed progress postFixDict tasks =
     -- TODO!: Create new task for "create new keys for box -> open box + unlock group"
     let
         getGroup groupId =
@@ -224,6 +226,10 @@ getTasks getShares getSharesInBoxes request groupsNotFullyDistributed progress p
 
         getStatus groupId =
             Request.getStatus groupId (getShares groupId) request
+
+        toDisplay gs =
+            Set.toList gs
+                |> List.map (\g -> ( getGroup g, getStatus g ))
     in
         -- Collect all same groups into a single task
         Dict.foldl
@@ -320,15 +326,20 @@ getTasks getShares getSharesInBoxes request groupsNotFullyDistributed progress p
                                     Dict.keys postFixDict
                                         |> Set.fromList
                                         |> (\all -> Set.diff all done)
-
-                                toDisplay gs =
-                                    Set.toList gs
-                                        |> List.map (\g -> ( getGroup g, getStatus g ))
                             in
                                 ExportPws { done = toDisplay done, toDo = toDisplay todo } :: ts
 
                         Nothing ->
                             ts
+               )
+            -- add CreateSharesForKeyBox
+            |> (\ts ->
+                    List.foldl
+                        (\( box, gs ) acc ->
+                            CreateSharesForKeyBox { for = box, groups = toDisplay gs } :: acc
+                        )
+                        ts
+                        boxesNeedingShares
                )
 
 

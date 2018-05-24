@@ -1,6 +1,7 @@
 module Views.Devices exposing (view, actionButton, Config, State, init, clear, wrongPassword, closeBox)
 
 import Dict exposing (Dict)
+import Set
 import Element exposing (..)
 import Elements
 import Styles
@@ -93,15 +94,13 @@ viewKeyBoxes config syncData state =
 
         bs =
             Data.KeyBox.mapBoxes
-                (\box isOpen ->
+                (\box ->
                     column [ height shrink ]
                         [ Elements.keyBox
                             (config.toMsg { state | selectedBox = Just (initBox box.id) })
                             (config.onCloseBox box.id)
-                            box.id
-                            box.name
-                            isOpen
-                        , if not isOpen then
+                            box
+                        , if not box.isOpen then
                             case state.selectedBox of
                                 Just b ->
                                     if b.id == box.id then
@@ -132,7 +131,7 @@ viewKeyBoxes config syncData state =
                           else
                             let
                                 gs =
-                                    Elements.groupIcons syncData box.hasShares
+                                    Elements.groupIcons syncData (Set.toList box.hasShares)
                             in
                                 Elements.paragraph []
                                     (if List.isEmpty gs then

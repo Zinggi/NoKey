@@ -222,6 +222,29 @@ viewTask config sync state task =
                             ]
                     ]
 
+            CreateSharesForKeyBox { groups, for } ->
+                card
+                    ([ Elements.paragraph [ spacing (Styles.paddingScale 1) ]
+                        [ el [ alignLeft ] (viewGroupsStatus config groups False)
+                        , if for.isOpen then
+                            none
+                          else if allGroupsUnlocked groups then
+                            Elements.text "open key box"
+                          else
+                            Elements.text "and open key box"
+                        ]
+                     ]
+                        ++ (if for.isOpen then
+                                [ Elements.text "to create keys for key box"
+                                , Elements.keyBoxShort for
+                                ]
+                            else
+                                [ Elements.keyBoxShort for
+                                , Elements.text "to create keys for it."
+                                ]
+                           )
+                    )
+
 
 passwords : Config msg -> State -> Views.PasswordGenerator.State -> SyncData -> Element msg
 passwords config state requirementsState sync =
@@ -421,6 +444,14 @@ viewGroup group status =
 
         _ ->
             Elements.groupIcon True group
+
+
+allGroupsUnlocked : List ( Group, Status ) -> Bool
+allGroupsUnlocked gs =
+    Dict.groupBy (Tuple.second >> RequestPassword.statusToComparable) gs
+        |> Dict.toList
+        |> List.filter (\( status, _ ) -> status /= "Done")
+        |> List.isEmpty
 
 
 viewGroupsStatus : Config msg -> List ( Group, Status ) -> Bool -> Element msg

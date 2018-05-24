@@ -25,6 +25,7 @@ module Data.RequestGroupPassword
         , getGroupPassword
         , lockGroups
         , statusToComparable
+        , unlockIfPossible
         )
 
 import Dict exposing (Dict)
@@ -196,6 +197,15 @@ updateGroupPws fn (State ({ groupPws } as state)) =
 
 updatePws fn (State ({ pws } as state)) =
     State { state | pws = fn pws }
+
+
+unlockIfPossible : GroupId -> List Share -> State -> State
+unlockIfPossible gId shares state =
+    updateGroupPws
+        (Dict.update gId
+            (Maybe.map (\info -> tryGetPassword gId shares info))
+        )
+        state
 
 
 addShare : GroupId -> List Share -> Share -> State -> ( State, Maybe AccountId )

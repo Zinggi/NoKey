@@ -19,6 +19,7 @@ module Data.KeyBox
         , numberOfBoxes
         , numberOfOpenBoxes
         , numberOfsharesFor
+        , boxesNeedingShares
         )
 
 import Time exposing (Time)
@@ -38,14 +39,11 @@ import Helper exposing (encodeTuple2, decodeTuple2)
 import AES
 
 
--- TODO:
---  Make use of those functions + ports for web crypto
---      Create a new box (boxes are created in the 'open' state) - ok -> used
---      Add a share (shares are only added if the box is open) - ok -> used
---      Open a box - ok -> used
---      Close a box - ok -> used
---      Close all boxes - ok
---      Get shares - ok -> used
+--  This module provides funcionality to:
+--      Create a new box (boxes are created in the 'open' state)
+--      Add a share (shares are only added if the box is open)
+--      Open/Close a box
+--      Get shares out of a box
 --
 --  For the password hash:
 --  - https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey
@@ -96,7 +94,7 @@ type alias KeyBox =
 
 
 type alias Box =
-    { name : String, salt : String, hashSalt : String, id : KeyBoxId, hasShares : List GroupId }
+    { name : String, id : KeyBoxId, hasShares : Set GroupId, isOpen : Bool, salt : String, hashSalt : String }
 
 
 init : Seed -> KeyBoxes
@@ -104,13 +102,34 @@ init seed =
     { data = ORDict.init seed, seed = seed, openBoxes = Dict.empty }
 
 
-keyBoxToBox id { name, salt, hashSalt, encryptedShares } =
+keyBoxToBox id { name, salt, hashSalt, encryptedShares } boxes =
     { id = id
     , name = TimestampedVersionRegister.get name
+    , hasShares = ORDict.keys encryptedShares
+    , isOpen = Dict.member id boxes.openBoxes
     , salt = salt
     , hashSalt = hashSalt
-    , hasShares = ORDict.keys encryptedShares |> Set.toList
     }
+
+
+boxesNeedingShares : Set GroupId -> KeyBoxes -> List ( Box, Set GroupId )
+boxesNeedingShares allGs boxes =
+    Dict.foldl
+        (\id box acc ->
+            let
+                b =
+                    keyBoxToBox id box boxes
+
+                gNeeded =
+                    Set.diff allGs b.hasShares
+            in
+                if Set.isEmpty gNeeded then
+                    acc
+                else
+                    ( b, gNeeded ) :: acc
+        )
+        []
+        (ORDict.get boxes.data)
 
 
 numberOfBoxes : KeyBoxes -> Int
@@ -155,12 +174,12 @@ getOpenAndInNeedOfShare groupId boxes =
                 []
 
 
-mapBoxes : (Box -> Bool -> b) -> KeyBoxes -> List b
+mapBoxes : (Box -> a) -> KeyBoxes -> List a
 mapBoxes fn boxes =
     ORDict.get boxes.data
         |> Dict.foldl
             (\id box acc ->
-                fn (keyBoxToBox id box) (Dict.member id boxes.openBoxes) :: acc
+                fn (keyBoxToBox id box boxes) :: acc
             )
             []
 

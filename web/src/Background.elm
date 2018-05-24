@@ -442,6 +442,7 @@ update msg model =
                         in
                             { model | syncData = newSync2 }
                                 |> withCmds [ encryptCmd ]
+                                |> andThenUpdate Api.syncToOthers
 
                     Err e ->
                         { model | devicesView = Views.Devices.wrongPassword e model.devicesView }

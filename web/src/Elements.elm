@@ -19,6 +19,7 @@ import HashIcon
 import Icons exposing (Icon)
 import Data exposing (..)
 import Data.Sync exposing (SyncData)
+import Data.KeyBox exposing (KeyBoxId, Box)
 import Route exposing (Page(..))
 import Helper
 
@@ -597,13 +598,26 @@ toggleMoreButton onOpen labelClosed labelOpen isOpen =
         }
 
 
-keyBox : msg -> msg -> ( String, Int ) -> String -> Bool -> Element msg
-keyBox onOpen onClose ( ids, idi ) name isOpen =
+keyBox : msg -> msg -> Box -> Element msg
+keyBox onOpen onClose box =
     row [ spacing (Styles.scaled 1) ]
-        [ hashIcon (ids ++ toString idi)
-        , text name
-        , el [ alignRight ] (keyBoxButton onOpen onClose isOpen)
+        [ hashIconBox box.id
+        , text box.name
+        , el [ alignRight ] (keyBoxButton onOpen onClose box.isOpen)
         ]
+
+
+keyBoxShort : Box -> Element msg
+keyBoxShort box =
+    row [ spacing (Styles.scaled 1), width shrink ]
+        [ hashIconBox box.id
+        , text box.name
+        ]
+
+
+hashIconBox : KeyBoxId -> Element msg
+hashIconBox ( ids, idi ) =
+    hashIcon (ids ++ toString idi)
 
 
 keyBoxButton : msg -> msg -> Bool -> Element msg
