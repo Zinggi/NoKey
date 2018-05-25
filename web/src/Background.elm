@@ -137,12 +137,13 @@ update msg model =
 
         DoMovePassword accountId from to time ->
             let
-                ( newSync, groupsToRequest ) =
-                    Data.Sync.movePassword time accountId from to model.syncData
+                ( newSync, groupsToRequest, newSeed, cmd ) =
+                    Data.Sync.movePassword encryptNewShares model.seed time accountId from to model.syncData
             in
-                { model | syncData = newSync }
+                { model | syncData = newSync, seed = newSeed, passwordsView = Views.Passwords.finishEdit model.passwordsView }
                     |> Api.syncToOthers
                     |> andThenUpdate (Api.requestShares groupsToRequest)
+                    |> addCmds [ cmd ]
 
         AddPassword pw ->
             let
@@ -454,6 +455,10 @@ update msg model =
                 , devicesView = Views.Devices.closeBox model.devicesView
             }
                 |> noCmd
+
+        DeleteBox id ->
+            { model | syncData = Data.Sync.updateKeyBoxes (Data.KeyBox.deleteBox id) model.syncData }
+                |> Api.syncToOthers
 
         ExportPasswords ->
             let

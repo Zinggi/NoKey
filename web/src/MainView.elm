@@ -298,6 +298,7 @@ devicesConfig =
     , onCreateKeyBox = NavigateTo CreateKeyBox
     , onOpenBox = OpenBox
     , onCloseBox = CloseBox
+    , onDeleteBox = DeleteBox
     }
 
 

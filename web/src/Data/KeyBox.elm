@@ -20,6 +20,7 @@ module Data.KeyBox
         , numberOfOpenBoxes
         , numberOfsharesFor
         , boxesNeedingShares
+        , deleteBox
         )
 
 import Time exposing (Time)
@@ -100,6 +101,12 @@ type alias Box =
 init : Seed -> KeyBoxes
 init seed =
     { data = ORDict.init seed, seed = seed, openBoxes = Dict.empty }
+
+
+deleteBox : KeyBoxId -> KeyBoxes -> KeyBoxes
+deleteBox id boxes =
+    { boxes | data = ORDict.remove id boxes.data }
+        |> closeBox id
 
 
 keyBoxToBox id { name, salt, hashSalt, encryptedShares } boxes =

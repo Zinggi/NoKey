@@ -369,7 +369,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                                     Elements.groupIcon True group
                                                 )
                                                 (\( g, _ ) -> Just g == state.selectedGroup)
-                                                (Data.Sync.namedGroups sync |> List.filter (\( g, _ ) -> groupId /= g))
+                                                (Data.Sync.getReasonableGroups sync |> List.filter (\( g, _ ) -> groupId /= g))
                                             )
                                         , row [ spacing (Styles.paddingScale 0) ]
                                             [ Elements.button (Just (config.toMsg CancelEdit)) "Cancel Move"
@@ -393,7 +393,7 @@ viewSiteData config state requirementsState sync siteName userNames group disabl
                                 else
                                     row [ spacing (Styles.paddingScale 0) ]
                                         [ Elements.button (Just (config.toMsg (EditPassword ( siteName, login )))) "Edit"
-                                        , if List.length (Data.Sync.groups sync) >= 2 then
+                                        , if List.length (Data.Sync.getReasonableGroups sync) >= 2 then
                                             Elements.button (Just (config.toMsg (MovePw ( siteName, login )))) "Move"
                                           else
                                             none

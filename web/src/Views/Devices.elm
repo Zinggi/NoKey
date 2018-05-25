@@ -12,12 +12,12 @@ import Icons
 
 
 type alias State =
-    { confirmDelete : Maybe String, isActionButtonOpen : Bool, selectedBox : Maybe BoxState }
+    { confirmDelete : Maybe String, isActionButtonOpen : Bool, selectedBox : Maybe BoxState, confirmBoxDelete : Maybe KeyBoxId }
 
 
 init : State
 init =
-    { confirmDelete = Nothing, isActionButtonOpen = False, selectedBox = Nothing }
+    { confirmDelete = Nothing, isActionButtonOpen = False, selectedBox = Nothing, confirmBoxDelete = Nothing }
 
 
 clear : State -> State
@@ -48,6 +48,11 @@ wrongPassword err state =
     { state | selectedBox = Maybe.map (\b -> { b | error = Just err }) state.selectedBox }
 
 
+confirmDelete : Maybe KeyBoxId -> State -> State
+confirmDelete mId state =
+    { state | confirmBoxDelete = mId }
+
+
 type alias Config msg =
     { toMsg : State -> msg
     , onSetDeviceName : String -> msg
@@ -56,6 +61,7 @@ type alias Config msg =
     , onCreateKeyBox : msg
     , onOpenBox : Box -> String -> msg
     , onCloseBox : KeyBoxId -> msg
+    , onDeleteBox : KeyBoxId -> msg
     }
 
 
@@ -131,16 +137,28 @@ viewKeyBoxes config syncData state =
                           else
                             let
                                 gs =
-                                    Elements.groupIcons syncData (Set.toList box.hasShares)
+                                    Elements.groupIcons (Set.toList box.hasShares)
+
+                                del =
+                                    if state.confirmBoxDelete == Just box.id then
+                                        deleteWarning (config.toMsg (confirmDelete Nothing state))
+                                            (config.onDeleteBox box.id)
+                                            syncData
+                                            "key box"
+                                    else
+                                        Elements.button (Just (config.toMsg (confirmDelete (Just box.id) state))) "Delete"
                             in
-                                Elements.paragraph []
-                                    (if List.isEmpty gs then
-                                        [ Elements.text "No Keys in here yet." ]
-                                     else
-                                        [ Elements.text "Has keys for "
-                                        , row [] gs
-                                        ]
-                                    )
+                                column [ spacing (Styles.paddingScale 2) ]
+                                    [ Elements.paragraph []
+                                        (if List.isEmpty gs then
+                                            [ Elements.text "No Keys in here yet." ]
+                                         else
+                                            [ Elements.text "Has keys for "
+                                            , row [] gs
+                                            ]
+                                        )
+                                    , del
+                                    ]
                         ]
                 )
                 boxes
@@ -165,31 +183,35 @@ viewDeviceEntry config sync state myId uuid ( name, idPart ) =
                     Elements.delete (config.toMsg { state | confirmDelete = Just uuid })
                 ]
             , if state.confirmDelete == Just uuid then
-                let
-                    numDevAfter =
-                        Data.Sync.numberOfKnownDevices sync - 1
-                in
-                    column [ spacing (Styles.paddingScale 1) ]
-                        [ Elements.b "Are you sure?"
-                        , Elements.p "Do you really want to remove this device?"
-                        , if numDevAfter < Data.Sync.maxUsedSecurityLevel sync then
-                            Elements.paragraph []
-                                [ Elements.b "WARNING"
-                                , Elements.text "If you remove this device, the passwords saved in "
-                                , Data.Sync.namedGroupsWithLevel (\l -> l > numDevAfter) sync
-                                    |> Elements.enumeration (Elements.groupIcon True)
-                                    |> row []
-                                , Elements.text "will no longer be accessible. Better pair one more device and remove it then"
-                                ]
-                          else
-                            none
-                        , row [ spacing (Styles.paddingScale 0) ]
-                            [ Elements.button (Just (config.toMsg { state | confirmDelete = Nothing })) "Cancel"
-                            , Elements.deleteDanger (config.onRemoveDevice uuid)
-                            ]
-                        ]
+                deleteWarning (config.toMsg { state | confirmDelete = Nothing }) (config.onRemoveDevice uuid) sync "device"
               else
                 none
+            ]
+
+
+deleteWarning onCancel onDelete sync removeWhat =
+    let
+        numDevAfter =
+            Data.Sync.numberOfKnownDevices sync - 1
+    in
+        column [ spacing (Styles.paddingScale 1) ]
+            [ Elements.b "Are you sure?"
+            , Elements.p ("Do you really want to remove this " ++ removeWhat ++ "?")
+            , if numDevAfter < Data.Sync.maxUsedSecurityLevel sync then
+                Elements.paragraph []
+                    [ Elements.b "WARNING"
+                    , Elements.text ("If you remove this " ++ removeWhat ++ ", the passwords saved in ")
+                    , Data.Sync.namedGroupsWithLevel (\l -> l > numDevAfter) sync
+                        |> Elements.enumeration (Elements.groupIcon True)
+                        |> row []
+                    , Elements.text "will no longer be accessible. Better pair one more device and remove it then"
+                    ]
+              else
+                none
+            , row [ spacing (Styles.paddingScale 0) ]
+                [ Elements.button (Just onCancel) "Cancel"
+                , Elements.deleteDanger onDelete
+                ]
             ]
 
 

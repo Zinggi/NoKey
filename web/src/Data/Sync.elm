@@ -244,6 +244,12 @@ groupIds sync =
 namedGroups : SyncData -> List Group
 namedGroups sync =
     groups sync
+        |> getNamedGroupsFor
+
+
+getNamedGroupsFor : List GroupId -> List Group
+getNamedGroupsFor gs =
+    gs
         |> Dict.groupBy Tuple.first
         -- Now we have a Dict Level (List GroupId)
         |> Dict.map
@@ -253,16 +259,6 @@ namedGroups sync =
             )
         -- Now we have a Dict Level (List (GroupId, PostFix))
         |> Dict.foldl (\_ inner acc -> acc ++ inner) []
-
-
-getNamedGroupsFor : List GroupId -> SyncData -> List Group
-getNamedGroupsFor gIds sync =
-    let
-        ids =
-            Set.fromList gIds
-    in
-        namedGroups sync
-            |> List.filter (\( id, _ ) -> Set.member id ids)
 
 
 namedGroupsWithLevel : (Int -> Bool) -> SyncData -> List Group
@@ -803,8 +799,8 @@ doMovePassword time accountId toPw to sync =
                 |> always sync
 
 
-movePassword : Time -> AccountId -> GroupId -> GroupId -> SyncData -> ( SyncData, List GroupId )
-movePassword time accountId from to sync =
+movePassword : ShouldAddNewShares msg -> RandomE.Seed -> Time -> AccountId -> GroupId -> GroupId -> SyncData -> ( SyncData, List GroupId, RandomE.Seed, Cmd msg )
+movePassword onShouldAddNewShares seed time accountId from to sync =
     let
         getGroupPw g =
             Request.getGroupPassword g (mySharesFor g sync) sync.groupPasswordRequestsState
@@ -820,16 +816,31 @@ movePassword time accountId from to sync =
                             s
                             groups
                    )
-                |> (\s -> ( s, groups ))
+                |> (\s -> ( s, groups, seed, Cmd.none ))
     in
         case ( getGroupPw from, getGroupPw to ) of
             ( Just fromPw, Just toPw ) ->
                 -- We can move the password
-                ( doMovePassword time accountId toPw to sync, [] )
+                ( doMovePassword time accountId toPw to sync, [], seed, Cmd.none )
 
             -- add to task if we can't do it right now
-            ( Just _, Nothing ) ->
-                addToTasks sync [ to ]
+            ( Just fromPw, Nothing ) ->
+                if List.member to (allGroups sync) then
+                    -- If the group exists, we add it as a task
+                    addToTasks sync [ to ]
+                else
+                    case getPassword accountId sync of
+                        Just pw ->
+                            let
+                                -- generate new group password and insert account there
+                                ( newSync, seed2, _, cmd ) =
+                                    insertSite onShouldAddNewShares time seed accountId to pw sync
+                            in
+                                ( newSync, [], seed2, cmd )
+
+                        Nothing ->
+                            Debug.log "We have the group password, but can't decode the password? Why??" ()
+                                |> always ( sync, [], seed, Cmd.none )
 
             ( Nothing, Just _ ) ->
                 addToTasks sync [ from ]
@@ -1199,6 +1210,44 @@ groupIdsWithShare ids sync =
         )
         []
         ids
+
+
+{-| This gives us a list of groups that make sense when moving passwords. It contains:
+
+  - All existing groups
+  - Level 1 group if it doesn't exist yet and if the user has set "allow level 1"
+  - Level 2, 3 group if it doesn't exists yet and the user has enough devices for it
+
+-}
+getReasonableGroups : SyncData -> List Group
+getReasonableGroups sync =
+    let
+        n =
+            numberOfAvailableDevices sync
+
+        gs =
+            groupIds sync
+
+        contains lvl =
+            Set.foldl (\( l, _ ) acc -> l == lvl || acc) False gs
+
+        add lvl all =
+            if n >= lvl && not (contains lvl) then
+                Set.insert ( lvl, (currentGroupId lvl sync) ) all
+            else
+                all
+    in
+        gs
+            |> (\all ->
+                    if (getSettings sync).allowLevel1 && not (contains 1) then
+                        Set.insert ( 1, (currentGroupId 1 sync) ) all
+                    else
+                        all
+               )
+            |> add 2
+            |> add 3
+            |> Set.toList
+            |> getNamedGroupsFor
 
 
 currentGroupId : Int -> SyncData -> String

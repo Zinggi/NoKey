@@ -666,13 +666,13 @@ groupIcon isLocked ( ( level, _ ), post ) =
         ]
 
 
-groupIcons : SyncData -> List GroupId -> List (Element msg)
-groupIcons sync groups =
+groupIcons : List GroupId -> List (Element msg)
+groupIcons groups =
     let
         gs =
-            Data.Sync.getNamedGroupsFor groups sync
+            Data.Sync.getNamedGroupsFor groups
     in
-        enumeration (groupIcon False) gs
+        enumeration (groupIcon True) gs
 
 
 avatar : List (Attribute msg) -> Data.Device -> Element msg

@@ -98,6 +98,7 @@ type Msg
     | OpenBox Box String
     | DoOpenBox { boxId : KeyBoxId, key : String, passwordHash : String, time : Time }
     | CloseBox KeyBoxId
+    | DeleteBox KeyBoxId
     | ExportPasswords
     | CancelExportPassword
     | OnImportPasswords Ports.FileData
