@@ -1,27 +1,34 @@
-<h2>Welcome to NoKey!</h2>
 <p class="lead">
-  NoKey is a distributed password manager without a master password.
-  <i>TODO</i>
+  NoKey is a distributed password manager that works without a master password.
 </p>
-<h3>Try the alpha version</h3>
+<p class="lead">
+  Instead, you can unlock your passwords by confirming from another device.
+  E.g. if you need a password on your PC, you only have to confirm this on your phone.
+  No need to remember any passwords!
+</p>
+
+<h3>How does it work?</h3>
 <p>
-  You can try out NoKey right now, but it's in an early alpha phase.
-  This means that there will be bugs and things that don't work, but you can still give it a try.
+Your passwords are encrypted using a strong, randomly generated password, here called group password.
+This group password is never stored anywhere directly. Instead, NoKey uses <a href="https://en.wikipedia.org/wiki/Shamir's_Secret_Sharing">Shamir's Secret Sharing</a>
+to split the group password into multiple shares (called keys in NoKey).
+When you confirm you want to unlock a group on another device, the device sends its key to the one that requested it.
+Then, if enough keys have been collected, the requester can recover the group password and with that decrypt your stored passwords.
 </p>
 <p>
-  <b>Don't rely on NoKey just yet!</b> There will probably be backwards incompatible changes before a proper release,
-  which would mean that if you would already rely on it now, you would lose your passwords once it's out of alpha.
+  For a more in depth explanation, you can check out the project report (coming soon).
+</p>
+<h3>Try the beta version</h3>
+<p>
+  You can try out NoKey right now, but there might still be some issues.
 </p>
 <p>
   You can report issues <a href="https://github.com/Zinggi/NoKey/issues">here on GitHub</a>.
 </p>
+<p>
+  <b>Don't use multiple clients on the same device!</b>
+<p/>
 <div class="row">
-  <%# <div class="col-lg-4"> %>
-  <%#   <h4>Web app</h4> %>
-  <%#   <p> %>
-  <%#     Try it right now in your browser: <a href="<%= page_path(@conn, :webApp) % >">Start the web app</a> %>
-  <%#   </p> %>
-  <%# </div> %>
   <div class="col-lg-4">
     <h4>Android</h4>
     <p>
@@ -46,7 +53,4 @@
   If none of these options work for you, you can try the <a href="<%= page_path(@conn, :webApp) %>">web app</a>.
   For Safari, there is currently no option that works.
 </p>
-<p>
-  <b>Don't use multiple clients on the same device.</b>
-<p/>
 

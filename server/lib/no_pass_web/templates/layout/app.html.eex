@@ -9,11 +9,20 @@
 
     <title>NoKey</title>
 
-
     <link rel="stylesheet" href="/lib/theme.min.css">
+    <style>
+      body {
+        background: rgb(255,241,222);
+      }
+      p {
+        max-width: 720px;
+        font-size: 1.2em;
+        font-weight: lighter;
+      }
+    </style>
   </head>
 
-  <body style="background: rgb(255,241,222);">
+  <body>
     <div class="container">
       <div class="page-header">
         <img src="/imgs/logo.svg" style="width: 100%;max-width: 500px;" alt="NoKey logo" />
