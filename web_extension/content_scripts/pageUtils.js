@@ -165,7 +165,6 @@ const closePopup = () => {
 };
 
 const closePopupFor = (time) => {
-    // TODO!
     closePopup();
     disablePopup();
     setTimeout(() => { enablePopup(); }, time);

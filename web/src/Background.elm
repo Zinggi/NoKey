@@ -320,12 +320,19 @@ update msg model =
             let
                 newSiteEntry =
                     if model.newSiteEntry.siteName == "" || Just model.newSiteEntry.siteName == model.currentSite then
+                        -- Pre fill the site name in the add new account dialogue if it was previously empty
+                        -- or if it contained the previous site
                         Data.PasswordMeta.setSiteName site model.newSiteEntry
                     else
                         model.newSiteEntry
+
+                newModel =
+                    { model | currentSite = Just site, newSiteEntry = newSiteEntry }
             in
-                { model | currentSite = Just site, newSiteEntry = newSiteEntry }
-                    |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
+                if Data.Settings.isDeactivatedFor site model.syncData.shared.settings then
+                    newModel |> noCmd
+                else
+                    newModel |> withCmds [ Ports.accountsForSite (Data.Sync.getAccountsForSite site model.syncData) ]
 
         AddSiteEntry { isSignUp, entry } ->
             -- TODO: type can be either SignUp | LogIn | UpdateCredentials

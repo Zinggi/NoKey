@@ -16,6 +16,7 @@ module Data.Settings
         , get
         , set
         , deactivateForSite
+        , isDeactivatedFor
         , setDoneWithTutorial
         )
 
@@ -30,20 +31,6 @@ import Time exposing (Time)
 import Random.Pcg as Random exposing (Seed)
 import Crdt.TimestampedVersionRegister as TimestampedVersionRegister exposing (TimestampedVersionRegister)
 import Crdt.ORSet as ORSet exposing (ORSet)
-
-
-{- TODO: update news + sync if read tutorial
-
-   save last seen update news for version number:
-       start at v 0.0.0.
-       If the current version number is bigger than our last seen,
-       show all news with v >= currentV
-
-       save news in a Dict Version Content
-
-       save read news and sync, so we only have to read once
-
--}
 
 
 type alias SharedSettings =
@@ -66,12 +53,12 @@ type alias Settings =
 
 currentVersion =
     -- TODO!: change if a new version is released
-    "0.3.0"
+    "0.4.0"
 
 
 allVersions =
     -- TODO!: update this on big releases, e.g. if you want to include some text
-    Set.fromList [ "0.3" ]
+    Set.fromList [ "0.3.0", "0.4.0" ]
 
 
 get : SharedSettings -> Settings
@@ -97,6 +84,11 @@ set id time settings shared =
 deactivateForSite : String -> SharedSettings -> SharedSettings
 deactivateForSite site opt =
     { opt | deactivateForSite = ORSet.add site opt.deactivateForSite }
+
+
+isDeactivatedFor : String -> SharedSettings -> Bool
+isDeactivatedFor site settings =
+    Set.member site (ORSet.get settings.deactivateForSite)
 
 
 removeFromIgnored : String -> SharedSettings -> SharedSettings

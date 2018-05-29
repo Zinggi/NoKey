@@ -219,7 +219,6 @@ getProgress groupId sharesInBoxes dict =
 
 getTasks : (GroupId -> List Share) -> (GroupId -> Int) -> List ( Box, Set GroupId ) -> Request.State -> Dict GroupId (List Device) -> Dict GroupId (Set String) -> Dict GroupId String -> TaskList -> List Task
 getTasks getShares getSharesInBoxes boxesNeedingShares request groupsNotFullyDistributed progress postFixDict tasks =
-    -- TODO!: Create new task for "create new keys for box -> open box + unlock group"
     let
         getGroup groupId =
             ( groupId, Helper.dictGetWithDefault "" groupId postFixDict )
