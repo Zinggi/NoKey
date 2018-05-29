@@ -44,7 +44,7 @@ Then, if enough keys have been collected, the requester can recover the group pa
   <div class="col-lg-4">
     <h4>Firefox Extension</h4>
     <p>
-      Download it here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.3/nokey-0.3-firefox.xpi">Firefox Extension</a>
+      Download it here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.4.0/nokey-0.4.0-firefox.xpi">Firefox Extension</a>
     </p>
   </div>
 </div>
