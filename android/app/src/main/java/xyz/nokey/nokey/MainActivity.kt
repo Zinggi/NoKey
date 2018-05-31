@@ -43,7 +43,7 @@ class MainActivity : Activity() {
     // val appBaseUrl = "https://10.2.121.215:3001"
 
     // TODO! change shell version if android apk changes
-    val androidShellVersion: String = "0.3"
+    val androidShellVersion: String = "0.4.0"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
