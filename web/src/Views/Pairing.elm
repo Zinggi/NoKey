@@ -95,7 +95,7 @@ view config isAndroid diag =
     let
         inp isEnabled rest =
             column [ spacing (Styles.paddingScale 2) ]
-                [ column [] [ Elements.p "Use your other device to scan the QR code of the other device or type the words shown below it" ]
+                [ column [] [ Elements.p "Use your other device to scan the QR code or type in the words shown below it" ]
                 , row
                     (spacing (Styles.paddingScale 1)
                         :: if shouldShowPairButton diag.inputToken then
