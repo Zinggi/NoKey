@@ -25,7 +25,7 @@ clear s =
 
 
 type alias Config msg =
-    { toMsg : State -> msg, onCancel : msg, onCreateKeyBox : { password : String, name : String } -> msg }
+    { toMsg : State -> msg, onCancel : msg, onCreateKeyBox : { password : String, name : String, itterations : Int } -> msg }
 
 
 entryError : KeyBoxes -> State -> Maybe String
@@ -82,7 +82,7 @@ view config model state =
                     row []
                         [ cancelBtn
                         , Elements.primaryButton
-                            (Just (config.onCreateKeyBox { password = state.password, name = state.boxName }))
+                            (Just (config.onCreateKeyBox { password = state.password, name = state.boxName, itterations = Boxes.numItterations }))
                             "Create key box"
                         ]
             ]

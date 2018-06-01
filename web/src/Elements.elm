@@ -603,6 +603,8 @@ keyBox onOpen onClose box =
     row [ spacing (Styles.scaled 1) ]
         [ hashIconBox box.id
         , text box.name
+
+        -- , text (": " ++ toString box.itterations)
         , el [ alignRight ] (keyBoxButton onOpen onClose box.isOpen)
         ]
 

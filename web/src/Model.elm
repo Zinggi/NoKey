@@ -93,7 +93,7 @@ type Msg
     | DoSetSettings Settings Time
       -- | AddDrivePressed
     | UpdateCreateKeyBox Views.CreateKeyBox.State
-    | StartCreatingKeyBox { password : String, name : String }
+    | StartCreatingKeyBox { password : String, name : String, itterations : Int }
     | DoCreateKeyBox { name : String, key : String, salt : String, passwordHash : String, hashSalt : String, time : Time }
     | OpenBox Box String
     | DoOpenBox { boxId : KeyBoxId, key : String, passwordHash : String, time : Time }

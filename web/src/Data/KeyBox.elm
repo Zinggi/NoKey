@@ -21,6 +21,7 @@ module Data.KeyBox
         , numberOfsharesFor
         , boxesNeedingShares
         , deleteBox
+        , numItterations
         )
 
 import Time exposing (Time)
@@ -81,6 +82,9 @@ type alias KeyBox =
     -- Static. When merging, the second one wins, as these parameters shouldn't change.
     , salt : String
 
+    -- How many itterations are used for hashing the password?
+    , itterations : Int
+
     -- The hashAlgorithm might change in a future version,
     -- but then we can just create a new box to make use of the new algorithm and
     --introduce that field then.
@@ -95,7 +99,7 @@ type alias KeyBox =
 
 
 type alias Box =
-    { name : String, id : KeyBoxId, hasShares : Set GroupId, isOpen : Bool, salt : String, hashSalt : String }
+    { name : String, id : KeyBoxId, hasShares : Set GroupId, isOpen : Bool, salt : String, hashSalt : String, itterations : Int }
 
 
 init : Seed -> KeyBoxes
@@ -109,13 +113,22 @@ deleteBox id boxes =
         |> closeBox id
 
 
-keyBoxToBox id { name, salt, hashSalt, encryptedShares } boxes =
+numItterations : Int
+numItterations =
+    -- LastPass uses only 5000, so lets use 10x of that.
+    -- (https://helpdesk.lastpass.com/account-settings/general/password-iterations-pbkdf2/)
+    -- With my phone this is still unnoticeable. With a slower phone it might be a bit too high..
+    50000
+
+
+keyBoxToBox id { name, salt, hashSalt, encryptedShares, itterations } boxes =
     { id = id
     , name = TimestampedVersionRegister.get name
     , hasShares = ORDict.keys encryptedShares
     , isOpen = Dict.member id boxes.openBoxes
     , salt = salt
     , hashSalt = hashSalt
+    , itterations = itterations
     }
 
 
@@ -381,6 +394,7 @@ createBox { creatorId, name, key, salt, passwordHash, hashSalt } time boxes =
                 , encryptedShares = ORDict.init seed
                 , passwordHash = passwordHash
                 , hashSalt = hashSalt
+                , itterations = numItterations
                 }
                 boxes.data
         , seed = seed
@@ -421,6 +435,7 @@ encodeBox box =
         , ( "name", TimestampedVersionRegister.encode JE.string box.name )
         , ( "hashSalt", JE.string box.hashSalt )
         , ( "passwordHash", JE.string box.passwordHash )
+        , ( "itterations", JE.int box.itterations )
 
         -- , ( "hashAlgorithm", JE.string box.hashAlgorithm )
         ]
@@ -441,7 +456,7 @@ decoder seed =
 boxDecoder : Seed -> Decoder KeyBox
 boxDecoder seed =
     decode
-        (\encS s pwh n hs -> { encryptedShares = encS, salt = s, name = n, passwordHash = pwh, hashSalt = hs })
+        (\encS s pwh n hs it -> { encryptedShares = encS, salt = s, name = n, passwordHash = pwh, hashSalt = hs, itterations = it })
         |> required "encryptedShares"
             (ORDict.decoder2 groupIdDecoder
                 (TimestampedVersionRegister.decoder SecretSharing.encryptedShareDecoder)
@@ -452,6 +467,9 @@ boxDecoder seed =
         -- |> required "hashAlgorithm" JD.string
         |> required "name" (TimestampedVersionRegister.decoder JD.string)
         |> required "hashSalt" JD.string
+        -- In a very early version, the itterations were not stored yet and accidentally set to only 100,
+        -- so this is the defualt.
+        |> optional "itterations" JD.int 100
 
 
 keyBoxIdDecoder : Decoder KeyBoxId

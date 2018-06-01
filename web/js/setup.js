@@ -212,7 +212,7 @@ const importKeys = (keys) => {
 };
 
 
-const hashPassword = (pw, salt) => {
+const hashPassword = (pw, salt, itterations) => {
     const encodedPw = stringToUint(pw);
     const saltBuffer = stringToUint(salt);
     return window.crypto.subtle.importKey(
@@ -221,7 +221,7 @@ const hashPassword = (pw, salt) => {
         return window.crypto.subtle.deriveKey({
                 "name": 'PBKDF2', "salt": saltBuffer,
                 // TODO: how high do we go? Think about mobile...
-                "iterations": 100,
+                "iterations": itterations,
                 "hash": 'SHA-256'
             }, key,
             // For this we don't actually need a cipher suite,
@@ -504,27 +504,35 @@ const setup = (startFn, onStart, onError) => {
         });
 
 
-        // port hashPwFirst : { password : String, name : String } -> Cmd msg
+        // port hashPwFirst : { password : String, name : String, itterations : Int } -> Cmd msg
         // port didHashPwFirst : ({ name : String, key : String, salt : String, passwordHash : String, hashSalt : String } -> msg) -> Sub msg
         app.ports.hashPwFirst.subscribe((msg) => {
             const salt = uintToString(getRandomUints(8));
             const hashSalt = uintToString(getRandomUints(8));
-            Promise.all([hashPassword(msg.password, salt), hashPassword(msg.password, hashSalt)]).then(([key, passwordHash]) => {
+            Promise.all([hashPassword(msg.password, salt, msg.itterations), hashPassword(msg.password, hashSalt, msg.itterations)]).then(([key, passwordHash]) => {
                 app.ports.didHashPwFirst.send({
                     name: msg.name, key: key, salt: salt, passwordHash: passwordHash, hashSalt: hashSalt, time: Date.now()
                 });
             });
         });
 
-        // port openBox : { boxId : KeyBoxId, salt: String, hashSalt: String, password : String } -> Cmd msg
+        // port openBox : { boxId : KeyBoxId, salt: String, hashSalt: String, password : String, itterations : Int } -> Cmd msg
         // port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String, time : Time } -> msg) -> Sub msg
         app.ports.openBox.subscribe((msg) => {
+            // performance.mark("hashPw-start");
             // console.log("open box", msg);
-            Promise.all([hashPassword(msg.password, msg.salt), hashPassword(msg.password, msg.hashSalt)])
+            Promise.all([hashPassword(msg.password, msg.salt, msg.itterations), hashPassword(msg.password, msg.hashSalt, msg.itterations)])
                 .then(([key, passwordHash]) => {
                     app.ports.onDidOpenBox.send({
                         boxId: msg.boxId, key: key, passwordHash: passwordHash, time: Date.now()
                     });
+                    // performance.mark("hashPw-end");
+                    // performance.measure(
+                        // "hashPw",
+                        // "hashPw-start",
+                        // "hashPw-end"
+                    // );
+                    // console.log(performance.getEntriesByName("hashPw"));
                 }
             );
         });

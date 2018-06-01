@@ -432,7 +432,7 @@ update msg model =
                     |> andThenUpdate Api.syncToOthers
 
         OpenBox box pw ->
-            model |> withCmds [ Ports.openBox { boxId = box.id, password = pw, salt = box.salt, hashSalt = box.hashSalt } ]
+            model |> withCmds [ Ports.openBox { boxId = box.id, password = pw, salt = box.salt, hashSalt = box.hashSalt, itterations = box.itterations } ]
 
         DoOpenBox { boxId, key, passwordHash, time } ->
             let

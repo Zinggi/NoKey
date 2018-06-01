@@ -144,13 +144,13 @@ port onDidDecryptRequestedShares : (DidDecryptRequestedSharesT -> msg) -> Sub ms
 -- KeyBoxes
 
 
-port hashPwFirst : { password : String, name : String } -> Cmd msg
+port hashPwFirst : { password : String, name : String, itterations : Int } -> Cmd msg
 
 
 port didHashPwFirst : ({ name : String, key : String, salt : String, passwordHash : String, hashSalt : String, time : Time } -> msg) -> Sub msg
 
 
-port openBox : { boxId : KeyBoxId, salt : String, hashSalt : String, password : String } -> Cmd msg
+port openBox : { boxId : KeyBoxId, salt : String, hashSalt : String, password : String, itterations : Int } -> Cmd msg
 
 
 port onDidOpenBox : ({ boxId : KeyBoxId, key : String, passwordHash : String, time : Time } -> msg) -> Sub msg
