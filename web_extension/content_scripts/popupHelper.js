@@ -32,7 +32,7 @@ const createCloseButton = (div) => {
 
 
     c.setAttribute("role", "button");
-    c.setAttribute("title", "Close popup and keep it closed for 20 seconds.")
+    c.setAttribute("title", "Close popup and keep it closed for 20 seconds.");
     c.addEventListener("click", () => {
         window.parent.postMessage({ type: "onCloseClicked" }, "*");
     });

@@ -200,14 +200,19 @@ const showContainer = (elem, popupContainer, isPw, isSignUp, accounts) => {
         }
     };
     const elementToShow = selectElement();
+    let didShow = false;
     for (let child of popupContainer.children) {
         if (elementToShow === child.myId) {
             child.style.display = '';
-            popupContainer.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
+            didShow = true;
         } else {
             child.style.display = 'none';
-            popupContainer.style.boxShadow = "";
         }
+    }
+    if (!didShow) {
+        popupContainer.style.boxShadow = "";
+    } else {
+        popupContainer.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
     }
 
     currentInput = elem;
