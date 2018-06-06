@@ -6,7 +6,25 @@ Instead, you can unlock your passwords by confirming from another device.
 E.g. if you need a password on your PC, you only have to confirm this on your phone.
 No need to remember any passwords!
 
-[nokey.xyz](https://nokey.xyz/)
+## Install
+**Don't use multiple clients on the same device!**
+
+### Android
+
+[Play Store](https://play.google.com/store/apps/details?id=xyz.nokey.nokey)  
+*F-Droid is planned*
+
+### Chrome Extension
+
+[Chrome Web Store](https://chrome.google.com/webstore/detail/nokey/jfgokfcaagmicdnbebhfccjkbjkdbnjc)
+
+### Firefox Extension
+
+[AMO](https://addons.mozilla.org/en-US/firefox/addon/nokey/)
+
+---
+
+If none of these options work for you, you can try the [web app](https://nokey.xyz/main.html). For Safari, there is currently no option that works. 
 
 
 ## How does it work?
