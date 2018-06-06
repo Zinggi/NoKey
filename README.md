@@ -11,7 +11,7 @@ No need to remember any passwords!
 
 ### Android
 
-[Play store](https://play.google.com/store/apps/details?id=xyz.nokey.nokey)  
+[Play Store](https://play.google.com/store/apps/details?id=xyz.nokey.nokey)  
 *F-Droid is planned*
 
 ### Chrome Extension
