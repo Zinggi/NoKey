@@ -6,51 +6,7 @@
   E.g. if you need a password on your PC, you only have to confirm this on your phone.
   No need to remember any passwords!
 </p>
-
-<h3>How does it work?</h3>
-<p>
-Your passwords are encrypted using a strong, randomly generated password, here called group password.
-This group password is never stored anywhere directly. Instead, NoKey uses <a href="https://en.wikipedia.org/wiki/Shamir's_Secret_Sharing">Shamir's Secret Sharing</a>
-to split the group password into multiple shares (called keys in NoKey).
-When you confirm you want to unlock a group on another device, the device sends its key to the one that requested it.
-Then, if enough keys have been collected, the requester can recover the group password and with that decrypt your stored passwords.
-</p>
-<p>
-  For a more in depth explanation, you can check out the project report (coming soon).
-</p>
-<h3>Try the beta version</h3>
-<p>
-  You can try out NoKey right now, but there might still be some issues.
-</p>
-<p>
-  You can report issues <a href="https://github.com/Zinggi/NoKey/issues">here on GitHub</a>.
-</p>
-<p>
-  <b>Don't use multiple clients on the same device!</b>
-<p/>
-<div class="row">
-  <div class="col-lg-4">
-    <h4>Android</h4>
-    <p>
-      Download the .apk here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.3/nokey-0.3-android.apk">Android</a>
-    </p>
-  </div>
-  <div class="col-lg-4">
-    <h4>Chrome Extension</h4>
-    <p>
-      Install from here: <a target="_blank" rel="noopener" href="https://chrome.google.com/webstore/detail/nokey/jfgokfcaagmicdnbebhfccjkbjkdbnjc">Chrome Extension</a>
-    </p>
-  </div>
-  <div class="col-lg-4">
-    <h4>Firefox Extension</h4>
-    <p>
-      Download it here: <a href="https://github.com/Zinggi/NoKey/releases/download/0.4.0/nokey-0.4.0-firefox.xpi">Firefox Extension</a>
-    </p>
-  </div>
-</div>
-
-<p>
-  If none of these options work for you, you can try the <a href="<%= page_path(@conn, :webApp) %>">web app</a>.
-  For Safari, there is currently no option that works.
+<p class="lead">
+  Download and more at: <a href="https://github.com/Zinggi/NoKey/">github.com/Zinggi/NoKey/</a>.
 </p>
 
