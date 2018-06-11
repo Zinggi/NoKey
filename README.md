@@ -35,7 +35,7 @@ to split the group password into multiple shares (called keys in NoKey).
 When you confirm you want to unlock a group on another device, the device sends its key to the one that requested it.
 Then, if enough keys have been collected, the requester can recover the group password and with that decrypt your stored passwords.
 
-For a more in depth explanation, you can check out the project report (**coming soon**).
+For a more in depth explanation, you can check out the [project report](https://github.com/Zinggi/NoKey/releases/download/0.4.0-docs/Report.pdf).
 
 
 ## FAQ
