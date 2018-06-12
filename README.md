@@ -41,29 +41,29 @@ For a more in depth explanation, you can check out the [project report](https://
 ## FAQ
 
 #### Can your server read my passwords?
-**No**, this is impossible. The server only forwards messages sent between devices.
+> **No**, this is impossible. The server only forwards messages sent between devices.
 Passwords are never stored or transmitted in the clear, they always stay fully encrypted.
 The only way to decrypt them is by collecting enough keys for a password group.
 These keys never leave a device in the clear, they are always encrypted with the public key of the receiver,
 such that only that device is able to read them.
 
-So all the server could do is observe how encrypted passwords and encrypted keys are exchanged, but there is no way to get to those passwords.
+> So all the server could do is observe how encrypted passwords and encrypted keys are exchanged, but there is no way to get to those passwords.
 
 #### What about privacy, what information does your server collect?
-**Nothing**. The server doesn't store any information, it doesn't even have a database.
+> **Nothing**. The server doesn't store any information, it doesn't even have a database.
 The source code of the server is [here](/server)
 
 #### Ok, but I don't trust you to actually run the same code as available here. What could a malicous server do?
-A malicous server could record every exchanged message.
+> A malicous server could record every exchanged message.
 But, it still woudn't be able to collect any passwords.
 It also couldn't alter any of the messages sent between devices, as each message is authenticated and integrity protected.
 
-However, it could read saved usernames and corresponding sites and this way create some sort of user profile.
+> However, it could read saved usernames and corresponding sites and this way create some sort of user profile.
 
-So, if you really don't trust my server, you're welcome to host it yourself.
+> So, if you really don't trust my server, you're welcome to host it yourself.
 
 #### What do the device icons mean? Can I change them?
-See https://github.com/Zinggi/NoKey/issues/27
+> See https://github.com/Zinggi/NoKey/issues/27
 
 
 ## Source code organization
