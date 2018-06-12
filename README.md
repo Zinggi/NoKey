@@ -62,6 +62,9 @@ However, it could read saved usernames and corresponding sites and this way crea
 
 So, if you really don't trust my server, you're welcome to host it yourself.
 
+#### What do the device icons mean? Can I change them?
+See https://github.com/Zinggi/NoKey/issues/27
+
 
 ## Source code organization
 
