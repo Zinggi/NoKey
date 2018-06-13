@@ -1,4 +1,4 @@
-# NoKey
+![NoKey](https://raw.githubusercontent.com/Zinggi/NoKey/master/web/staticFiles/imgs/logo.svg?sanitize=true)
 
 NoKey is a distributed password manager that works without a master password.
 
