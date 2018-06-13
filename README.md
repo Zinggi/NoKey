@@ -24,7 +24,8 @@ No need to remember any passwords!
 
 ---
 
-If none of these options work for you, you can try the [web app](https://nokey.xyz/main.html). For Safari, there is currently no option that works ([it seems to be missing a few things from the Web Crypto API](https://github.com/Zinggi/NoKey/issues/9)). 
+If none of these options work for you, you can try the [web app](https://nokey.xyz/main.html).    
+For Safari, there is currently no option that works ([it seems to be missing a few things from the Web Crypto API](https://github.com/Zinggi/NoKey/issues/9)). 
 
 
 ## How does it work?
@@ -60,10 +61,19 @@ It also couldn't alter any of the messages sent between devices, as each message
 
 > However, it could read saved usernames and corresponding sites and this way create some sort of user profile.
 
-> So, if you really don't trust my server, you're welcome to host it yourself.
+> So, if you really don't trust my server, you're welcome to [host it yourself](https://github.com/Zinggi/NoKey/issues/28#issuecomment-396875079).
 
 #### What do the device icons mean? Can I change them?
 > See https://github.com/Zinggi/NoKey/issues/27
+
+#### How exactely are passwords propagated and stored?
+> See https://github.com/Zinggi/NoKey/issues/28#issuecomment-396868982
+
+#### What data exactely flows through the server?
+> See https://github.com/Zinggi/NoKey/issues/28#issuecomment-396872038
+
+#### What crypto keys does NoKey handle and how are they handled?
+> See https://github.com/Zinggi/NoKey/issues/28#issuecomment-396865465
 
 
 ## Source code organization
