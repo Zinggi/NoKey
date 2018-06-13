@@ -24,7 +24,7 @@ No need to remember any passwords!
 
 ---
 
-If none of these options work for you, you can try the [web app](https://nokey.xyz/main.html). For Safari, there is currently no option that works (it seems to be missing a few things from the Web Crypto API). 
+If none of these options work for you, you can try the [web app](https://nokey.xyz/main.html). For Safari, there is currently no option that works ([it seems to be missing a few things from the Web Crypto API](https://github.com/Zinggi/NoKey/issues/9)). 
 
 
 ## How does it work?
