@@ -1,19 +1,15 @@
+var _user$project$Native_PortUtils = (function() {
 
-const _user$project$Native_PortUtils = function() {
-
-    const toJs = (val) => {
+    var toJs = function(val) {
         return val;
     };
 
-    const fromJs = (val) => {
+    var fromJs = function(val) {
         return val;
     };
-
-
 
     return {
-            toJs: toJs,
-            fromJs: fromJs
+        toJs: toJs,
+        fromJs: fromJs
     };
-
-}();
+})();
