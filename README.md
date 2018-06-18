@@ -1,10 +1,14 @@
-# NoKey
+![NoKey](https://raw.githubusercontent.com/Zinggi/NoKey/master/web/staticFiles/imgs/logo.svg?sanitize=true)
 
 NoKey is a distributed password manager that works without a master password.
 
 Instead, you can unlock your passwords by confirming from another device.
 E.g. if you need a password on your PC, you only have to confirm this on your phone.
 No need to remember any passwords!
+
+## Screenshots
+[![screenshot](https://i.imgur.com/2RVudMw.png)](https://imgur.com/a/sL2jkPu)
+(click the image for more)
 
 ## Install
 **Don't use multiple clients on the same device!**
