@@ -34,11 +34,11 @@ For Safari, there is currently no option that works ([it seems to be missing a f
 
 ## How does it work?
 
-Your passwords are encrypted using a strong, randomly generated password, here called group password.
-This group password is never stored anywhere directly. Instead, NoKey uses [Shamir's Secret Sharing](https://en.wikipedia.org/wiki/Shamir's_Secret_Sharing)
-to split the group password into multiple shares (called keys in NoKey).
+Your passwords are encrypted using [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) with a randomly generated key, here called group key.
+This group key is never stored anywhere directly. Instead, NoKey uses [Shamir's Secret Sharing](https://en.wikipedia.org/wiki/Shamir's_Secret_Sharing)
+to split the group key into multiple key shares.
 When you confirm you want to unlock a group on another device, the device sends its key to the one that requested it.
-Then, if enough keys have been collected, the requester can recover the group password and with that decrypt your stored passwords.
+Then, if enough keys have been collected, the requester can recover the group key and with that decrypt your stored passwords.
 
 For a more in depth explanation, you can check out the [project report](https://github.com/Zinggi/NoKey/releases/download/0.4.0-docs/Report.pdf).
 
