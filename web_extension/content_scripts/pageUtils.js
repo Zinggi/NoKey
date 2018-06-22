@@ -191,12 +191,17 @@ const openPopup = (elem, isPw, isSignUp, accounts) => {
 
 const showContainer = (elem, popupContainer, isPw, isSignUp, accounts) => {
     popupContainer.style.display = '';
+    popupContainer.style.position = "absolute";
+    popupContainer.style.right = "";
+    popupContainer.style.width = "";
+    popupContainer.style.height = "";
+    popupContainer.classList.remove("fade-in-no-key");
 
     const selectElement = () => {
         if (isSignUp && isPw) {
-            return "newPassword";
+            return "content_scripts/newPassword";
         } else if (!isSignUp && accounts.length > 0) {
-            return "fillForm";
+            return "content_scripts/fillForm";
         }
     };
     const elementToShow = selectElement();
@@ -248,16 +253,16 @@ const makeContainer = () => {
     container.style.left = "-5000px";
     container.style.top = "-5000px";
 
-    const elmNodes = ["fillForm", "newPassword"].map((f) => {
+    const elmNodes = [["content_scripts/fillForm", ""], ["content_scripts/newPassword", ""], ["popup/main", "?popup=true"]].map((f) => {
         const iframe = document.createElement('iframe');
-        iframe.src = browser.extension.getURL("content_scripts/"+f+".html");
+        iframe.src = browser.extension.getURL(f[0]+".html"+f[1]);
         iframe.frameBorder = 0;
         iframe.style.width = "100%";
         iframe.style.height = "100%";
 
         container.appendChild(iframe);
 
-        iframe.myId = f;
+        iframe.myId = f[0];
 
         return iframe;
     });
@@ -272,6 +277,26 @@ const makeContainer = () => {
 
     // return iframe;
     return [container, elmNodes];
+};
+
+const openMainPopup = () => {
+    popupContainer.style.display = '';
+    setTimeout(() => { actionOutsidePopup.listen(true); }, 5000);
+    popupContainer.style.top = "30px";
+    popupContainer.style.right = "30px";
+    popupContainer.style.left = "";
+    popupContainer.style.width = "600px";
+    popupContainer.style.height = "400px";
+    popupContainer.style.position = "fixed";
+    popupContainer.classList.add("fade-in-no-key");
+    for (let child of popupContainer.children) {
+        if ("popup/main" === child.myId) {
+            child.style.display = '';
+        } else {
+            child.style.display = 'none';
+        }
+    }
+    popupContainer.style.boxShadow = "rgba(0, 0, 0, 0.48) 0px 0px 3px 2px";
 };
 
 const getCurrentSite = () => {
@@ -332,9 +357,16 @@ const onWindowLoad = () => {
                 popupLoaded = true;
                 let [container, elmNodes] = makeContainer();
                 popupContainer = container;
-                actionOutsidePopup = new ActionOutside(popupContainer, closePopup);
+                actionOutsidePopup = new ActionOutside(popupContainer, () => {
+                    postMsg({type: "closePopup"});
+                    closePopup();
+                });
                 document.body.appendChild(popupContainer);
             }
+        } else if (msg.type == "openMainPopup") {
+            openMainPopup();
+        } else if (msg.type == "closePopup") {
+            closePopup();
         }
     });
     postMsg({type: "getAccountsForSite", data: getCurrentSite()});

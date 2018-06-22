@@ -1,0 +1,15 @@
+@keyframes fadeInNoKey {
+    from {
+        opacity: 0;
+    } to {
+        opacity: 1;
+    }
+}
+
+.fade-in-no-key {
+    opacity: 0;
+    animation: fadeInNoKey ease-in 1;
+    animation-fill-mode: forwards;
+    animation-duration: 0.5s;
+    animation-delay: 0.3s;
+}

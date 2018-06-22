@@ -51,6 +51,7 @@ module.exports = (env, argv) => ({
             { from: './manifest.json' },
             { from: './icons', to: 'icons/' },
             { from: './popup/main.html', to: 'popup/' },
+            { from: './css', to: 'css/' },
             { from: './content_scripts/*.html' },
             { from: './node_modules/webextension-polyfill/dist/browser-polyfill.min.js', to: 'dist/webextensionPolyfill.js' },
             { from: './../web/styles.css', to: 'dist/styles.css' }

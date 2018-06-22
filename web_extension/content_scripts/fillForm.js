@@ -3,7 +3,7 @@ import setup from '../../web/js/setup.js';
 import setupElm from './popupHelper.js';
 
 const main = () => {
-    const [port, div] = setupElm("fillForm");
+    const [port, div] = setupElm("content_scripts/fillForm");
 
     const app = Elm.FillLogin.embed(div);
     port.onMessage.addListener((msg) => {

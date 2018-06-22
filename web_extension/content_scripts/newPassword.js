@@ -4,7 +4,7 @@ import setupElm from './popupHelper.js';
 
 
 const main = () => {
-    const [port, div] = setupElm("newPassword");
+    const [port, div] = setupElm("content_scripts/newPassword");
 
     const rands = setup.getRandomInts(9);
     const flags = {

@@ -38,7 +38,8 @@
   "web_accessible_resources": [
       "icons/logo.svg",
       "content_scripts/newPassword.html",
-      "content_scripts/fillForm.html"
+      "content_scripts/fillForm.html",
+      "popup/main.html"
   ],
 
   "background": {
@@ -49,12 +50,13 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": ["dist/webextensionPolyfill.js", "content/bundle.js"],
+      "css": ["css/content.css"],
       "run_at": "document_end",
       "all_frames": true
     }
   ],
 
-  "content_security_policy":            "script-src 'self'; object-src 'self';",
+  "content_security_policy":            "script-src 'self' 'unsafe-eval'; object-src 'self';",
   "content_security_policy_RELEASE":    "script-src 'self'; object-src 'self';",
   "content_security_policy_DEBUG":      "script-src 'self' 'unsafe-eval'; object-src 'self';"
 }

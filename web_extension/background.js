@@ -16,27 +16,32 @@ const sendMsgToAll = (msg, ports) => {
 };
 
 
+const openPopup = (state) => {
+    sendMsgToAll({
+        type: "openMainPopup"
+    }, state.ports);
+};
+
 // console.log(Elm.MainBackground);
 setup(Elm.MainBackground.fullscreen, (app) => {
     // console.log("(background) started", app);
 
     // ports are stored in this object
-    let ports = {};
-    let lastPort = null;
-    let hasPopupOpen = false;
-    let previousNotificationsCount = 0;
+    let state = {};
+    state.ports = {};
+    state.hasPopupOpen = false;
+    state.previousNotificationsCount = 0;
 
     // TODO: this is a very primitive way to check if we are running on firefox.
     // It stops working as soon as chrome adds this api too
     const isFirefox = (browser.contentScripts && browser.contentScripts.register) ? true : false;
     // console.log("Is Firefox:", isFirefox);
 
-    chrome.runtime.onConnect.addListener(function(port) {
+    browser.runtime.onConnect.addListener((port) => {
         // console.log("(background) port connected", port.name);
-        ports[port.name] = port;
-        lastPort = port.name;
+        state.ports[port.name] = port;
 
-        port.onMessage.addListener(function(msg) {
+        port.onMessage.addListener((msg) => {
             if (msg.type === "onStateRequest") {
                 // console.log("(background) onStateRequest from " + port.name);
                 app.ports.onStateRequest.send(msg.data);
@@ -48,30 +53,41 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             } else if (msg.type === "didSubmit") {
                 // console.log("didSubmit", msg.data);
                 app.ports.onAddSiteEntry.send(msg.data);
+            } else if (msg.type === "closePopup") {
+                state.hasPopupOpen = false;
+                sendMsgToAll({ type: "closePopup" }, state.ports);
             }
         });
         port.onDisconnect.addListener(() => {
             // console.log("(background) port.onDisconnect " + port.name);
-            delete ports[port.name];
+            delete state.ports[port.name];
         });
+    });
+    browser.tabs.onUpdated.addListener((tabId, info) => {
+        if (info.status === 'complete' && state.hasPopupOpen) {
+            openPopup(state);
+            setTimeout(() => { openPopup(state); }, 500);
+            setTimeout(() => { openPopup(state); }, 1000);
+        }
     });
 
     app.ports.accountsForSite.subscribe((accounts) => {
         sendMsgToAll({
             type: "onGetAccountsForSite",
             data: accounts
-        }, ports);
+        }, state.ports);
     });
 
     // fillForm : { login : String, site : String, password : String } -> Cmd msg
     app.ports.fillForm.subscribe((msg) => {
         // console.log("fill form:", msg);
-        sendMsgToAll({ type: "fillForm", data: msg }, ports);
+        sendMsgToAll({ type: "fillForm", data: msg }, state.ports);
     });
 
     // close all popups
     app.ports.closePopup.subscribe((msg) => {
-        sendMsgToAll({ type: "closePopup" }, ports);
+        sendMsgToAll({ type: "closePopup" }, state.ports);
+        state.hasPopupOpen = false;
     });
 
     app.ports.notificationCount.subscribe((count) => {
@@ -82,49 +98,26 @@ setup(Elm.MainBackground.fullscreen, (app) => {
             // this is the tooltip
             browser.browserAction.setTitle({title: "NoKey: User interaction required"});
 
-            if (hasPopupOpen || count <= previousNotificationsCount ) {
-                previousNotificationsCount = count;
+            if (state.hasPopupOpen || count <= state.previousNotificationsCount ) {
+                state.previousNotificationsCount = count;
                 return;
+            } else {
+                openPopup(state);
+                state.hasPopupOpen = true;
             }
-            hasPopupOpen = true;
-            const popupUrl = browser.extension.getURL("popup/main.html");
-            browser.windows.create({
-                url: popupUrl+"?popup=true",
-                width: 601,
-                height: 401,
-                type: 'popup'
-            }).then((win) => {
-                // TODO: This is a workaround for this firefox bug:
-                // https://discourse.mozilla.org/t/ff57-browser-windows-create-displays-blank-panel-detached-panel-popup/23644/5
-                // This can hopefully be removed at some point
-                browser.windows.update(win.id, { width: 600, height: 400 });
-
-                browser.windows.onRemoved.addListener((id) => {
-                    // console.log("on remove window");
-                    if (id == win.id) {
-                        hasPopupOpen = false;
-                        // console.log("close popup window");
-                    }
-                });
-            }, (err) => {
-                console.error("creating window failed!", err);
-            });
         } else {
             browser.browserAction.setBadgeText({text: ""});
             browser.browserAction.setTitle({title: "NoKey"});
-            if (hasPopupOpen) {
-
-            }
         }
-        previousNotificationsCount = count;
+        state.previousNotificationsCount = count;
     });
 
-    app.ports.sendOutNewState.subscribe((state) => {
-        sendMsgToAll({ type: "onNewState", data: state }, ports);
-        // console.log("(background) want to sendOutNewState", state);
+    app.ports.sendOutNewState.subscribe((data) => {
+        sendMsgToAll({ type: "onNewState", data: data }, state.ports);
+        // console.log("(background) want to sendOutNewState", data);
     });
 
-    app.ports.openExtensionInTab.subscribe((state) => {
+    app.ports.openExtensionInTab.subscribe((msg) => {
         const popupUrl = browser.extension.getURL("popup/main.html");
         browser.tabs.create({
             url: popupUrl+"?tab=true"
