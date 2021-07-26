@@ -1,0 +1,10 @@
+.elixir_ls
+.git
+android/
+server/_build
+server/deps
+server/assets/node_modules
+web/dist
+web/node_modules
+web/elm-stuff
+web_extension/
