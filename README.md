@@ -6,6 +6,13 @@ Instead, you can unlock your passwords by confirming from another device.
 E.g. if you need a password on your PC, you only have to confirm this on your phone.
 No need to remember any passwords!
 
+## No active development!
+
+**NoKey is not actively developed anymore. I'm not adding any new features and won't be maintaining the apps on the different stores if Google ever decides to remove it for some reason.**
+
+**I'll keep the server running and the web app alive for users that are still using it. (Including me :smile:)**  
+I have no idea how many users there are, the server doesn't store anything..
+
 ## Screenshots
 [![screenshot](https://i.imgur.com/2RVudMw.png)](https://imgur.com/a/sL2jkPu)
 (click the image for more)
@@ -16,7 +23,6 @@ No need to remember any passwords!
 ### Android
 
 [Play Store](https://play.google.com/store/apps/details?id=xyz.nokey.nokey)  
-*F-Droid is planned*
 
 ### Chrome Extension
 
