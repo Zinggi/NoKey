@@ -14,12 +14,12 @@
 
 * watch files:
     `yarn watch`
-    `web-ext run -s addon/` ([web-ext](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Getting_started_with_web-ext))
+    `web-ext run -s addon/` ([web-ext](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Getting_started_with_web-ext))
 
 * build files:
     `yarn build`
 
-https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Debugging
+https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Debugging
 
 
 ## create a package
